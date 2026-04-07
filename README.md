@@ -1,6 +1,6 @@
 # Ekstremedia Laravel Starter Kit
 
-Opinionated Laravel starter kit for new product work. It ships with the baseline stack and repeated setup already done: Inertia SPA mode, Vue 3 + TypeScript, Tailwind CSS v4, PrimeVue v4, Pest, Docker, Spatie roles/permissions, localization, dark mode, shared user settings, and a polished auth flow.
+Opinionated Laravel starter kit for new product work. It ships with the baseline stack and repeated setup already done: Inertia SPA mode, Vue 3 + TypeScript, Tailwind CSS v4, PrimeVue v4, Laravel Reverb, Pest, Docker, Spatie roles/permissions, localization, dark mode, shared user settings, and a polished auth flow.
 
 ## Included
 
@@ -15,6 +15,7 @@ Opinionated Laravel starter kit for new product work. It ships with the baseline
 - English and Norwegian translations
 - Local-only easy login for development
 - Docker app stack with Nginx, PHP-FPM, Vite, PostgreSQL, Redis, and Mailpit
+- Laravel Reverb websocket server running inside the app container
 
 ## New Project Flow
 
@@ -47,7 +48,8 @@ Point your chosen hostname from `.env` to the container IP in `/etc/hosts`, for 
 ### 5. Visit the app
 
 - App: value from `APP_URL`
-- Mailpit: `http://localhost:8026`
+- Mailpit: `http://localhost:${MAILPIT_HOST_PORT:-8126}`
+- Reverb: `ws://<your-app-host>:8080`
 
 ## Seeded Admin
 
@@ -81,6 +83,7 @@ make tinker             # Open Laravel Tinker
 make db-shell           # Open PostgreSQL shell
 make logs               # Tail app logs
 make logs-all           # Tail all container logs
+make reverb-restart     # Restart the Reverb websocket server
 
 make pint               # Run Laravel Pint
 make cache-clear        # Clear Laravel caches
@@ -91,7 +94,7 @@ make npm-build          # Build frontend assets
 
 ## Testing
 
-Tests use [`.env.testing`](./.env.testing) plus forced `phpunit.xml` environment overrides so Docker-exported env vars cannot leak into the test environment.
+Tests use [`.env.testing`](./.env.testing) plus forced `phpunit.xml` environment overrides so Docker-exported env vars cannot leak into the test environment. The test environment keeps broadcasting disabled, so Reverb is not required for PHP test runs.
 
 These should both pass:
 
