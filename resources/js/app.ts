@@ -8,7 +8,7 @@ import PrimeVue from 'primevue/config';
 import Aura from '@primevue/themes/aura';
 import { i18n } from '@/i18n';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Ekstremedia Laravel Starter Kit';
+const appName = import.meta.env.VITE_APP_NAME || 'Laravel Starter Kit';
 
 createInertiaApp({
     title: (title) => title ? `${title} - ${appName}` : appName,

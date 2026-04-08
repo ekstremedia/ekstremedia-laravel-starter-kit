@@ -1,4 +1,4 @@
-# Ekstremedia Laravel Starter Kit
+# Laravel Starter Kit
 
 An opinionated starter repository for new Laravel products. The goal is to avoid redoing the same baseline setup on every project while still keeping the code generic and easy to reshape for a real domain.
 

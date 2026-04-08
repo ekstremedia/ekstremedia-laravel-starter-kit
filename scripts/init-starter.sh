@@ -39,7 +39,7 @@ set_env() {
     ' "$ENV_FILE" "$key" "$value"
 }
 
-app_name="$(prompt "App name" "Ekstremedia Laravel Starter Kit")"
+app_name="$(prompt "App name" "Laravel Starter Kit")"
 app_url="$(prompt "App URL" "http://starter-kit.test")"
 db_database="$(prompt "Database name" "starter")"
 db_username="$(prompt "Database username" "starter")"

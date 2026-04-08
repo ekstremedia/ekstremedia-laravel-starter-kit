@@ -1,4 +1,4 @@
-# Ekstremedia Laravel Starter Kit
+# Laravel Starter Kit
 
 Opinionated Laravel starter kit for new product work. It ships with the baseline stack and repeated setup already done: Inertia SPA mode, Vue 3 + TypeScript, Tailwind CSS v4, PrimeVue v4, Laravel Reverb, Pest, Docker, Spatie roles/permissions, localization, dark mode, shared user settings, and a polished auth flow.
 
@@ -110,4 +110,4 @@ docker compose exec app php artisan test
 - Add your first domain models and pages
 - Update branding and favicon
 - Tighten the auth flow if your product needs invitations, teams, or social login
-# ekstremedia-laravel-starter-kit
+# laravel-starter-kit

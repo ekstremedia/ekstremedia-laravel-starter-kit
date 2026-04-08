@@ -1,6 +1,6 @@
 {
     "$schema": "https://www.schemastore.org/package.json",
-    "name": "ekstremedia-laravel-starter-kit",
+    "name": "laravel-starter-kit",
     "private": true,
     "type": "module",
     "scripts": {
