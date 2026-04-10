@@ -94,10 +94,12 @@ After login, verified users land on `/dashboard` (account overview cards) and ca
 `RoleAndPermissionSeeder` creates three roles:
 
 - **Admin** — full access (all permissions)
-- **Editor** — `view dashboard`, `manage content`, `manage settings`, `manage profile`
-- **User** — `view dashboard`, `manage profile`
+- **Editor** — `view dashboard`, `manage resources`, `manage settings`, `manage profile`
+- **User** — `view dashboard`, `manage settings`, `manage profile`
 
-`DatabaseSeeder` creates the configured admin (from `STARTER_ADMIN_*` env vars) plus a small demo set of editors and users. Roles and permissions are shared as Inertia props on `auth.user.roles` / `auth.user.permissions`.
+> **Note:** Permission names like `manage resources` are example placeholders. Rename or replace them to match your domain before shipping.
+
+`DatabaseSeeder` creates the configured admin (from `STARTER_ADMIN_*` env vars) plus a small demo set of editors and users (only when `SEED_DEMO_USERS=true`). Roles and permissions are shared as Inertia props on `auth.user.roles` / `auth.user.permissions`.
 
 ## Commands
 
@@ -147,4 +149,3 @@ docker compose exec app php artisan test
 - Add your first domain models and pages
 - Update branding and favicon
 - Tighten the auth flow if your product needs invitations, teams, or social login
-# laravel-starter-kit

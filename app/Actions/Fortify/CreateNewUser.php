@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
+use Spatie\Permission\Exceptions\RoleDoesNotExist;
 
 class CreateNewUser implements CreatesNewUsers
 {
@@ -33,7 +34,11 @@ class CreateNewUser implements CreatesNewUsers
             'password' => $input['password'],
         ]);
 
-        $user->assignRole('User');
+        try {
+            $user->assignRole('User');
+        } catch (RoleDoesNotExist) {
+            // 'User' role has not been seeded yet; the account is created without a role.
+        }
 
         return $user;
     }

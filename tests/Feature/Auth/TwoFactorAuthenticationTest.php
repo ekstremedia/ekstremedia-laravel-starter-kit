@@ -75,3 +75,29 @@ it('requires authentication to manage 2FA', function () {
     $this->postJson('/user/two-factor-authentication')
         ->assertUnauthorized();
 });
+
+it('requires password confirmation before enabling 2FA', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->postJson('/user/two-factor-authentication')
+        ->assertStatus(423);
+});
+
+it('rejects invalid TOTP code when confirming 2FA', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post('/user/confirm-password', ['password' => 'password']);
+
+    $this->actingAs($user)
+        ->postJson('/user/two-factor-authentication');
+
+    expect($user->fresh()->two_factor_confirmed_at)->toBeNull();
+
+    $this->actingAs($user)
+        ->postJson('/user/confirmed-two-factor-authentication', ['code' => '000000'])
+        ->assertUnprocessable();
+
+    expect($user->fresh()->two_factor_confirmed_at)->toBeNull();
+});

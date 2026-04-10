@@ -62,10 +62,10 @@ const appName = import.meta.env.VITE_APP_NAME || t('app.name');
                             </svg>
                         </div>
                         <h3 class="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
-                            {{ t('welcome.feature_medicine') }}
+                            {{ t('welcome.feature_roles') }}
                         </h3>
                         <p class="text-sm text-gray-500 dark:text-dark-400">
-                            {{ t('welcome.feature_medicine_desc') }}
+                            {{ t('welcome.feature_roles_desc') }}
                         </p>
                     </div>
 
@@ -77,10 +77,10 @@ const appName = import.meta.env.VITE_APP_NAME || t('app.name');
                             </svg>
                         </div>
                         <h3 class="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
-                            {{ t('welcome.feature_economy') }}
+                            {{ t('welcome.feature_settings') }}
                         </h3>
                         <p class="text-sm text-gray-500 dark:text-dark-400">
-                            {{ t('welcome.feature_economy_desc') }}
+                            {{ t('welcome.feature_settings_desc') }}
                         </p>
                     </div>
                 </div>

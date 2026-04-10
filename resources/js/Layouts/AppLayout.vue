@@ -21,7 +21,9 @@ function logout() {
 }
 
 function initials(u: { first_name: string; last_name: string }) {
-    return (u.first_name[0] + u.last_name[0]).toUpperCase();
+    const first = (u.first_name?.trim() ?? '')[0] ?? '';
+    const last = (u.last_name?.trim() ?? '')[0] ?? '';
+    return (first + last).toUpperCase();
 }
 </script>
 

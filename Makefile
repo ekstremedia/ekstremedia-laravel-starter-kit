@@ -6,8 +6,10 @@ endif
 APP_SERVICE ?= app
 DB_SERVICE ?= postgres
 
-# Build display URL: append port if not 80
-ifeq ($(APP_HOST_PORT),80)
+# Build display URL: append port only when set and not 80
+ifeq ($(APP_HOST_PORT),)
+DISPLAY_URL := $(APP_URL)
+else ifeq ($(APP_HOST_PORT),80)
 DISPLAY_URL := $(APP_URL)
 else
 DISPLAY_URL := $(APP_URL):$(APP_HOST_PORT)

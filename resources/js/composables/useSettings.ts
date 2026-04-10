@@ -77,6 +77,9 @@ export function useSettings() {
                 router.patch('/settings', payload, {
                     preserveState: true,
                     preserveScroll: true,
+                    onError: () => {
+                        Object.assign(pendingPatch, payload);
+                    },
                 });
             }, 600);
         }

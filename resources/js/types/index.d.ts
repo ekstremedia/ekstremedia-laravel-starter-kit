@@ -8,7 +8,7 @@ export interface User {
     last_name: string;
     email: string;
     email_verified_at?: string;
-    two_factor_confirmed_at?: string;
+    two_factor_enabled?: boolean;
     created_at?: string;
     full_name: string;
     roles?: string[];

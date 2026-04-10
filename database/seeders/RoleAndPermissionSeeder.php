@@ -16,7 +16,7 @@ class RoleAndPermissionSeeder extends Seeder
             'view dashboard',
             'manage users',
             'manage roles',
-            'manage content',
+            'manage resources',
             'manage settings',
             'manage profile',
         ];
@@ -31,7 +31,7 @@ class RoleAndPermissionSeeder extends Seeder
         $editorRole = Role::firstOrCreate(['name' => 'Editor']);
         $editorRole->givePermissionTo([
             'view dashboard',
-            'manage content',
+            'manage resources',
             'manage settings',
             'manage profile',
         ]);

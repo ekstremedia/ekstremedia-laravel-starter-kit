@@ -24,5 +24,6 @@ export function useFlashToast() {
                 toast.add({ severity: 'info', summary: 'Info', detail: flash.status, life: 4000 });
             }
         },
+        { immediate: true },
     );
 }

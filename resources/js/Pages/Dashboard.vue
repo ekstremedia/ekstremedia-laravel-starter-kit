@@ -6,7 +6,7 @@ import { gsap } from 'gsap';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import type { PageProps } from '@/types';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const page = usePage<PageProps>();
 const user = computed(() => page.props.auth.user!);
 
@@ -20,7 +20,7 @@ const roleBadgeClass = computed(() => {
         case 'Editor':
             return 'bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-400';
         default:
-            return 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400';
+            return 'bg-slate-100 text-slate-600 dark:bg-dark-800 dark:text-dark-400';
     }
 });
 
@@ -88,12 +88,12 @@ onMounted(() => {
                     </p>
                     <span
                         class="inline-flex items-center gap-1.5 text-sm font-medium"
-                        :class="user.two_factor_confirmed_at
+                        :class="user.two_factor_enabled
                             ? 'text-green-600 dark:text-green-400'
                             : 'text-gray-500 dark:text-dark-400'"
                     >
-                        <span class="w-2 h-2 rounded-full" :class="user.two_factor_confirmed_at ? 'bg-green-500' : 'bg-gray-400 dark:bg-dark-500'"></span>
-                        {{ user.two_factor_confirmed_at ? t('dashboard.enabled') : t('dashboard.disabled') }}
+                        <span class="w-2 h-2 rounded-full" :class="user.two_factor_enabled ? 'bg-green-500' : 'bg-gray-400 dark:bg-dark-500'"></span>
+                        {{ user.two_factor_enabled ? t('dashboard.enabled') : t('dashboard.disabled') }}
                     </span>
                 </div>
 
@@ -103,7 +103,7 @@ onMounted(() => {
                         {{ t('dashboard.member_since') }}
                     </p>
                     <p class="text-sm font-medium text-gray-900 dark:text-white">
-                        {{ user.created_at ? new Date(user.created_at).toLocaleDateString() : '—' }}
+                        {{ user.created_at ? new Date(user.created_at).toLocaleDateString(locale) : '—' }}
                     </p>
                 </div>
             </div>

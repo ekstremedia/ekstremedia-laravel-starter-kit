@@ -61,7 +61,7 @@ function updatePassword() {
 }
 
 // --- Two-Factor Auth ---
-const twoFactorEnabled = computed(() => !!user.value.two_factor_confirmed_at);
+const twoFactorEnabled = computed(() => !!user.value.two_factor_enabled);
 const enabling = ref(false);
 const confirming = ref(false);
 const qrCode = ref('');
@@ -71,44 +71,82 @@ const confirmError = ref('');
 const disabling = ref(false);
 const showRecovery = ref(false);
 
-async function confirmPassword() {
-    await window.fetch('/user/confirm-password', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content
-                ?? document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '',
-            'X-Requested-With': 'XMLHttpRequest',
-            Accept: 'application/json',
-        },
-        body: JSON.stringify({ password: '' }),
-    }).catch(() => {});
-}
+// Password confirmation state
+const showPasswordConfirm = ref(false);
+const confirmPasswordInput = ref('');
+const confirmPasswordError = ref('');
+let pendingAction: (() => Promise<void>) | null = null;
 
-async function enableTwoFactor() {
-    enabling.value = true;
+async function confirmPassword(password: string): Promise<boolean> {
     try {
-        // Enable 2FA
-        await fetch('/user/two-factor-authentication', {
+        const res = await window.fetch('/user/confirm-password', {
             method: 'POST',
             headers: {
-                'X-CSRF-TOKEN': getToken(),
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content
+                    ?? document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '',
                 'X-Requested-With': 'XMLHttpRequest',
                 Accept: 'application/json',
             },
+            body: JSON.stringify({ password }),
         });
-        // Get QR code
-        const qrRes = await fetch('/user/two-factor-qr-code', {
-            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-        });
-        const qrData = await qrRes.json();
-        qrCode.value = qrData.svg;
-        confirming.value = true;
+        return res.ok;
     } catch {
-        toast.add({ severity: 'error', detail: 'Failed to enable 2FA.', life: 4000 });
-    } finally {
-        enabling.value = false;
+        return false;
     }
+}
+
+async function requirePasswordConfirm(action: () => Promise<void>) {
+    pendingAction = action;
+    confirmPasswordInput.value = '';
+    confirmPasswordError.value = '';
+    showPasswordConfirm.value = true;
+}
+
+async function submitPasswordConfirm() {
+    confirmPasswordError.value = '';
+    const ok = await confirmPassword(confirmPasswordInput.value);
+    if (!ok) {
+        confirmPasswordError.value = t('profile.confirm_password_error');
+        return;
+    }
+    showPasswordConfirm.value = false;
+    confirmPasswordInput.value = '';
+    if (pendingAction) await pendingAction();
+    pendingAction = null;
+}
+
+function cancelPasswordConfirm() {
+    showPasswordConfirm.value = false;
+    confirmPasswordInput.value = '';
+    confirmPasswordError.value = '';
+    pendingAction = null;
+}
+
+async function enableTwoFactor() {
+    await requirePasswordConfirm(async () => {
+        enabling.value = true;
+        try {
+            await fetch('/user/two-factor-authentication', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': getToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                    Accept: 'application/json',
+                },
+            });
+            const qrRes = await fetch('/user/two-factor-qr-code', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+            });
+            const qrData = await qrRes.json();
+            qrCode.value = qrData.svg;
+            confirming.value = true;
+        } catch {
+            toast.add({ severity: 'error', detail: t('profile.failed_enable_2fa'), life: 4000 });
+        } finally {
+            enabling.value = false;
+        }
+    });
 }
 
 async function confirmTwoFactor() {
@@ -125,7 +163,7 @@ async function confirmTwoFactor() {
             body: JSON.stringify({ code: confirmCode.value }),
         });
         if (!res.ok) {
-            confirmError.value = 'Invalid code. Please try again.';
+            confirmError.value = t('profile.invalid_2fa_code');
             return;
         }
         confirming.value = false;
@@ -134,7 +172,7 @@ async function confirmTwoFactor() {
         showRecovery.value = true;
         router.reload({ only: ['auth'] });
     } catch {
-        confirmError.value = 'Something went wrong.';
+        confirmError.value = t('profile.something_went_wrong');
     }
 }
 
@@ -146,38 +184,42 @@ async function fetchRecoveryCodes() {
 }
 
 async function regenerateCodes() {
-    await fetch('/user/two-factor-recovery-codes', {
-        method: 'POST',
-        headers: {
-            'X-CSRF-TOKEN': getToken(),
-            'X-Requested-With': 'XMLHttpRequest',
-            Accept: 'application/json',
-        },
-    });
-    await fetchRecoveryCodes();
-    toast.add({ severity: 'success', detail: 'Recovery codes regenerated.', life: 3000 });
-}
-
-async function disableTwoFactor() {
-    disabling.value = true;
-    try {
-        await fetch('/user/two-factor-authentication', {
-            method: 'DELETE',
+    await requirePasswordConfirm(async () => {
+        await fetch('/user/two-factor-recovery-codes', {
+            method: 'POST',
             headers: {
                 'X-CSRF-TOKEN': getToken(),
                 'X-Requested-With': 'XMLHttpRequest',
                 Accept: 'application/json',
             },
         });
-        showRecovery.value = false;
-        recoveryCodes.value = [];
-        router.reload({ only: ['auth'] });
-        toast.add({ severity: 'info', detail: 'Two-factor authentication disabled.', life: 3000 });
-    } catch {
-        toast.add({ severity: 'error', detail: 'Failed to disable 2FA.', life: 4000 });
-    } finally {
-        disabling.value = false;
-    }
+        await fetchRecoveryCodes();
+        toast.add({ severity: 'success', detail: t('profile.recovery_codes_regenerated'), life: 3000 });
+    });
+}
+
+async function disableTwoFactor() {
+    await requirePasswordConfirm(async () => {
+        disabling.value = true;
+        try {
+            await fetch('/user/two-factor-authentication', {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': getToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                    Accept: 'application/json',
+                },
+            });
+            showRecovery.value = false;
+            recoveryCodes.value = [];
+            router.reload({ only: ['auth'] });
+            toast.add({ severity: 'info', detail: t('profile.two_factor_disabled_toast'), life: 3000 });
+        } catch {
+            toast.add({ severity: 'error', detail: t('profile.failed_disable_2fa'), life: 4000 });
+        } finally {
+            disabling.value = false;
+        }
+    });
 }
 
 async function showExistingRecoveryCodes() {
@@ -295,8 +337,35 @@ function getToken(): string {
                         {{ twoFactorEnabled ? t('profile.two_factor_enabled') : t('profile.two_factor_not_enabled') }}
                     </p>
 
+                    <!-- Inline password confirmation -->
+                    <div v-if="showPasswordConfirm" class="mb-4 p-4 rounded-lg bg-gray-50 dark:bg-dark-800 border border-gray-200 dark:border-dark-700 space-y-3">
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('auth.confirm_password_title') }}</p>
+                        <p class="text-sm text-gray-500 dark:text-dark-400">{{ t('auth.confirm_password_subtitle') }}</p>
+                        <TextInput
+                            v-model="confirmPasswordInput"
+                            type="password"
+                            :label="t('auth.password')"
+                            :error="confirmPasswordError"
+                            autofocus
+                        />
+                        <div class="flex gap-3">
+                            <button
+                                @click="submitPasswordConfirm"
+                                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer"
+                            >
+                                {{ t('auth.confirm_password_submit') }}
+                            </button>
+                            <button
+                                @click="cancelPasswordConfirm"
+                                class="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors cursor-pointer"
+                            >
+                                {{ t('common.cancel') }}
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Enable flow -->
-                    <div v-if="!twoFactorEnabled && !confirming">
+                    <div v-if="!twoFactorEnabled && !confirming && !showPasswordConfirm">
                         <button
                             @click="enableTwoFactor"
                             :disabled="enabling"

@@ -150,15 +150,15 @@ When customizing the Fortify actions, **do not use `validateWithBag()`** unless 
 Seeded roles:
 
 - `Admin` — all permissions
-- `Editor` — `view dashboard`, `manage content`, `manage settings`, `manage profile`
-- `User` — `view dashboard`, `manage profile` (assigned to all new registrations by `CreateNewUser`)
+- `Editor` — `view dashboard`, `manage resources`, `manage settings`, `manage profile`
+- `User` — `view dashboard`, `manage settings`, `manage profile` (assigned to all new registrations by `CreateNewUser`)
 
 Starter permissions:
 
 - `view dashboard`
 - `manage users`
 - `manage roles`
-- `manage content`
+- `manage resources`
 - `manage settings`
 - `manage profile`
 

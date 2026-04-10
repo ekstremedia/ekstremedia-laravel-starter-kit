@@ -51,12 +51,12 @@ it('resets the password with a valid token', function () {
 
     $user = User::factory()->create(['email' => 'test@example.com']);
 
-    $this->post('/forgot-password', ['email' => 'test@example.com']);
+    $this->post('/forgot-password', ['email' => $user->email]);
 
-    Notification::assertSentTo($user, ResetPassword::class, function ($notification) {
+    Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
         $this->post('/reset-password', [
             'token' => $notification->token,
-            'email' => 'test@example.com',
+            'email' => $user->email,
             'password' => 'new-password-123',
             'password_confirmation' => 'new-password-123',
         ])->assertRedirect('/login');
@@ -70,12 +70,12 @@ it('requires password confirmation for reset', function () {
 
     $user = User::factory()->create(['email' => 'test@example.com']);
 
-    $this->post('/forgot-password', ['email' => 'test@example.com']);
+    $this->post('/forgot-password', ['email' => $user->email]);
 
-    Notification::assertSentTo($user, ResetPassword::class, function ($notification) {
+    Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
         $this->post('/reset-password', [
             'token' => $notification->token,
-            'email' => 'test@example.com',
+            'email' => $user->email,
             'password' => 'new-password-123',
             'password_confirmation' => 'different-password',
         ])->assertSessionHasErrors('password');

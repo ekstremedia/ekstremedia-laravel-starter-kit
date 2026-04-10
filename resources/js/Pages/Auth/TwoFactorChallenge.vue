@@ -79,7 +79,7 @@ function submit() {
                         :placeholder="t('auth.two_factor_recovery_code')"
                         :error="form.errors.recovery_code"
                         autofocus
-                        autocomplete="one-time-code"
+                        autocomplete="off"
                     />
 
                     <PrimaryButton :disabled="form.processing">

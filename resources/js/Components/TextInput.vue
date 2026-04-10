@@ -8,6 +8,7 @@ const props = defineProps<{
     label?: string;
     error?: string;
     autofocus?: boolean;
+    disabled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -35,6 +36,7 @@ onMounted(() => {
                 :type="type ?? 'text'"
                 :value="modelValue"
                 :placeholder="placeholder"
+                :disabled="disabled"
                 @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
                 @focus="isFocused = true"
                 @blur="isFocused = false"

@@ -2,7 +2,9 @@
 
 use App\Models\User;
 use Database\Seeders\RoleAndPermissionSeeder;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 
 beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
@@ -48,6 +50,27 @@ it('updates profile information via fortify', function () {
     expect($user->first_name)->toBe('New');
     expect($user->last_name)->toBe('Person');
     expect($user->email)->toBe('new@example.com');
+});
+
+it('clears email_verified_at and sends verification email when email changes', function () {
+    Notification::fake();
+
+    $user = User::factory()->create([
+        'email' => 'old@example.com',
+        'email_verified_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->put('/user/profile-information', [
+            'first_name' => $user->first_name,
+            'last_name' => $user->last_name,
+            'email' => 'new@example.com',
+        ])
+        ->assertSessionHasNoErrors();
+
+    $user->refresh();
+    expect($user->email_verified_at)->toBeNull();
+    Notification::assertSentTo($user, VerifyEmail::class);
 });
 
 it('updates password via fortify with correct current password', function () {
