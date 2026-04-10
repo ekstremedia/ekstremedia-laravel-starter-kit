@@ -13,6 +13,17 @@
         'Segoe UI Symbol', 'Noto Color Emoji';
     --animate-fade-in: fade-in 0.3s ease-out;
     --animate-shake: shake 0.4s ease-in-out;
+
+    /* Dark blue palette */
+    --color-dark-950: #080c18;
+    --color-dark-900: #0c1222;
+    --color-dark-850: #101830;
+    --color-dark-800: #162040;
+    --color-dark-700: #1e2d54;
+    --color-dark-600: #283a68;
+    --color-dark-500: #3a4f82;
+    --color-dark-400: #5a70a8;
+    --color-dark-300: #8ba4c4;
 }
 
 @keyframes fade-in {

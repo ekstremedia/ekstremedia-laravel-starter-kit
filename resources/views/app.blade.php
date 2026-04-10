@@ -6,6 +6,18 @@
 
     <title inertia>{{ config('app.name', 'Laravel Starter Kit') }}</title>
 
+    <script>
+        (function() {
+            var key = '{{ env('VITE_APP_STORAGE_KEY', 'starter_kit_settings') }}';
+            try {
+                var s = JSON.parse(localStorage.getItem(key) || '{}');
+                if (s.dark_mode !== false) document.documentElement.classList.add('dark');
+            } catch(e) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700" rel="stylesheet" />

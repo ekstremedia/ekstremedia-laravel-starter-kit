@@ -9,9 +9,12 @@ Opinionated Laravel starter kit for new product work. It ships with the baseline
 - Tailwind CSS v4 + PrimeVue v4
 - PostgreSQL 17 + Redis 7
 - Pest test suite + GitHub Actions
-- Registration, login, logout, email verification
-- Spatie roles/permissions with seeded `Admin` and `User`
-- Shared user settings for `locale` and `dark_mode`
+- Laravel Fortify authentication (login, registration, email verification, password reset, two-factor authentication)
+- Laravel Sanctum for SPA session auth and API tokens
+- Spatie roles/permissions seeded with `Admin`, `Editor`, and `User` plus a richer demo user set
+- Authenticated dashboard and self-service profile page (name, email, password, 2FA management)
+- Dark-first UI with a dark-blue palette (`--color-dark-*` in `resources/css/app.css`) and PrimeVue toast notifications wired through `useFlashToast`
+- Shared user settings for `locale` and `dark_mode` (defaults to dark)
 - English and Norwegian translations
 - Local-only easy login for development
 - Docker app stack with Nginx, PHP-FPM, Vite, PostgreSQL, Redis, and Mailpit
@@ -47,9 +50,11 @@ Point your chosen hostname from `.env` to the container IP in `/etc/hosts`, for 
 
 ### 5. Visit the app
 
-- App: value from `APP_URL`
+- App: value from `APP_URL` (default host port `8120`, configurable via `APP_HOST_PORT`)
 - Mailpit: `http://localhost:${MAILPIT_HOST_PORT:-8126}`
 - Reverb: `ws://<your-app-host>:8080`
+
+Sanctum stateful domains are read from `SANCTUM_STATEFUL_DOMAINS` in `.env` — set this to your `APP_URL` host (and any additional domains the SPA is served from).
 
 ## Seeded Admin
 
@@ -61,6 +66,40 @@ The database seeder creates a verified admin user from these `.env` values:
 - `STARTER_ADMIN_PASSWORD`
 
 If `DEV_EASY_LOGIN_ENABLED=true`, the login page shows a local-only shortcut button that logs in as user `1`. This is gated to local runtime and test runtime only.
+
+## Authentication
+
+Authentication is powered by [Laravel Fortify](https://laravel.com/docs/fortify) (headless backend) and [Laravel Sanctum](https://laravel.com/docs/sanctum) (SPA session auth + API tokens).
+
+**Included flows:** login, registration, email verification, password reset (forgot password), and two-factor authentication (TOTP + recovery codes).
+
+Fortify actions live in `app/Actions/Fortify/` and custom response classes in `app/Http/Responses/`. Views are rendered as Inertia pages via `FortifyServiceProvider`.
+
+### Two-Factor Authentication
+
+Users can enable 2FA through the Fortify endpoints:
+
+- `POST /user/two-factor-authentication` — enable (requires password confirmation)
+- `POST /user/confirmed-two-factor-authentication` — confirm setup with TOTP code
+- `GET /user/two-factor-qr-code` — retrieve QR code SVG
+- `GET /user/two-factor-recovery-codes` — retrieve recovery codes
+- `DELETE /user/two-factor-authentication` — disable
+
+When a user with 2FA enabled logs in, they are redirected to `/two-factor-challenge` to enter their TOTP code or a recovery code.
+
+After login, verified users land on `/dashboard` (account overview cards) and can self-manage profile, password, and 2FA at `/profile`. Both routes are gated by `auth` + `verified` middleware in `routes/web.php`.
+
+## Roles & Seeded Users
+
+`RoleAndPermissionSeeder` creates three roles:
+
+- **Admin** — full access (all permissions)
+- **Editor** — `view dashboard`, `manage resources`, `manage settings`, `manage profile`
+- **User** — `view dashboard`, `manage settings`, `manage profile`
+
+> **Note:** Permission names like `manage resources` are example placeholders. Rename or replace them to match your domain before shipping.
+
+`DatabaseSeeder` creates the configured admin (from `STARTER_ADMIN_*` env vars) plus a small demo set of editors and users (only when `SEED_DEMO_USERS=true`). Roles and permissions are shared as Inertia props on `auth.user.roles` / `auth.user.permissions`.
 
 ## Commands
 
@@ -110,4 +149,3 @@ docker compose exec app php artisan test
 - Add your first domain models and pages
 - Update branding and favicon
 - Tighten the auth flow if your product needs invitations, teams, or social login
-# laravel-starter-kit

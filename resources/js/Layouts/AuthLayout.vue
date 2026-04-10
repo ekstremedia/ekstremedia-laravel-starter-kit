@@ -22,7 +22,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 transition-colors">
+    <div class="min-h-screen flex flex-col bg-gray-50 dark:bg-dark-950 transition-colors">
         <!-- Top bar -->
         <div class="flex justify-between items-center p-4">
             <a href="/" class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 transition-colors hover:text-indigo-500">

@@ -39,10 +39,18 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user() ? array_merge(
-                    $request->user()->toArray(),
-                    ['full_name' => $request->user()->fullName()],
-                ) : null,
+                'user' => $request->user() ? [
+                    'id' => $request->user()->id,
+                    'first_name' => $request->user()->first_name,
+                    'last_name' => $request->user()->last_name,
+                    'email' => $request->user()->email,
+                    'email_verified_at' => $request->user()->email_verified_at,
+                    'created_at' => $request->user()->created_at,
+                    'two_factor_enabled' => ! is_null($request->user()->two_factor_confirmed_at),
+                    'full_name' => $request->user()->fullName(),
+                    'roles' => $request->user()->getRoleNames()->toArray(),
+                    'permissions' => $request->user()->getAllPermissions()->pluck('name')->toArray(),
+                ] : null,
             ],
             'locale' => app()->getLocale(),
             'debug' => [
@@ -55,6 +63,7 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
+                'status' => fn () => $request->session()->get('status'),
             ],
         ];
     }

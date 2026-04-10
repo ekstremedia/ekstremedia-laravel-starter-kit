@@ -5,6 +5,7 @@ import { createApp, h, type DefineComponent } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import PrimeVue from 'primevue/config';
+import ToastService from 'primevue/toastservice';
 import Aura from '@primevue/themes/aura';
 import { i18n } from '@/i18n';
 
@@ -21,6 +22,7 @@ createInertiaApp({
         createApp({ render: () => h(App, props) })
             .use(plugin)
             .use(i18n)
+            .use(ToastService)
             .use(PrimeVue, {
                 theme: {
                     preset: Aura,
@@ -32,6 +34,6 @@ createInertiaApp({
             .mount(el);
     },
     progress: {
-        color: '#4B5563',
+        color: '#6366f1',
     },
 });

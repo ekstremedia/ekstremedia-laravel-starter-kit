@@ -9,7 +9,7 @@ const { isDark, toggle } = useDarkMode();
 <template>
     <button
         @click="toggle"
-        class="p-2 rounded-lg transition-colors hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
+        class="p-2 rounded-lg transition-colors hover:bg-gray-200 dark:hover:bg-dark-800 cursor-pointer"
         :title="isDark ? t('common.light_mode') : t('common.dark_mode')"
         :aria-label="isDark ? t('common.light_mode') : t('common.dark_mode')"
     >

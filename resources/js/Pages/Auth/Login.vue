@@ -48,13 +48,13 @@ function easyLogin() {
     <Head :title="t('nav.login')" />
 
     <AuthLayout>
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg dark:shadow-gray-900/50 p-8 transition-colors">
+        <div class="bg-white dark:bg-dark-900 rounded-2xl shadow-lg dark:shadow-dark-950/50 border border-gray-100 dark:border-dark-700 p-8 transition-colors">
             <!-- Header -->
             <div class="text-center mb-8">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ t('auth.login_title') }}
                 </h1>
-                <p class="mt-2 text-gray-600 dark:text-gray-400">
+                <p class="mt-2 text-gray-600 dark:text-dark-400">
                     {{ t('auth.login_subtitle') }}
                 </p>
             </div>
@@ -78,18 +78,27 @@ function easyLogin() {
                         :error="form.errors.password"
                     />
 
-                    <!-- Remember me -->
-                    <label class="flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                            v-model="form.remember"
-                            type="checkbox"
-                            class="rounded border-gray-300 dark:border-gray-600 text-indigo-600
-                                   focus:ring-indigo-500 dark:bg-gray-700 transition-colors"
-                        />
-                        <span class="text-sm text-gray-600 dark:text-gray-400">
-                            {{ t('auth.remember_me') }}
-                        </span>
-                    </label>
+                    <!-- Remember me & Forgot password -->
+                    <div class="flex items-center justify-between">
+                        <label class="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                                v-model="form.remember"
+                                type="checkbox"
+                                class="rounded border-gray-300 dark:border-dark-600 text-indigo-600
+                                       focus:ring-indigo-500 dark:bg-dark-800 transition-colors"
+                            />
+                            <span class="text-sm text-gray-600 dark:text-dark-400">
+                                {{ t('auth.remember_me') }}
+                            </span>
+                        </label>
+
+                        <Link
+                            href="/forgot-password"
+                            class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+                        >
+                            {{ t('auth.forgot_password') }}
+                        </Link>
+                    </div>
 
                     <PrimaryButton :disabled="form.processing">
                         {{ t('nav.login') }}
@@ -111,7 +120,7 @@ function easyLogin() {
             </form>
 
             <!-- Register link -->
-            <p class="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+            <p class="mt-6 text-center text-sm text-gray-600 dark:text-dark-400">
                 {{ t('auth.no_account') }}
                 <Link href="/register" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
                     {{ t('nav.register') }}

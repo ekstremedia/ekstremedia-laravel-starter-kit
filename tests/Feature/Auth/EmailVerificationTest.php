@@ -19,7 +19,7 @@ it('redirects verified users away from verification notice', function () {
 
     $this->actingAs($user)
         ->get('/email/verify')
-        ->assertRedirect('/');
+        ->assertRedirect('/dashboard');
 });
 
 it('verifies email with valid signed url', function () {
@@ -35,7 +35,7 @@ it('verifies email with valid signed url', function () {
 
     $this->actingAs($user)
         ->get($verificationUrl)
-        ->assertRedirect('/');
+        ->assertRedirect('/dashboard?verified=1');
 
     expect($user->fresh()->hasVerifiedEmail())->toBeTrue();
     Event::assertDispatched(Verified::class);

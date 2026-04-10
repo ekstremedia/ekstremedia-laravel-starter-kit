@@ -6,6 +6,15 @@ endif
 APP_SERVICE ?= app
 DB_SERVICE ?= postgres
 
+# Build display URL: append port only when set and not 80
+ifeq ($(APP_HOST_PORT),)
+DISPLAY_URL := $(APP_URL)
+else ifeq ($(APP_HOST_PORT),80)
+DISPLAY_URL := $(APP_URL)
+else
+DISPLAY_URL := $(APP_URL):$(APP_HOST_PORT)
+endif
+
 .PHONY: help init build up down restart shell test migrate seed fresh logs tinker pint queue vite npm-install composer-install cache-clear reverb-restart
 
 # Default target
@@ -22,7 +31,7 @@ init: ## Initialize .env for a new project
 build: ## Build and start all containers
 	docker compose up -d --build --renew-anon-volumes
 	@echo ""
-	@echo "  App:     $(APP_URL)"
+	@echo "  App:     $(DISPLAY_URL)"
 	@echo "  Mailpit: http://localhost:$(MAILPIT_HOST_PORT)"
 	@echo "  Reverb:  ws://$(VITE_REVERB_HOST):$(REVERB_PORT)"
 	@echo ""
@@ -30,7 +39,7 @@ build: ## Build and start all containers
 up: ## Start all containers
 	docker compose up -d
 	@echo ""
-	@echo "  App:     $(APP_URL)"
+	@echo "  App:     $(DISPLAY_URL)"
 	@echo "  Mailpit: http://localhost:$(MAILPIT_HOST_PORT)"
 	@echo "  Reverb:  ws://$(VITE_REVERB_HOST):$(REVERB_PORT)"
 	@echo ""

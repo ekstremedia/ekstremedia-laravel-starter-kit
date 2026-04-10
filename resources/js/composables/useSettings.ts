@@ -7,13 +7,14 @@ const STORAGE_KEY = import.meta.env.VITE_APP_STORAGE_KEY || 'starter_kit_setting
 // Default settings mirror UserSetting::$defaults on the backend
 const defaults: UserSettings = {
     locale: 'en',
-    dark_mode: false,
+    dark_mode: true,
 };
 
 // Module-level reactive state — shared across all composable calls
 const settings = ref<UserSettings>({ ...defaults });
 
 let dbSyncTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingPatch: Record<string, UserSettingValue> = {};
 let initialized = false;
 
 function sanitizePartial(partial: Partial<UserSettings>): Record<string, UserSettingValue> {
@@ -68,11 +69,17 @@ export function useSettings() {
 
         // Only sync to DB if the user is authenticated
         if (page.props.auth?.user) {
+            Object.assign(pendingPatch, sanitizedPartial);
             if (dbSyncTimer) clearTimeout(dbSyncTimer);
             dbSyncTimer = setTimeout(() => {
-                router.patch('/settings', sanitizedPartial, {
+                const payload = { ...pendingPatch };
+                pendingPatch = {};
+                router.patch('/settings', payload, {
                     preserveState: true,
                     preserveScroll: true,
+                    onError: () => {
+                        Object.assign(pendingPatch, payload);
+                    },
                 });
             }, 600);
         }
