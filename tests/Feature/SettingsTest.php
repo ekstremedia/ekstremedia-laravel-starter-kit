@@ -16,7 +16,7 @@ it('returns defaults for missing keys', function () {
     $user->settings()->merge(['locale' => 'no']);
 
     // dark_mode was never set, should still return default
-    expect($user->settings()->resolved()['dark_mode'])->toBe(false);
+    expect($user->settings()->resolved()['dark_mode'])->toBe(true);
     expect($user->settings()->resolved()['locale'])->toBe('no');
 });
 

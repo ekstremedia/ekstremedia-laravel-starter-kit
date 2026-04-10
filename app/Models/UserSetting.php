@@ -19,7 +19,7 @@ class UserSetting extends Model
      */
     public static array $defaults = [
         'locale'    => 'en',
-        'dark_mode' => false,
+        'dark_mode' => true,
     ];
 
     public function user(): BelongsTo

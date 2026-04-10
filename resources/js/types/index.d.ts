@@ -8,8 +8,11 @@ export interface User {
     last_name: string;
     email: string;
     email_verified_at?: string;
+    two_factor_confirmed_at?: string;
+    created_at?: string;
     full_name: string;
     roles?: string[];
+    permissions?: string[];
 }
 
 export interface UserSettings {
@@ -30,5 +33,6 @@ export interface PageProps extends InertiaPageProps {
     flash: {
         success?: string;
         error?: string;
+        status?: string;
     };
 }

@@ -36,7 +36,7 @@ function resend() {
     <Head :title="t('auth.verify_title')" />
 
     <AuthLayout>
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg dark:shadow-gray-900/50 p-8 transition-colors text-center">
+        <div class="bg-white dark:bg-dark-900 rounded-2xl shadow-lg dark:shadow-dark-950/50 border border-gray-100 dark:border-dark-700 p-8 transition-colors text-center">
             <!-- Animated mail icon -->
             <div ref="iconRef" class="text-6xl mb-6">
                 ✉️
@@ -46,18 +46,18 @@ function resend() {
                 {{ t('auth.verify_title') }}
             </h1>
 
-            <p class="text-gray-600 dark:text-gray-400 mb-2">
+            <p class="text-gray-600 dark:text-dark-400 mb-2">
                 {{ t('auth.verify_subtitle') }}
             </p>
 
-            <p class="text-sm text-gray-500 dark:text-gray-500 mb-8">
+            <p class="text-sm text-gray-500 dark:text-dark-500 mb-8">
                 {{ t('auth.verify_check_spam') }}
             </p>
 
             <!-- Success message -->
             <div
                 v-if="sent"
-                class="mb-6 px-4 py-3 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-sm
+                class="mb-6 px-4 py-3 rounded-lg bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 text-sm
                        animate-fade-in"
             >
                 {{ t('auth.verify_resent') }}

@@ -89,5 +89,5 @@ it('redirects authenticated users away from register page', function () {
 
     $this->actingAs($user)
         ->get('/register')
-        ->assertRedirect('/');
+        ->assertRedirect('/dashboard');
 });

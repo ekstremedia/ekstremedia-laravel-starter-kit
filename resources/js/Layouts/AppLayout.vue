@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
 import { usePage, Link, router } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import Toast from 'primevue/toast';
 import LanguageSwitcher from '@/Components/LanguageSwitcher.vue';
 import DarkModeToggle from '@/Components/DarkModeToggle.vue';
+import { useFlashToast } from '@/composables/useFlashToast';
 import type { PageProps } from '@/types';
 
 const { t } = useI18n();
@@ -11,54 +13,121 @@ const page = usePage<PageProps>();
 const user = computed(() => page.props.auth?.user);
 const appName = import.meta.env.VITE_APP_NAME || t('app.name');
 
+const dropdownOpen = ref(false);
+useFlashToast();
+
 function logout() {
     router.post('/logout');
+}
+
+function initials(u: { first_name: string; last_name: string }) {
+    return (u.first_name[0] + u.last_name[0]).toUpperCase();
 }
 </script>
 
 <template>
-    <div class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors">
+    <Toast position="top-right" />
+    <div class="min-h-screen bg-gray-50 dark:bg-dark-950 text-gray-900 dark:text-gray-100 transition-colors">
         <!-- Navigation -->
-        <nav class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors">
+        <nav class="border-b border-gray-200 dark:border-dark-800 bg-white dark:bg-dark-900 transition-colors">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-16 items-center">
-                    <!-- Logo -->
-                    <div class="flex items-center">
-                        <Link href="/" class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 transition-colors hover:text-indigo-500">
+                    <!-- Left: Logo + nav links -->
+                    <div class="flex items-center gap-8">
+                        <Link href="/" class="text-xl font-bold text-indigo-600 dark:text-indigo-400 transition-colors hover:text-indigo-500">
                             {{ appName }}
                         </Link>
+
+                        <template v-if="user">
+                            <div class="hidden sm:flex items-center gap-1">
+                                <Link
+                                    href="/dashboard"
+                                    class="px-3 py-2 text-sm font-medium rounded-lg transition-colors"
+                                    :class="$page.url === '/dashboard'
+                                        ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10'
+                                        : 'text-gray-600 dark:text-dark-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-dark-800'"
+                                >
+                                    {{ t('nav.dashboard') }}
+                                </Link>
+                            </div>
+                        </template>
                     </div>
 
                     <!-- Right side -->
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-3">
                         <LanguageSwitcher />
                         <DarkModeToggle />
 
-                        <!-- Auth links -->
+                        <!-- User dropdown -->
                         <template v-if="user">
-                            <span class="text-sm text-gray-600 dark:text-gray-400 hidden sm:inline">
-                                {{ user.full_name }}
-                            </span>
-                            <button
-                                @click="logout"
-                                class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white
-                                       transition-colors cursor-pointer"
-                            >
-                                {{ t('nav.logout') }}
-                            </button>
+                            <div class="relative">
+                                <button
+                                    @click="dropdownOpen = !dropdownOpen"
+                                    class="flex items-center gap-2 cursor-pointer rounded-lg px-2 py-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-dark-800"
+                                >
+                                    <div class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-semibold">
+                                        {{ initials(user) }}
+                                    </div>
+                                    <span class="text-sm text-gray-700 dark:text-gray-300 hidden sm:inline">
+                                        {{ user.full_name }}
+                                    </span>
+                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+
+                                <!-- Dropdown menu -->
+                                <Transition
+                                    enter-active-class="transition ease-out duration-100"
+                                    enter-from-class="opacity-0 scale-95"
+                                    enter-to-class="opacity-100 scale-100"
+                                    leave-active-class="transition ease-in duration-75"
+                                    leave-from-class="opacity-100 scale-100"
+                                    leave-to-class="opacity-0 scale-95"
+                                >
+                                    <div
+                                        v-if="dropdownOpen"
+                                        @click="dropdownOpen = false"
+                                        class="absolute right-0 mt-2 w-48 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 shadow-lg dark:shadow-dark-950/50 py-1 z-50"
+                                    >
+                                        <Link
+                                            href="/dashboard"
+                                            class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800 sm:hidden"
+                                        >
+                                            {{ t('nav.dashboard') }}
+                                        </Link>
+                                        <Link
+                                            href="/profile"
+                                            class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800"
+                                        >
+                                            {{ t('nav.profile') }}
+                                        </Link>
+                                        <div class="border-t border-gray-100 dark:border-dark-700 my-1"></div>
+                                        <button
+                                            @click="logout"
+                                            class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800 cursor-pointer"
+                                        >
+                                            {{ t('nav.logout') }}
+                                        </button>
+                                    </div>
+                                </Transition>
+                            </div>
+
+                            <!-- Click-outside backdrop -->
+                            <div v-if="dropdownOpen" @click="dropdownOpen = false" class="fixed inset-0 z-40"></div>
                         </template>
+
+                        <!-- Guest links -->
                         <template v-else>
                             <Link
                                 href="/login"
-                                class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white
-                                       transition-colors"
+                                class="text-sm text-gray-600 dark:text-dark-400 hover:text-gray-900 dark:hover:text-white transition-colors"
                             >
                                 {{ t('nav.login') }}
                             </Link>
                             <Link
                                 href="/register"
-                                class="text-sm px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg
-                                       transition-colors"
+                                class="text-sm px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
                             >
                                 {{ t('nav.register') }}
                             </Link>

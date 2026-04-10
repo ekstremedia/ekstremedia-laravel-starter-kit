@@ -5,6 +5,7 @@ An opinionated starter repository for new Laravel products. The goal is to avoid
 ## Tech Stack
 
 - **Backend:** Laravel 13, PHP 8.4, PostgreSQL 17, Redis 7
+- **Auth:** Laravel Fortify (headless backend) + Laravel Sanctum (SPA session + API tokens)
 - **Frontend:** Vue 3 + TypeScript, Inertia.js (SPA mode), Tailwind CSS v4, PrimeVue v4
 - **Testing:** Pest
 - **Other:** Docker, Mailpit, GSAP, vue-i18n, Spatie Laravel Permission, Laravel Reverb
@@ -21,22 +22,41 @@ This is an Inertia SPA. Laravel handles routing, middleware, controllers, auth, 
 
 ```
 app/
+  Actions/
+    Fortify/             # CreateNewUser, UpdateUserProfileInformation, UpdateUserPassword,
+                         # ResetUserPassword, PasswordValidationRules — Fortify action overrides
   Http/
     Controllers/
-      Auth/              # RegisterController, LoginController, EmailVerificationController
+      Auth/
+        DevLoginController.php # POST /login/dev — local easy login (only auth controller left;
+                               # login/register/verify are all handled by Fortify)
       SettingsController # PATCH /settings — partial updates to user settings
-    Middleware/          # HandleInertiaRequests shares auth, settings, locale, debug, flash
+    Middleware/          # HandleInertiaRequests shares auth (with roles+permissions),
+                         # settings, locale, debug, flash (incl. Fortify status)
+    Responses/
+      LoginResponse.php       # redirects to /dashboard (or /email/verify if unverified)
+      RegisterResponse.php    # redirects to /email/verify after registration
   Models/
-    User.php             # implements MustVerifyEmail, HasRoles, has settings() helper
+    User.php             # implements MustVerifyEmail, HasRoles, TwoFactorAuthenticatable,
+                         # first_name/last_name schema, settings() helper
     UserSetting.php      # single JSONB settings column, defaults defined in $defaults
+                         # (dark_mode defaults to true — dark-first)
+  Providers/
+    FortifyServiceProvider.php # binds Fortify views to Inertia pages, registers actions
+                               # and custom Login/Register response classes
 config/
   dev.php                # local-only development flags such as easy login
+  fortify.php            # features enabled, home → /dashboard
+  sanctum.php            # stateful domains for SPA session auth
 resources/js/
   Pages/
     Welcome.vue          # generic starter landing page
-    Auth/                # Login.vue, Register.vue, VerifyEmail.vue
+    Dashboard.vue        # account overview cards (auth+verified)
+    Profile.vue          # profile info, password, 2FA management (auth+verified)
+    Auth/                # Login, Register, VerifyEmail, ForgotPassword, ResetPassword,
+                         # TwoFactorChallenge, ConfirmPassword
   Layouts/
-    AppLayout.vue        # top nav, login/register links, locale switcher, dark mode
+    AppLayout.vue        # top nav with user dropdown, locale switcher, dark mode, toast
     AuthLayout.vue       # auth page shell
   Components/
     DarkModeToggle.vue
@@ -47,13 +67,16 @@ resources/js/
     useSettings.ts       # localStorage + server sync for user settings
     useDarkMode.ts       # theme integration
     useLocale.ts         # vue-i18n integration
+    useFlashToast.ts     # surfaces flash messages as PrimeVue toasts
   i18n/
     en.ts
     no.ts
+resources/css/
+  app.css                # Tailwind v4 @theme block — dark-blue palette --color-dark-*
 database/
   seeders/
-    DatabaseSeeder.php           # generic seeded admin from .env
-    RoleAndPermissionSeeder.php  # starter permissions and roles
+    DatabaseSeeder.php           # seeded admin (from .env) plus demo editors and users
+    RoleAndPermissionSeeder.php  # Admin / Editor / User roles, starter permissions
 docker/
   entrypoint.sh
   nginx.conf
@@ -62,7 +85,10 @@ scripts/
   init-starter.sh       # interactive project bootstrap for .env
 tests/
   Feature/
-    Auth/
+    Auth/                # Login, Registration, EmailVerification, PasswordReset,
+                         # PasswordConfirmation, TwoFactorAuthentication, RolesAndPermissions
+    DashboardTest.php
+    ProfileTest.php
     SettingsTest.php
 ```
 
@@ -105,22 +131,46 @@ The starter supports English (`en`) and Norwegian (`no`). Always update both tra
 
 The localStorage key is controlled by `VITE_APP_STORAGE_KEY` so each generated app can keep its own browser settings namespace.
 
+## Authentication
+
+Auth is powered by **Laravel Fortify** (headless) and **Laravel Sanctum** (SPA session + API tokens). All views are rendered as Inertia pages from `app/Providers/FortifyServiceProvider.php`. Custom behavior lives in:
+
+- `app/Actions/Fortify/` — `CreateNewUser` (assigns `User` role on register), `UpdateUserProfileInformation` (uses `first_name`/`last_name`, default error bag so Inertia surfaces errors), `UpdateUserPassword` (default error bag), `ResetUserPassword`
+- `app/Http/Responses/LoginResponse.php` — sends verified users to `/dashboard`, unverified users to `/email/verify`
+- `app/Http/Responses/RegisterResponse.php` — sends new users to `/email/verify`
+
+`config('fortify.home')` is `/dashboard`. After login/register, that's where Fortify redirects authenticated users — including the "redirect away from login/register/forgot-password" guard.
+
+Included flows: login, registration, email verification, password reset, two-factor authentication (TOTP + recovery codes), password confirmation. The `Dashboard` and `Profile` pages are gated behind `['auth', 'verified']` in `routes/web.php`.
+
+When customizing the Fortify actions, **do not use `validateWithBag()`** unless you also wire the error bag through Inertia's `useForm({ ... }, { errorBag: ... })`. The starter actions use `validate()` so errors flow through the default bag and the existing Profile.vue forms work without extra config.
+
 ## Roles & Permissions
 
 Seeded roles:
 
-- `Admin`
-- `User`
+- `Admin` — all permissions
+- `Editor` — `view dashboard`, `manage content`, `manage settings`, `manage profile`
+- `User` — `view dashboard`, `manage profile` (assigned to all new registrations by `CreateNewUser`)
 
 Starter permissions:
 
 - `view dashboard`
 - `manage users`
 - `manage roles`
+- `manage content`
 - `manage settings`
 - `manage profile`
 
-These are starter defaults. They should usually be adapted early in a real project.
+Roles and permissions are shared on every Inertia request as `auth.user.roles` and `auth.user.permissions` (see `HandleInertiaRequests`). These are starter defaults — adapt them early in a real project.
+
+## UI Theme & Toasts
+
+The starter is **dark-first**: `UserSetting::$defaults['dark_mode']` is `true`, and `resources/views/app.blade.php` runs an inline pre-paint script that adds the `dark` class to `<html>` before Vue mounts to avoid a flash of light theme.
+
+The dark palette lives in `resources/css/app.css` under the Tailwind v4 `@theme` block as `--color-dark-950` … `--color-dark-300` (dark blues). Use `dark:bg-dark-900`, `dark:border-dark-700`, etc. instead of Tailwind's default slate.
+
+Flash messages from the backend are surfaced as PrimeVue toasts via `resources/js/composables/useFlashToast.ts`, which is invoked once in `AppLayout.vue`. PrimeVue's `ToastService` is registered in `resources/js/app.ts`. To raise a toast from any page, use `useToast()` from `primevue/usetoast`; to raise one from the backend, set `flash.success` / `flash.error` / `flash.status` in the redirect.
 
 ## Local Dev Login
 

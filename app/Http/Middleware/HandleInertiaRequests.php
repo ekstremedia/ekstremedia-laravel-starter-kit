@@ -41,7 +41,11 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user() ? array_merge(
                     $request->user()->toArray(),
-                    ['full_name' => $request->user()->fullName()],
+                    [
+                        'full_name' => $request->user()->fullName(),
+                        'roles' => $request->user()->getRoleNames()->toArray(),
+                        'permissions' => $request->user()->getAllPermissions()->pluck('name')->toArray(),
+                    ],
                 ) : null,
             ],
             'locale' => app()->getLocale(),
@@ -55,6 +59,7 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
+                'status' => fn () => $request->session()->get('status'),
             ],
         ];
     }

@@ -38,12 +38,13 @@ onMounted(() => {
                 @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
                 @focus="isFocused = true"
                 @blur="isFocused = false"
-                class="w-full px-4 py-3 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                class="w-full px-4 py-3 rounded-lg border bg-white dark:bg-dark-800 text-gray-900 dark:text-gray-100
                        transition-all duration-200 outline-none
-                       border-gray-300 dark:border-gray-600
+                       border-gray-300 dark:border-dark-600
                        focus:border-indigo-500 dark:focus:border-indigo-400
                        focus:ring-2 focus:ring-indigo-500/20 dark:focus:ring-indigo-400/20
-                       placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                       placeholder:text-gray-400 dark:placeholder:text-dark-500
+                       disabled:opacity-60 disabled:cursor-not-allowed"
                 :class="{ '!border-red-500 !ring-red-500/20': error }"
             />
             <!-- Subtle glow on focus -->
