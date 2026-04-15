@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
+import { ref } from 'vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
+import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
 import ConfirmDialog from 'primevue/confirmdialog';
 import { useConfirm } from 'primevue/useconfirm';
+import { FilterMatchMode } from '@primevue/core/api';
 
 defineOptions({ layout: AdminLayout });
 
@@ -14,6 +17,7 @@ interface Role { id: number; name: string; permissions: string[]; users_count: n
 defineProps<{ roles: Role[] }>();
 
 const confirm = useConfirm();
+const filters = ref({ global: { value: null as string | null, matchMode: FilterMatchMode.CONTAINS } });
 
 function destroy(r: Role) {
     confirm.require({
@@ -34,15 +38,25 @@ function destroy(r: Role) {
         <Link href="/admin/roles/create"><Button label="New role" icon="pi pi-plus" /></Link>
     </div>
 
-    <DataTable :value="roles" stripedRows class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
-        <Column field="id" header="ID" style="width: 5rem" />
-        <Column field="name" header="Name" />
+    <DataTable :value="roles" stripedRows removableSort
+               v-model:filters="filters" :globalFilterFields="['name', 'permissions']"
+               class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
+        <template #header>
+            <div class="flex justify-end">
+                <span class="relative">
+                    <i class="pi pi-search absolute top-1/2 -translate-y-1/2 left-3 text-gray-400"></i>
+                    <InputText v-model="filters['global'].value" placeholder="Filter roles" class="pl-9" />
+                </span>
+            </div>
+        </template>
+        <Column field="id" header="ID" style="width: 5rem" sortable />
+        <Column field="name" header="Name" sortable />
         <Column header="Permissions">
             <template #body="{ data }">
                 <Tag v-for="p in data.permissions" :key="p" :value="p" severity="secondary" class="mr-1 mb-1" />
             </template>
         </Column>
-        <Column field="users_count" header="Users" style="width: 6rem" />
+        <Column field="users_count" header="Users" style="width: 6rem" sortable />
         <Column header="Actions" style="width: 14rem">
             <template #body="{ data }">
                 <Link :href="`/admin/roles/${data.id}/edit`"><Button label="Edit" icon="pi pi-pencil" size="small" severity="secondary" class="mr-2" /></Link>

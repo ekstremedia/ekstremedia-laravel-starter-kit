@@ -24,7 +24,7 @@ class UserController extends Controller
         $search = $request->string('search')->toString();
 
         $users = User::query()
-            ->with('roles:id,name')
+            ->with(['roles:id,name', 'media'])
             ->when($search !== '', function ($q) use ($search) {
                 $driver = $q->getModel()->getConnection()->getDriverName();
                 $op = $driver === 'pgsql' ? 'ilike' : 'like';
@@ -45,6 +45,12 @@ class UserController extends Controller
             ->orderBy('id', 'desc')
             ->paginate(15)
             ->withQueryString();
+
+        $users->getCollection()->transform(function (User $user) {
+            $user->setAttribute('avatar_thumb_url', $user->avatarUrl('thumb'));
+
+            return $user;
+        });
 
         return Inertia::render('Admin/Users/Index', [
             'users' => $users,

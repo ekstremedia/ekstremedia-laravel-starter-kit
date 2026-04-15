@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
+import { ref } from 'vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
@@ -7,6 +8,7 @@ import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import ConfirmDialog from 'primevue/confirmdialog';
 import { useConfirm } from 'primevue/useconfirm';
+import { FilterMatchMode } from '@primevue/core/api';
 
 defineOptions({ layout: AdminLayout });
 
@@ -15,6 +17,7 @@ defineProps<{ permissions: Permission[] }>();
 
 const form = useForm({ name: '' });
 const confirm = useConfirm();
+const filters = ref({ global: { value: null as string | null, matchMode: FilterMatchMode.CONTAINS } });
 
 function create() {
     form.post('/admin/permissions', { onSuccess: () => form.reset() });
@@ -42,11 +45,21 @@ function destroy(p: Permission) {
         <p v-if="form.errors.name" class="text-xs text-red-500 self-center">{{ form.errors.name }}</p>
     </form>
 
-    <DataTable :value="permissions" stripedRows class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
-        <Column field="id" header="ID" style="width: 5rem" />
-        <Column field="name" header="Name" />
-        <Column field="guard_name" header="Guard" style="width: 8rem" />
-        <Column field="roles_count" header="Roles" style="width: 6rem" />
+    <DataTable :value="permissions" stripedRows removableSort
+               v-model:filters="filters" :globalFilterFields="['name', 'guard_name']"
+               class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
+        <template #header>
+            <div class="flex justify-end">
+                <span class="relative">
+                    <i class="pi pi-search absolute top-1/2 -translate-y-1/2 left-3 text-gray-400"></i>
+                    <InputText v-model="filters['global'].value" placeholder="Filter permissions" class="pl-9" />
+                </span>
+            </div>
+        </template>
+        <Column field="id" header="ID" style="width: 5rem" sortable />
+        <Column field="name" header="Name" sortable />
+        <Column field="guard_name" header="Guard" style="width: 8rem" sortable />
+        <Column field="roles_count" header="Roles" style="width: 6rem" sortable />
         <Column header="Actions" style="width: 10rem">
             <template #body="{ data }">
                 <Button label="Delete" icon="pi pi-trash" size="small" severity="danger" @click="destroy(data)" />

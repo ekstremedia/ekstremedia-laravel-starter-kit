@@ -12,7 +12,19 @@ import { useConfirm } from 'primevue/useconfirm';
 
 defineOptions({ layout: AdminLayout });
 
-interface UserRow { id: number; first_name: string; last_name: string; email: string; created_at: string; roles: { id: number; name: string }[] }
+interface UserRow {
+    id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+    created_at: string;
+    avatar_thumb_url: string | null;
+    roles: { id: number; name: string }[];
+}
+
+function initials(u: UserRow) {
+    return ((u.first_name?.[0] ?? '') + (u.last_name?.[0] ?? '')).toUpperCase();
+}
 interface Props {
     users: { data: UserRow[]; links: any; meta?: any; current_page?: number; last_page?: number; total?: number };
     filters: { search: string };
@@ -60,12 +72,22 @@ function canImpersonate(u: UserRow) {
         <Button label="Search" icon="pi pi-search" severity="secondary" @click="doSearch" />
     </div>
 
-    <DataTable :value="users.data" stripedRows class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
-        <Column field="id" header="ID" style="width: 5rem" />
-        <Column header="Name">
+    <DataTable :value="users.data" stripedRows removableSort
+               class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
+        <Column field="id" header="ID" style="width: 5rem" sortable />
+        <Column header="" style="width: 4rem">
+            <template #body="{ data }">
+                <img v-if="data.avatar_thumb_url" :src="data.avatar_thumb_url" :alt="`${data.first_name} ${data.last_name}`"
+                     class="w-9 h-9 rounded-full object-cover ring-1 ring-indigo-500/20" />
+                <div v-else class="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-semibold">
+                    {{ initials(data) }}
+                </div>
+            </template>
+        </Column>
+        <Column header="Name" field="first_name" sortable>
             <template #body="{ data }">{{ data.first_name }} {{ data.last_name }}</template>
         </Column>
-        <Column field="email" header="Email" />
+        <Column field="email" header="Email" sortable />
         <Column header="Roles">
             <template #body="{ data }">
                 <Tag v-for="r in data.roles" :key="r.id" :value="r.name" class="mr-1" severity="info" />

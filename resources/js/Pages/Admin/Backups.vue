@@ -46,15 +46,16 @@ function runClean() {
         </div>
     </div>
 
-    <DataTable :value="backups" stripedRows class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
-        <Column field="date" header="Date" style="width: 18rem">
+    <DataTable :value="backups" stripedRows removableSort
+               class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
+        <Column field="date" header="Date" style="width: 18rem" sortable>
             <template #body="{ data }">{{ new Date(data.date).toLocaleString() }}</template>
         </Column>
-        <Column field="disk" header="Disk" style="width: 10rem">
+        <Column field="disk" header="Disk" style="width: 10rem" sortable>
             <template #body="{ data }"><Tag :value="data.disk" severity="info" /></template>
         </Column>
-        <Column field="path" header="File" />
-        <Column field="size" header="Size" style="width: 10rem">
+        <Column field="path" header="File" sortable />
+        <Column field="size" header="Size" style="width: 10rem" sortable>
             <template #body="{ data }">{{ humanSize(data.size) }}</template>
         </Column>
     </DataTable>

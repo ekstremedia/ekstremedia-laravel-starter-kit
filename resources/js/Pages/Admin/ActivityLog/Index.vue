@@ -62,23 +62,24 @@ function reset() {
         </div>
     </div>
 
-    <DataTable :value="activities.data" stripedRows class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
-        <Column field="created_at" header="When" style="width: 12rem">
+    <DataTable :value="activities.data" stripedRows removableSort
+               class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
+        <Column field="created_at" header="When" style="width: 12rem" sortable>
             <template #body="{ data }">{{ new Date(data.created_at).toLocaleString() }}</template>
         </Column>
-        <Column header="User">
+        <Column header="User" sortable :sortField="(d: any) => d.causer?.email ?? ''">
             <template #body="{ data }">
                 <span v-if="data.causer">{{ data.causer.email }}</span>
                 <span v-else class="text-gray-400">system</span>
             </template>
         </Column>
-        <Column header="Log">
+        <Column field="log_name" header="Log" sortable>
             <template #body="{ data }"><Tag v-if="data.log_name" :value="data.log_name" severity="info" /></template>
         </Column>
-        <Column header="Event">
+        <Column field="event" header="Event" sortable>
             <template #body="{ data }"><Tag v-if="data.event" :value="data.event" /></template>
         </Column>
-        <Column field="description" header="Description" />
+        <Column field="description" header="Description" sortable />
         <Column header="Subject">
             <template #body="{ data }">
                 <span v-if="data.subject_type" class="text-xs text-gray-500">{{ data.subject_type.split('\\').pop() }}#{{ data.subject_id }}</span>
