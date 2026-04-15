@@ -33,7 +33,7 @@ function submit() {
     </div>
 
     <form @submit.prevent="submit" class="max-w-2xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl p-6 space-y-4">
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
                 <label class="block text-sm mb-1">First name</label>
                 <InputText v-model="form.first_name" class="w-full" />
@@ -50,7 +50,7 @@ function submit() {
             <InputText v-model="form.email" type="email" class="w-full" />
             <p v-if="form.errors.email" class="text-xs text-red-500 mt-1">{{ form.errors.email }}</p>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
                 <label class="block text-sm mb-1">Password</label>
                 <Password v-model="form.password" toggleMask :feedback="false" class="w-full" inputClass="w-full" />

@@ -42,8 +42,9 @@ Opinionated, batteries-included Laravel starter kit. Everything you reach for in
 
 - Dark-first UI with a custom `--color-dark-*` palette; one-click light/dark toggle
 - Single-flag `LanguageSwitcher` dropdown with English + Norwegian translations
-- Shared user settings (`locale`, `dark_mode`) synced via debounced `PATCH /settings`
-- PrimeVue Toast + ConfirmDialog + DataTable already wired
+- Shared user preferences (`locale`, `dark_mode`) exposed as `user_settings` via debounced `PATCH /settings`
+- PrimeVue Toast + ConfirmDialog + DataTable already wired with blue-tinted dark-mode styling
+- **Mobile-ready** — admin sidebar collapses behind a hamburger + backdrop, top nav compacts the user/lang controls into a dropdown, every DataTable ships with `scrollable` for horizontal overflow, grid layouts stack at the `sm` breakpoint
 
 ### Code quality & testing
 

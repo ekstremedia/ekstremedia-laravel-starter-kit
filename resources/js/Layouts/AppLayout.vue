@@ -58,19 +58,19 @@ function initials(u: { first_name: string; last_name: string }) {
         </div>
 
         <!-- Impersonation banner -->
-        <div v-if="isImpersonating" class="bg-amber-500/90 text-white px-4 py-2 text-sm flex items-center justify-between">
-            <div><i class="pi pi-user-edit mr-2"></i>You are impersonating <strong>{{ user?.email }}</strong>.</div>
-            <button @click="leaveImpersonation" class="px-3 py-1 rounded bg-white/20 hover:bg-white/30 text-sm">
+        <div v-if="isImpersonating" class="bg-amber-500/90 text-white px-4 py-2 text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div class="truncate"><i class="pi pi-user-edit mr-2"></i>You are impersonating <strong>{{ user?.email }}</strong>.</div>
+            <button @click="leaveImpersonation" class="self-start sm:self-auto px-3 py-1 rounded bg-white/20 hover:bg-white/30 text-sm cursor-pointer">
                 <i class="pi pi-sign-out mr-1"></i>Stop impersonating
             </button>
         </div>
         <!-- Navigation -->
         <nav class="border-b border-gray-200 dark:border-dark-800 bg-white dark:bg-dark-900 transition-colors">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-16 items-center">
+                <div class="flex justify-between h-16 items-center gap-2">
                     <!-- Left: Logo + nav links -->
-                    <div class="flex items-center gap-8">
-                        <Link href="/" class="text-xl font-bold text-indigo-600 dark:text-indigo-400 transition-colors hover:text-indigo-500">
+                    <div class="flex items-center gap-4 md:gap-8 min-w-0">
+                        <Link href="/" class="text-base sm:text-xl font-bold text-indigo-600 dark:text-indigo-400 transition-colors hover:text-indigo-500 truncate">
                             {{ appName }}
                         </Link>
 
@@ -100,8 +100,8 @@ function initials(u: { first_name: string; last_name: string }) {
                     </div>
 
                     <!-- Right side -->
-                    <div class="flex items-center gap-3">
-                        <LanguageSwitcher />
+                    <div class="flex items-center gap-1 sm:gap-3">
+                        <div class="hidden sm:block"><LanguageSwitcher /></div>
                         <DarkModeToggle />
 
                         <!-- Notification bell -->
@@ -204,6 +204,8 @@ function initials(u: { first_name: string; last_name: string }) {
                                         >
                                             <i class="pi pi-shield mr-2 text-xs"></i>Admin
                                         </Link>
+                                        <div class="sm:hidden border-t border-gray-100 dark:border-dark-700 my-1"></div>
+                                        <div class="sm:hidden px-4 py-2" @click.stop><LanguageSwitcher /></div>
                                         <div class="border-t border-gray-100 dark:border-dark-700 my-1"></div>
                                         <button
                                             @click="logout"
@@ -223,13 +225,13 @@ function initials(u: { first_name: string; last_name: string }) {
                         <template v-else>
                             <Link
                                 href="/login"
-                                class="text-sm text-gray-600 dark:text-dark-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                class="text-sm text-gray-600 dark:text-dark-400 hover:text-gray-900 dark:hover:text-white transition-colors px-2"
                             >
                                 {{ t('nav.login') }}
                             </Link>
                             <Link
                                 href="/register"
-                                class="text-sm px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                                class="text-sm px-3 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors whitespace-nowrap"
                             >
                                 {{ t('nav.register') }}
                             </Link>

@@ -60,19 +60,19 @@ function canImpersonate(u: UserRow) {
 <template>
     <Head title="Users · Admin" />
     <ConfirmDialog />
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-6">
         <h1 class="text-2xl font-semibold">Users</h1>
         <Link href="/admin/users/create">
             <Button label="New user" icon="pi pi-plus" />
         </Link>
     </div>
 
-    <div class="mb-4 flex gap-2">
-        <InputText v-model="search" placeholder="Search name or email" class="w-64" @keydown.enter="doSearch" />
+    <div class="mb-4 flex flex-wrap gap-2">
+        <InputText v-model="search" placeholder="Search name or email" class="flex-1 sm:flex-none sm:w-64" @keydown.enter="doSearch" />
         <Button label="Search" icon="pi pi-search" severity="secondary" @click="doSearch" />
     </div>
 
-    <DataTable :value="users.data" stripedRows removableSort
+    <DataTable :value="users.data" stripedRows removableSort scrollable
                class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
         <Column field="id" header="ID" style="width: 5rem" sortable />
         <Column header="" style="width: 4rem">

@@ -46,7 +46,7 @@ function runClean() {
         </div>
     </div>
 
-    <DataTable :value="backups" stripedRows removableSort
+    <DataTable :value="backups" stripedRows removableSort scrollable
                class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
         <Column field="date" header="Date" style="width: 18rem" sortable>
             <template #body="{ data }">{{ new Date(data.date).toLocaleString() }}</template>

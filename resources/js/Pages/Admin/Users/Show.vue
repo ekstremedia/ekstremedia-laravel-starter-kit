@@ -106,7 +106,7 @@ function formatDate(iso: string | null) {
         </template>
     </Dialog>
 
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-6">
         <Link href="/admin/users" class="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
             <i class="pi pi-arrow-left mr-1"></i> All users
         </Link>
@@ -120,15 +120,15 @@ function formatDate(iso: string | null) {
 
     <!-- Header card -->
     <div class="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-2xl p-6 mb-6">
-        <div class="flex items-start gap-5">
+        <div class="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-5">
             <img v-if="user.avatar_url" :src="user.avatar_url" :alt="user.full_name"
-                 class="w-24 h-24 rounded-full object-cover ring-2 ring-gray-200 dark:ring-dark-700" />
-            <div v-else class="w-24 h-24 rounded-full bg-indigo-600 text-white flex items-center justify-center text-3xl font-semibold">
+                 class="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover ring-2 ring-gray-200 dark:ring-dark-700" />
+            <div v-else class="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-indigo-600 text-white flex items-center justify-center text-2xl sm:text-3xl font-semibold">
                 {{ user.first_name[0] }}{{ user.last_name[0] }}
             </div>
-            <div class="flex-1">
-                <h1 class="text-2xl font-semibold">{{ user.full_name }}</h1>
-                <p class="text-sm text-gray-500">{{ user.email }}</p>
+            <div class="flex-1 min-w-0">
+                <h1 class="text-xl sm:text-2xl font-semibold truncate">{{ user.full_name }}</h1>
+                <p class="text-sm text-gray-500 truncate">{{ user.email }}</p>
                 <div class="flex flex-wrap items-center gap-2 mt-3">
                     <Tag v-for="r in user.roles" :key="r" :value="r" severity="info" />
                     <Tag v-if="user.email_verified_at" value="verified" severity="success" icon="pi pi-check" />

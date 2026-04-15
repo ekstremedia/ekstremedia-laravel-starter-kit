@@ -351,7 +351,7 @@ function getToken(): string {
                     </p>
 
                     <form @submit.prevent="saveProfile" class="space-y-4">
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <TextInput
                                 v-model="profileForm.first_name"
                                 :label="t('auth.first_name')"

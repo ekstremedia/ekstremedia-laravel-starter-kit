@@ -47,7 +47,7 @@ function destroy(p: Permission) {
         <p v-if="form.errors.name" class="text-xs text-red-500 self-center">{{ form.errors.name }}</p>
     </form>
 
-    <DataTable :value="permissions" stripedRows removableSort
+    <DataTable :value="permissions" stripedRows removableSort scrollable
                v-model:filters="filters" :globalFilterFields="['name', 'guard_name']"
                class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
         <template #header>

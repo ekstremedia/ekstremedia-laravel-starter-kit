@@ -40,7 +40,7 @@ function destroy(r: Role) {
         <Link href="/admin/roles/create"><Button label="New role" icon="pi pi-plus" /></Link>
     </div>
 
-    <DataTable :value="roles" stripedRows removableSort
+    <DataTable :value="roles" stripedRows removableSort scrollable
                v-model:filters="filters" :globalFilterFields="['name', 'permissions']"
                class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
         <template #header>

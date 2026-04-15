@@ -62,7 +62,7 @@ function reset() {
         </div>
     </div>
 
-    <DataTable :value="activities.data" stripedRows removableSort
+    <DataTable :value="activities.data" stripedRows removableSort scrollable
                class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
         <Column field="created_at" header="When" style="width: 12rem" sortable>
             <template #body="{ data }">{{ new Date(data.created_at).toLocaleString() }}</template>

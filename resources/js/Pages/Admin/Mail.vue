@@ -50,7 +50,7 @@ function sendTest() {
     <h1 class="text-2xl font-semibold mb-6">Mail Settings</h1>
 
     <form @submit.prevent="save" class="max-w-3xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl p-6 space-y-4">
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
                 <label class="block text-sm mb-1">Mailer</label>
                 <InputText v-model="form.mailer" class="w-full" />
@@ -60,7 +60,7 @@ function sendTest() {
                 <ToggleSwitch v-model="form.enabled" />
             </div>
         </div>
-        <div class="grid grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div class="col-span-2">
                 <label class="block text-sm mb-1">Host</label>
                 <InputText v-model="form.host" class="w-full" />
@@ -70,7 +70,7 @@ function sendTest() {
                 <InputNumber v-model="form.port" class="w-full" :useGrouping="false" />
             </div>
         </div>
-        <div class="grid grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
                 <label class="block text-sm mb-1">Encryption</label>
                 <Select v-model="form.encryption" :options="encryptionOptions" optionLabel="label" optionValue="value" class="w-full" />
@@ -84,7 +84,7 @@ function sendTest() {
                 <Password v-model="form.password" toggleMask :feedback="false" class="w-full" inputClass="w-full" :placeholder="settings.has_password ? '(unchanged)' : 'Set a password'" />
             </div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
                 <label class="block text-sm mb-1">From address</label>
                 <InputText v-model="form.from_address" class="w-full" />
