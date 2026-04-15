@@ -29,14 +29,25 @@ class PermissionController extends Controller
             'name' => ['required', 'string', 'max:120', 'unique:permissions,name'],
         ]);
 
-        Permission::create(['name' => $data['name']]);
+        $permission = Permission::create(['name' => $data['name']]);
+
+        activity('permission')
+            ->performedOn($permission)
+            ->event('created')
+            ->log("Created permission {$permission->name}");
 
         return back()->with('success', 'Permission created.');
     }
 
     public function destroy(Permission $permission): RedirectResponse
     {
+        $name = $permission->name;
         $permission->delete();
+
+        activity('permission')
+            ->withProperties(['name' => $name])
+            ->event('deleted')
+            ->log("Deleted permission {$name}");
 
         return back()->with('success', 'Permission deleted.');
     }

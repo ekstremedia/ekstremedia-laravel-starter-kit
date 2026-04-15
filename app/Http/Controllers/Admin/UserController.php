@@ -69,6 +69,12 @@ class UserController extends Controller
 
         $user->syncRoles($data['roles'] ?? []);
 
+        activity('user')
+            ->performedOn($user)
+            ->withProperties(['roles' => $data['roles'] ?? []])
+            ->event('created')
+            ->log("Created user {$user->email}");
+
         return redirect()->route('admin.users.index')->with('success', 'User created.');
     }
 
@@ -90,18 +96,34 @@ class UserController extends Controller
     {
         $data = $request->validated();
 
+        $previousRoles = $user->getRoleNames()->sort()->values()->all();
+        $newRoles = collect($data['roles'] ?? [])->sort()->values()->all();
+        $passwordChanged = ! empty($data['password']);
+
         $user->fill([
             'first_name' => $data['first_name'],
             'last_name' => $data['last_name'],
             'email' => $data['email'],
         ]);
 
-        if (! empty($data['password'])) {
+        if ($passwordChanged) {
             $user->password = Hash::make($data['password']);
         }
 
         $user->save();
         $user->syncRoles($data['roles'] ?? []);
+
+        if ($previousRoles !== $newRoles || $passwordChanged) {
+            activity('user')
+                ->performedOn($user)
+                ->withProperties([
+                    'roles_added' => array_values(array_diff($newRoles, $previousRoles)),
+                    'roles_removed' => array_values(array_diff($previousRoles, $newRoles)),
+                    'password_changed' => $passwordChanged,
+                ])
+                ->event('admin_updated')
+                ->log("Admin updated user {$user->email}");
+        }
 
         return redirect()->route('admin.users.index')->with('success', 'User updated.');
     }
@@ -112,7 +134,14 @@ class UserController extends Controller
             return back()->with('error', 'You cannot delete your own account.');
         }
 
+        $email = $user->email;
+        $roles = $user->getRoleNames()->all();
         $user->delete();
+
+        activity('user')
+            ->withProperties(['email' => $email, 'roles' => $roles])
+            ->event('deleted')
+            ->log("Deleted user {$email}");
 
         return redirect()->route('admin.users.index')->with('success', 'User deleted.');
     }

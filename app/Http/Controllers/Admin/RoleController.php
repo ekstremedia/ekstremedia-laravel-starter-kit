@@ -43,6 +43,12 @@ class RoleController extends Controller
         $role = Role::create(['name' => $data['name']]);
         $role->syncPermissions($data['permissions'] ?? []);
 
+        activity('role')
+            ->performedOn($role)
+            ->withProperties(['permissions' => $data['permissions'] ?? []])
+            ->event('created')
+            ->log("Created role {$role->name}");
+
         return redirect()->route('admin.roles.index')->with('success', 'Role created.');
     }
 
@@ -66,15 +72,37 @@ class RoleController extends Controller
             'permissions.*' => ['string', 'exists:permissions,name'],
         ]);
 
+        $previousName = $role->name;
+        $previousPermissions = $role->permissions->pluck('name')->sort()->values()->all();
+        $newPermissions = collect($data['permissions'] ?? [])->sort()->values()->all();
+
         $role->update(['name' => $data['name']]);
         $role->syncPermissions($data['permissions'] ?? []);
+
+        activity('role')
+            ->performedOn($role)
+            ->withProperties([
+                'previous' => ['name' => $previousName, 'permissions' => $previousPermissions],
+                'current' => ['name' => $role->name, 'permissions' => $newPermissions],
+                'permissions_added' => array_values(array_diff($newPermissions, $previousPermissions)),
+                'permissions_removed' => array_values(array_diff($previousPermissions, $newPermissions)),
+            ])
+            ->event('updated')
+            ->log("Updated role {$role->name}");
 
         return redirect()->route('admin.roles.index')->with('success', 'Role updated.');
     }
 
     public function destroy(Role $role): RedirectResponse
     {
+        $name = $role->name;
+        $permissions = $role->permissions->pluck('name')->all();
         $role->delete();
+
+        activity('role')
+            ->withProperties(['name' => $name, 'permissions' => $permissions])
+            ->event('deleted')
+            ->log("Deleted role {$name}");
 
         return redirect()->route('admin.roles.index')->with('success', 'Role deleted.');
     }

@@ -43,12 +43,16 @@ class BackupController extends Controller
     {
         Artisan::queue('backup:run', ['--only-db' => false]);
 
+        activity('backup')->event('run')->log('Manual backup queued');
+
         return back()->with('success', 'Backup queued.');
     }
 
     public function clean(): RedirectResponse
     {
         Artisan::queue('backup:clean');
+
+        activity('backup')->event('clean')->log('Manual backup cleanup queued');
 
         return back()->with('success', 'Backup cleanup queued.');
     }

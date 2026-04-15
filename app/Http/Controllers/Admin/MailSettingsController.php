@@ -55,6 +55,12 @@ class MailSettingsController extends Controller
 
         $settings->fill($data)->save();
 
+        activity('mail_settings')
+            ->performedOn($settings)
+            ->withProperties(['password_changed' => isset($data['password'])])
+            ->event('updated')
+            ->log('Updated mail settings');
+
         return back()->with('success', 'Mail settings saved.');
     }
 
