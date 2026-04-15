@@ -48,7 +48,7 @@ export function useSettings() {
     }
 
     watch(
-        () => [page.props.auth?.user?.id, page.props.settings] as const,
+        () => [page.props.auth?.user?.id, page.props.user_settings] as const,
         ([userId, serverSettings]) => {
             if (userId && serverSettings) {
                 syncFromServer(serverSettings);

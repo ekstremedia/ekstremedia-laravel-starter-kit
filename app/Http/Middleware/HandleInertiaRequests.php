@@ -62,8 +62,10 @@ class HandleInertiaRequests extends Middleware
             'debug' => [
                 'easy_login_enabled' => (app()->isLocal() || app()->runningUnitTests()) && config('dev.easy_login_enabled'),
             ],
-            // Resolved settings for authenticated users, defaults for guests
-            'settings' => $request->user()
+            // Resolved per-user preferences for authenticated users, defaults for
+            // guests. Named `user_settings` so it cannot collide with a page-level
+            // `settings` prop on admin pages (app settings, mail settings, …).
+            'user_settings' => $request->user()
                 ? $request->user()->settings()->resolved()
                 : UserSetting::$defaults,
             'flash' => [

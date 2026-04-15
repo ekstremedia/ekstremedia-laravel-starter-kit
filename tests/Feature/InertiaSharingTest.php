@@ -64,7 +64,7 @@ it('shares user settings for authenticated users', function () {
     $this->actingAs($user)
         ->get('/dashboard')
         ->assertInertia(fn ($page) => $page
-            ->has('settings.locale')
-            ->has('settings.dark_mode')
+            ->has('user_settings.locale')
+            ->has('user_settings.dark_mode')
         );
 });

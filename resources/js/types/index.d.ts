@@ -33,7 +33,7 @@ export interface PageProps extends InertiaPageProps {
         easy_login_enabled: boolean;
     };
     locale: string;
-    settings: UserSettings;
+    user_settings: UserSettings;
     flash: {
         success?: string;
         error?: string;
