@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use Database\Seeders\RoleAndPermissionSeeder;
+use Spatie\Activitylog\Models\Activity;
 
 beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
@@ -54,7 +55,7 @@ it('logs impersonation events to the activity log', function () {
     $this->actingAs($this->admin)
         ->post("/admin/users/{$this->target->id}/impersonate");
 
-    $log = \Spatie\Activitylog\Models\Activity::where('log_name', 'impersonation')->latest()->first();
+    $log = Activity::where('log_name', 'impersonation')->latest()->first();
     expect($log)->not->toBeNull()
         ->and($log->event)->toBe('started');
 });

@@ -13,9 +13,7 @@ class PingJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public string $nonce)
-    {
-    }
+    public function __construct(public string $nonce) {}
 
     public function handle(): void
     {

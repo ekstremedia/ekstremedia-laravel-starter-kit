@@ -21,7 +21,7 @@ it('encrypts the password attribute', function () {
     $settings->password = 'secret-pw';
     $settings->save();
 
-    $raw = \DB::table('mail_settings')->where('id', $settings->id)->value('password');
+    $raw = DB::table('mail_settings')->where('id', $settings->id)->value('password');
     expect($raw)->not->toBe('secret-pw');
 
     expect($settings->fresh()->password)->toBe('secret-pw');

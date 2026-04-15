@@ -13,9 +13,7 @@ class PingEvent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public function __construct(public string $nonce, public string $at)
-    {
-    }
+    public function __construct(public string $nonce, public string $at) {}
 
     /**
      * @return array<int, Channel>

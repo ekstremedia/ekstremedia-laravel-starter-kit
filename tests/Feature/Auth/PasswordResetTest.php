@@ -33,7 +33,7 @@ it('shows the reset password page', function () {
 
     $this->post('/forgot-password', ['email' => 'test@example.com']);
 
-    Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
+    Notification::assertSentTo($user, ResetPassword::class, function ($notification) {
         $this->get('/reset-password/'.$notification->token.'?email=test@example.com')
             ->assertStatus(200)
             ->assertInertia(fn ($page) => $page

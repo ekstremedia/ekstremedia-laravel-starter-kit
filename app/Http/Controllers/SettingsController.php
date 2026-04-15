@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\UserSetting;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 
 class SettingsController extends Controller
 {

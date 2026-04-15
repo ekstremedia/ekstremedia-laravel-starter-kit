@@ -53,7 +53,7 @@ it('filters activity log by log name', function () {
 
 it('filters activity log by date range', function () {
     $old = Activity::create(['log_name' => 'datefilter', 'description' => 'old']);
-    \DB::table('activity_log')->where('id', $old->id)->update(['created_at' => now()->subDays(10)]);
+    DB::table('activity_log')->where('id', $old->id)->update(['created_at' => now()->subDays(10)]);
     Activity::create(['log_name' => 'datefilter', 'description' => 'recent']);
 
     $this->actingAs($this->admin)

@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use Database\Seeders\RoleAndPermissionSeeder;
+use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
@@ -35,7 +36,7 @@ it('renders the roles create form', function () {
 });
 
 it('renders the roles edit form with current permissions preloaded', function () {
-    $role = \Spatie\Permission\Models\Role::findByName('Editor');
+    $role = Role::findByName('Editor');
 
     $this->actingAs($this->admin)
         ->get("/admin/roles/{$role->id}/edit")

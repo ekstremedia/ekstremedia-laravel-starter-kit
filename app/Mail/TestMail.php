@@ -13,9 +13,7 @@ class TestMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public string $note = '')
-    {
-    }
+    public function __construct(public string $note = '') {}
 
     public function envelope(): Envelope
     {
