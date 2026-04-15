@@ -71,10 +71,13 @@ function canImpersonate(u: UserRow) {
                 <Tag v-for="r in data.roles" :key="r.id" :value="r.name" class="mr-1" severity="info" />
             </template>
         </Column>
-        <Column header="Actions" style="width: 20rem">
+        <Column header="Actions" style="width: 16rem">
             <template #body="{ data }">
+                <Link :href="`/admin/users/${data.id}`">
+                    <Button icon="pi pi-eye" size="small" severity="secondary" class="mr-1" title="View" />
+                </Link>
                 <Link :href="`/admin/users/${data.id}/edit`">
-                    <Button label="Edit" icon="pi pi-pencil" size="small" severity="secondary" class="mr-1" />
+                    <Button icon="pi pi-pencil" size="small" severity="secondary" class="mr-1" title="Edit" />
                 </Link>
                 <Button
                     v-if="canImpersonate(data)"
@@ -85,7 +88,7 @@ function canImpersonate(u: UserRow) {
                     title="Log in as this user"
                     @click="impersonate(data)"
                 />
-                <Button label="Delete" icon="pi pi-trash" size="small" severity="danger" @click="destroy(data)" />
+                <Button icon="pi pi-trash" size="small" severity="danger" title="Delete" @click="destroy(data)" />
             </template>
         </Column>
     </DataTable>

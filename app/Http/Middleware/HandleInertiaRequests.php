@@ -2,9 +2,11 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\AppSetting;
 use App\Models\UserSetting;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Throwable;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -69,6 +71,31 @@ class HandleInertiaRequests extends Middleware
                 'error' => fn () => $request->session()->get('error'),
                 'status' => fn () => $request->session()->get('status'),
             ],
+            'app_settings' => fn () => $this->appSettings(),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function appSettings(): array
+    {
+        try {
+            $s = AppSetting::current();
+
+            return [
+                'registration_open' => $s->registration_open,
+                'login_enabled' => $s->login_enabled,
+                'announcement' => $s->announcement_banner
+                    ? ['text' => $s->announcement_banner, 'severity' => $s->announcement_severity]
+                    : null,
+            ];
+        } catch (Throwable) {
+            return [
+                'registration_open' => true,
+                'login_enabled' => true,
+                'announcement' => null,
+            ];
+        }
     }
 }

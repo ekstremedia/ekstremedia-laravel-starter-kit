@@ -2,7 +2,9 @@
 
 namespace App\Actions\Fortify;
 
+use App\Models\AppSetting;
 use App\Models\User;
+use App\Notifications\WelcomeNotification;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -34,10 +36,16 @@ class CreateNewUser implements CreatesNewUsers
             'password' => $input['password'],
         ]);
 
+        $settings = AppSetting::current();
+
         try {
-            $user->assignRole('User');
+            $user->assignRole($settings->default_role ?? 'User');
         } catch (RoleDoesNotExist) {
-            // 'User' role has not been seeded yet; the account is created without a role.
+            // Configured default role isn't seeded; the account is created without a role.
+        }
+
+        if ($settings->send_welcome_notification) {
+            $user->notify(new WelcomeNotification);
         }
 
         return $user;

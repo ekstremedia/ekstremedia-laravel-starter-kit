@@ -20,6 +20,13 @@ useFlashToast();
 
 const unreadCount = computed(() => user.value?.unread_notifications_count ?? 0);
 const isImpersonating = computed(() => user.value?.is_impersonating ?? false);
+const announcement = computed(() => (page.props as any).app_settings?.announcement as { text: string; severity: string } | null);
+const announcementClass: Record<string, string> = {
+    info: 'bg-sky-500/90',
+    warn: 'bg-amber-500/90',
+    danger: 'bg-rose-500/90',
+    success: 'bg-emerald-500/90',
+};
 
 function logout() {
     router.post('/logout');
@@ -44,6 +51,12 @@ function initials(u: { first_name: string; last_name: string }) {
 <template>
     <Toast position="top-right" />
     <div class="min-h-screen bg-gray-50 dark:bg-dark-950 text-gray-900 dark:text-gray-100 transition-colors">
+        <!-- Announcement banner -->
+        <div v-if="announcement"
+             :class="[announcementClass[announcement.severity] ?? 'bg-sky-500/90', 'text-white px-4 py-2 text-sm text-center']">
+            <i class="pi pi-megaphone mr-2"></i>{{ announcement.text }}
+        </div>
+
         <!-- Impersonation banner -->
         <div v-if="isImpersonating" class="bg-amber-500/90 text-white px-4 py-2 text-sm flex items-center justify-between">
             <div><i class="pi pi-user-edit mr-2"></i>You are impersonating <strong>{{ user?.email }}</strong>.</div>

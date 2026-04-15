@@ -37,6 +37,37 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         return ! $this->hasRole('Admin');
     }
 
+    public function isBanned(): bool
+    {
+        return $this->banned_at !== null;
+    }
+
+    public function ban(?string $reason = null): void
+    {
+        $this->forceFill([
+            'banned_at' => now(),
+            'banned_reason' => $reason,
+        ])->save();
+    }
+
+    public function unban(): void
+    {
+        $this->forceFill([
+            'banned_at' => null,
+            'banned_reason' => null,
+        ])->save();
+    }
+
+    public function scopeBanned($query)
+    {
+        return $query->whereNotNull('banned_at');
+    }
+
+    public function scopeNotBanned($query)
+    {
+        return $query->whereNull('banned_at');
+    }
+
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('avatar')
@@ -115,6 +146,8 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     {
         return [
             'email_verified_at' => 'datetime',
+            'banned_at' => 'datetime',
+            'last_login_at' => 'datetime',
             'password' => 'hashed',
         ];
     }

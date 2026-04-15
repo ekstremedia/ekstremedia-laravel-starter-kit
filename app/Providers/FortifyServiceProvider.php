@@ -8,8 +8,10 @@ use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Http\Responses\LoginResponse;
 use App\Http\Responses\RegisterResponse;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -55,6 +57,25 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::twoFactorChallengeView(fn () => Inertia::render('Auth/TwoFactorChallenge'));
 
         Fortify::confirmPasswordView(fn () => Inertia::render('Auth/ConfirmPassword'));
+
+        // Block login for banned users. Returning null here signals "invalid
+        // credentials" to Fortify so Laravel still shows the generic error
+        // without leaking that a specific account is banned.
+        Fortify::authenticateUsing(function (Request $request) {
+            $user = User::where('email', $request->input(Fortify::username()))->first();
+
+            if (! $user || ! Hash::check($request->input('password'), $user->password)) {
+                return null;
+            }
+
+            if ($user->isBanned()) {
+                return null;
+            }
+
+            $user->forceFill(['last_login_at' => now()])->save();
+
+            return $user;
+        });
 
         // Rate limiting
         RateLimiter::for('login', function (Request $request) {
