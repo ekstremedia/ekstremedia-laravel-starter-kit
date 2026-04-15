@@ -1,24 +1,59 @@
 # Laravel Starter Kit
 
-Opinionated Laravel starter kit for new product work. It ships with the baseline stack and repeated setup already done: Inertia SPA mode, Vue 3 + TypeScript, Tailwind CSS v4, PrimeVue v4, Laravel Reverb, Pest, Docker, Spatie roles/permissions, localization, dark mode, shared user settings, and a polished auth flow.
+Opinionated, batteries-included Laravel starter kit. Everything you reach for in most projects is already wired: auth, admin dashboard, queues, broadcasting, media uploads, activity log, observability, backups, impersonation, notifications, CI, and a full test suite.
 
 ## Included
 
-- Laravel 13 + PHP 8.4
-- Inertia.js + Vue 3 + TypeScript
-- Tailwind CSS v4 + PrimeVue v4
-- PostgreSQL 17 + Redis 7
-- Pest test suite + GitHub Actions
-- Laravel Fortify authentication (login, registration, email verification, password reset, two-factor authentication)
-- Laravel Sanctum for SPA session auth and API tokens
-- Spatie roles/permissions seeded with `Admin`, `Editor`, and `User` plus a richer demo user set
-- Authenticated dashboard and self-service profile page (name, email, password, 2FA management)
-- Dark-first UI with a dark-blue palette (`--color-dark-*` in `resources/css/app.css`) and PrimeVue toast notifications wired through `useFlashToast`
-- Shared user settings for `locale` and `dark_mode` (defaults to dark)
-- English and Norwegian translations
-- Local-only easy login for development
-- Docker app stack with Nginx, PHP-FPM, Vite, PostgreSQL, Redis, and Mailpit
-- Laravel Reverb websocket server running inside the app container
+### Core
+
+- **Laravel 13** + **PHP 8.4** (Imagick + GD with JPEG/WebP + phpredis installed in the image)
+- **Inertia.js v3** + **Vue 3** + **TypeScript**
+- **Tailwind CSS v4** + **PrimeVue v4** + **primeicons** + **GSAP**
+- **PostgreSQL 17** + **Redis 7** (cache, queue, session) + **Mailpit**
+- **Docker** stack with Supervisor running php-fpm, nginx, Vite, **Reverb**, **Horizon**, **Pulse check/work**, and the **Laravel scheduler**
+
+### Auth & users
+
+- **Laravel Fortify** (login, register, email verification, password reset, TOTP 2FA + recovery codes) + **Sanctum** (SPA session + API tokens)
+- **Spatie Permission** — roles/permissions seeded (`Admin` / `Editor` / `User`)
+- **Spatie Medialibrary** — profile-photo uploads with synchronous `thumb` (64×64) + queued `avatar` (256×256) WebP conversions; easy to switch disks via `MEDIA_DISK`
+- **Impersonation** (lab404/laravel-impersonate) — one-click "log in as user" for admins, amber banner + activity-log entries on start/stop
+- **Dev easy-login** button on the login page when `DEV_EASY_LOGIN_ENABLED=true`
+
+### Admin dashboard (`/admin`, role:Admin gated)
+
+- Users / Roles / Permissions CRUD with form requests and validation
+- Activity log viewer (filter by user, date, log name, event)
+- Server & System page: live queue / Reverb / Redis pings + PHP / Laravel / drivers / cache / extensions snapshot
+- Mail settings (encrypted SMTP password, applied to runtime config) + test-send button
+- Backups — scheduled daily (01:30 clean / 02:00 run / 06:00 monitor) via spatie/laravel-backup; manual run/clean buttons
+- Horizon (`/horizon`), Pulse (`/pulse`), Log viewer (`/log-viewer`) — each gated to admins
+
+### Observability & reliability
+
+- **Sentry** (`sentry/sentry-laravel`) — enable by setting `SENTRY_LARAVEL_DSN`
+- **Laravel Pulse** — app metrics dashboard
+- **Laravel Horizon** — queue dashboard with configurable workers
+- **Spatie Activitylog** — user changes auto-logged; custom viewer in admin
+- **opcodesio/log-viewer** — raw `storage/logs/*` browsable at `/log-viewer`
+- **Notifications inbox** — DB-backed, unread count shared via Inertia, bell with badge in nav, mark-read/mark-all-read/delete endpoints
+
+### Frontend polish
+
+- Dark-first UI with a custom `--color-dark-*` palette; one-click light/dark toggle
+- Single-flag `LanguageSwitcher` dropdown with English + Norwegian translations
+- Shared user settings (`locale`, `dark_mode`) synced via debounced `PATCH /settings`
+- PrimeVue Toast + ConfirmDialog + DataTable already wired
+
+### Code quality & testing
+
+- **Pest 4.6** backend suite (184 tests, 651 assertions) — auth, CRUD, health, mail, avatars, impersonation, notifications, backups, arch rules
+- **Vitest 4** frontend suite (18 tests) for `TextInput`, `PrimaryButton`, `DarkModeToggle`, `LanguageSwitcher`
+- **Larastan** (phpstan.neon, level 5) — `make stan`
+- **Laravel Pint** — `make pint`
+- **Husky + lint-staged** pre-commit hook runs Pint on staged PHP and `vue-tsc` on staged TS/Vue
+- **GitHub Actions** pipeline: parallel backend (Pest + Pint + Larastan) and frontend (Vitest + tsc + build) jobs, Postgres + Redis service containers
+- **Laravel Boost** MCP server pre-configured (`.mcp.json`) to run inside the container
 
 ## New Project Flow
 
@@ -125,22 +160,101 @@ make logs-all           # Tail all container logs
 make reverb-restart     # Restart the Reverb websocket server
 
 make pint               # Run Laravel Pint
+make stan               # Run Larastan static analysis
+make test-js            # Run Vitest frontend tests
+make test-all           # Run Pest + typecheck + Vitest
+make backup             # Trigger a manual backup
+make backup-clean       # Drop old backups
 make cache-clear        # Clear Laravel caches
 make composer-install   # Run composer install in container
 make npm-install        # Run npm install in container
 make npm-build          # Build frontend assets
 ```
 
+`make help` lists every target with a description.
+
+## Admin Surface
+
+All admin pages live under `/admin/*` and are gated by the `role:Admin` middleware.
+
+| Route | Purpose |
+| --- | --- |
+| `/admin` | Overview tiles |
+| `/admin/users` | User CRUD + role assignment + impersonate |
+| `/admin/roles` | Role CRUD + permission sync |
+| `/admin/permissions` | Permissions registry |
+| `/admin/activity` | Activity log viewer (filter by user/date/log name/event) |
+| `/admin/mail` | SMTP settings + test send |
+| `/admin/backups` | List + trigger backups |
+| `/admin/system` | Live queue/Reverb/Redis health + full runtime snapshot |
+| `/horizon` | Laravel Horizon dashboard |
+| `/pulse` | Laravel Pulse metrics |
+| `/log-viewer` | Raw `storage/logs/*` viewer |
+
+Impersonation writes a yellow banner across the top while active; clicking **Stop impersonating** returns you to the original admin account.
+
+## Key Env Vars
+
+Beyond standard Laravel vars, the starter kit uses:
+
+```dotenv
+# Admin seeded by DatabaseSeeder + UserSeeder
+STARTER_ADMIN_EMAIL=admin@example.test
+STARTER_ADMIN_PASSWORD=password
+SEED_DEMO_USERS=true              # Seed 3 editors + 8 users with nb_NO fake names
+
+# Easy login shortcut shown on /login in local/testing
+DEV_EASY_LOGIN_ENABLED=false
+
+# Spatie Medialibrary
+MEDIA_DISK=public                 # switch to 's3' (or any disk) to move uploads
+IMAGE_DRIVER=imagick              # fallback: 'gd'
+QUEUE_CONVERSIONS_BY_DEFAULT=true
+
+# Sentry (leave DSN empty to disable)
+SENTRY_LARAVEL_DSN=
+SENTRY_TRACES_SAMPLE_RATE=0.2
+SENTRY_PROFILES_SAMPLE_RATE=0.2
+
+# Laravel Pulse cache store — database avoids phpredis/Collection unserialize
+# issues when the main CACHE_STORE is redis.
+PULSE_CACHE_DRIVER=database
+
+# Log viewer (opcodesio) — list every host the SPA might be served from
+LOG_VIEWER_API_STATEFUL_DOMAINS=starter-kit.test,localhost
+```
+
 ## Testing
 
-Tests use [`.env.testing`](./.env.testing) plus forced `phpunit.xml` environment overrides so Docker-exported env vars cannot leak into the test environment. The test environment keeps broadcasting disabled, so Reverb is not required for PHP test runs.
+Two test suites run in parallel in CI and locally.
 
-These should both pass:
+**Backend (Pest 4):**
 
 ```bash
-php artisan test
-docker compose exec app php artisan test
+make test                # all suites
+docker compose exec app php artisan test --compact
+docker compose exec app vendor/bin/phpstan analyse
+docker compose exec app vendor/bin/pint --test
 ```
+
+Pest uses SQLite `:memory:` by default (forced via `phpunit.xml`). Broadcasting, Pulse, and Nightwatch are disabled in the test env so Reverb is not required.
+
+**Frontend (Vitest 4 + Vue Test Utils):**
+
+```bash
+docker compose exec app npm test
+docker compose exec app npm run typecheck
+```
+
+Component specs live in `tests/frontend/Components/`. The `tests/frontend/setup.ts` file stubs Inertia so mounted components don't need a real SPA.
+
+**Everything at once:**
+
+```bash
+make test-all
+```
+
+CI (`.github/workflows/tests.yml`) runs two parallel jobs — **Backend** (Postgres + Redis service containers, Pint, Larastan, Pest) and **Frontend** (typecheck, Vitest, build).
 
 ## What To Customize First
 
