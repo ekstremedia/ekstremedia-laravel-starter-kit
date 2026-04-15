@@ -52,7 +52,7 @@ it('enforces the upload size ceiling', function () {
 
     $this->actingAs($user)
         ->post('/profile/avatar', [
-            'avatar' => UploadedFile::fake()->image('big.png')->size(16000),
+            'avatar' => UploadedFile::fake()->image('big.png')->size(52000),
         ])
         ->assertSessionHasErrors('avatar');
 });

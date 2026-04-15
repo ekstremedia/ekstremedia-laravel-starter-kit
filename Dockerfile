@@ -30,9 +30,9 @@ RUN apt-get update && apt-get install -y \
 
 # Upload limits — kept slightly below nginx's client_max_body_size
 RUN { \
-        echo 'upload_max_filesize=20M'; \
-        echo 'post_max_size=25M'; \
-        echo 'memory_limit=256M'; \
+        echo 'upload_max_filesize=50M'; \
+        echo 'post_max_size=55M'; \
+        echo 'memory_limit=512M'; \
     } > /usr/local/etc/php/conf.d/uploads.ini
 
 # Install Composer

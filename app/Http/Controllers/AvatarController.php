@@ -12,7 +12,7 @@ class AvatarController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'avatar' => ['required', 'image', 'mimes:jpeg,png,webp,gif', 'max:15360'],
+            'avatar' => ['required', 'image', 'mimes:jpeg,png,webp,gif', 'max:51200'],
         ]);
 
         try {

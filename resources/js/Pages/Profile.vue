@@ -289,7 +289,7 @@ function getToken(): string {
                 <div class="p-6 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700">
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Profile photo</h2>
                     <p class="text-sm text-gray-500 dark:text-dark-400 mt-1 mb-5">
-                        JPG, PNG, WebP or GIF. Up to 15&nbsp;MB. A square image works best.
+                        JPG, PNG, WebP or GIF. Up to 50&nbsp;MB. A square image works best.
                     </p>
 
                     <div class="flex items-center gap-6">
