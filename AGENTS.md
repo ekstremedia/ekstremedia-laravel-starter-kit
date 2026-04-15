@@ -13,6 +13,40 @@ An opinionated starter repository for new Laravel products. The goal is to avoid
 - **Activity log:** Spatie Laravel Activitylog (custom viewer under `/admin/activity`)
 - **Other:** Docker, Mailpit, GSAP, vue-i18n, Spatie Laravel Permission, Laravel Reverb
 
+## PhpStorm + Docker setup
+
+`docker-compose.yml` bind-mounts the entire project, including `vendor/` and `node_modules/`, so PhpStorm on the host can index every class (framework, packages, Vue components). The tradeoff is bind-mount I/O cost — fine on Linux, slower on macOS/Windows Docker Desktop (re-add `/var/www/html/vendor` and `/var/www/html/node_modules` as anonymous volumes there).
+
+For autocomplete on Laravel facades, the service container, and Eloquent magic methods, regenerate the IDE helper files whenever your models change:
+
+```sh
+make ide-helper
+```
+
+This produces `_ide_helper.php`, `_ide_helper_models.php`, and `.phpstorm.meta.php` at the project root (all git-ignored). `composer update` auto-regenerates facades + meta; models are on-demand because they need DB connectivity.
+
+After a fresh clone:
+
+```sh
+docker compose up -d app
+docker compose exec app composer install
+docker compose exec app npm install
+make ide-helper
+```
+
+Then in PhpStorm: **File → Invalidate Caches and Restart**.
+
+## Blade Icons
+
+`blade-ui-kit/blade-icons` + `blade-ui-kit/blade-heroicons` ship SVG icons for any Blade view (mail templates, root `app.blade.php`, future admin partials). Three equivalent syntaxes:
+
+```blade
+@svg('heroicon-o-user', 'w-5 h-5 text-indigo-500')
+<x-heroicon-o-user class="w-5 h-5 text-indigo-500" />
+```
+
+The Vue/Inertia side keeps using `primeicons`; Blade Icons only matters for server-rendered views. `resources/views/mail/test.blade.php` has a live example.
+
 ## Running Commands (Container-Only)
 
 All commands run inside the `app` container — never on the host. The repo mounts the working directory, so edits on host are visible.

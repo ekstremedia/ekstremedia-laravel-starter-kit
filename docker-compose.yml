@@ -9,9 +9,11 @@ services:
       - "${VITE_HOST_PORT:-5173}:5173"
       - "${REVERB_HOST_PORT:-8080}:8080"
     volumes:
+      # Full project bind-mount. vendor/ and node_modules/ are host-visible
+      # so PhpStorm can index them. On Docker Desktop (macOS/Windows) you may
+      # want to re-add anonymous volumes for `/var/www/html/vendor` and
+      # `/var/www/html/node_modules` for performance.
       - .:/var/www/html
-      - /var/www/html/vendor
-      - /var/www/html/node_modules
     depends_on:
       postgres:
         condition: service_healthy

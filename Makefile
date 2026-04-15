@@ -92,6 +92,11 @@ pint: ## Run Laravel Pint (code formatter)
 stan: ## Run Larastan static analysis
 	docker compose exec $(APP_SERVICE) ./vendor/bin/phpstan analyse --memory-limit=1G --no-progress
 
+ide-helper: ## Regenerate IDE helper files (facades, models, meta) for PhpStorm
+	docker compose exec $(APP_SERVICE) php artisan ide-helper:generate
+	docker compose exec $(APP_SERVICE) php artisan ide-helper:meta
+	docker compose exec $(APP_SERVICE) php artisan ide-helper:models --nowrite --reset
+
 backup: ## Run a manual backup
 	docker compose exec $(APP_SERVICE) php artisan backup:run
 

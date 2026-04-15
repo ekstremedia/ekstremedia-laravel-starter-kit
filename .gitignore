@@ -21,6 +21,8 @@
 /storage/framework/views/*.php
 /vendor
 _ide_helper.php
+_ide_helper_models.php
+.phpstorm.meta.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
