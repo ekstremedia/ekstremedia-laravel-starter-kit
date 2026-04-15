@@ -19,9 +19,11 @@ const nav = [
     { label: 'Permissions', href: '/admin/permissions', icon: 'pi-key', match: (p: string) => p.startsWith('/admin/permissions') },
     { label: 'Activity Log', href: '/admin/activity', icon: 'pi-list', match: (p: string) => p.startsWith('/admin/activity') },
     { label: 'Mail Settings', href: '/admin/mail', icon: 'pi-envelope', match: (p: string) => p.startsWith('/admin/mail') },
+    { label: 'Backups', href: '/admin/backups', icon: 'pi-cloud-upload', match: (p: string) => p.startsWith('/admin/backups') },
     { label: 'Server & System', href: '/admin/system', icon: 'pi-server', match: (p: string) => p.startsWith('/admin/system') || p.startsWith('/admin/health') },
     { label: 'Horizon', href: '/horizon', icon: 'pi-compass', external: true },
     { label: 'Pulse', href: '/pulse', icon: 'pi-chart-line', external: true },
+    { label: 'Logs', href: '/log-viewer', icon: 'pi-file', external: true },
 ];
 
 const mobileOpen = ref(false);

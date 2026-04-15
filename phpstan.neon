@@ -1,0 +1,27 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app
+        - config
+        - database
+        - routes
+
+    level: 5
+
+    ignoreErrors:
+        - '#Property App\\Models\\User::\$[a-z_]+ is never read, only written#'
+        - '#Call to an undefined method Illuminate\\Database\\Eloquent\\Builder#'
+        - '#Call to an undefined method Spatie\\Image\\Drivers\\ImageDriver::#'
+        - '#Call to an undefined method Lab404\\Impersonate\\Services\\ImpersonateManager::#'
+        - '#Called .env. outside of the config directory#'
+        - '#Class Spatie\\MediaLibraryPro\\Models\\TemporaryUpload not found#'
+        - '#should return App\\Models\\UserSetting but returns Illuminate\\Database\\Eloquent\\Model#'
+        - '#Match expression does not handle remaining value: string#'
+        - '#Instanceof between App\\Models\\User and Illuminate\\Contracts\\Auth\\MustVerifyEmail will always evaluate to true#'
+
+    excludePaths:
+        - app/Providers/HorizonServiceProvider.php
+
+    reportUnmatchedIgnoredErrors: false

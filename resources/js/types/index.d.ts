@@ -15,6 +15,8 @@ export interface User {
     avatar_thumb_url?: string | null;
     roles?: string[];
     permissions?: string[];
+    unread_notifications_count?: number;
+    is_impersonating?: boolean;
 }
 
 export interface UserSettings {

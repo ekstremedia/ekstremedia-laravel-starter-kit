@@ -52,6 +52,8 @@ class HandleInertiaRequests extends Middleware
                     'avatar_thumb_url' => $request->user()->avatarUrl('thumb'),
                     'roles' => $request->user()->getRoleNames()->toArray(),
                     'permissions' => $request->user()->getAllPermissions()->pluck('name')->toArray(),
+                    'unread_notifications_count' => $request->user()->unreadNotifications()->count(),
+                    'is_impersonating' => session()->has('impersonated_by'),
                 ] : null,
             ],
             'locale' => app()->getLocale(),

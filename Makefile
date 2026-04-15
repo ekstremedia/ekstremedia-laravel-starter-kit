@@ -87,6 +87,15 @@ tinker: ## Open Laravel Tinker
 pint: ## Run Laravel Pint (code formatter)
 	docker compose exec $(APP_SERVICE) ./vendor/bin/pint
 
+stan: ## Run Larastan static analysis
+	docker compose exec $(APP_SERVICE) ./vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+
+backup: ## Run a manual backup
+	docker compose exec $(APP_SERVICE) php artisan backup:run
+
+backup-clean: ## Clean old backups
+	docker compose exec $(APP_SERVICE) php artisan backup:clean
+
 logs: ## Show app container logs
 	docker compose logs -f $(APP_SERVICE)
 

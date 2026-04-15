@@ -15,10 +15,23 @@ const isAdmin = computed(() => user.value?.roles?.includes('Admin') ?? false);
 const appName = import.meta.env.VITE_APP_NAME || t('app.name');
 
 const dropdownOpen = ref(false);
+const notificationsOpen = ref(false);
 useFlashToast();
+
+const unreadCount = computed(() => user.value?.unread_notifications_count ?? 0);
+const isImpersonating = computed(() => user.value?.is_impersonating ?? false);
 
 function logout() {
     router.post('/logout');
+}
+
+function leaveImpersonation() {
+    router.post('/impersonate/leave');
+}
+
+function markAllRead() {
+    router.post('/notifications/read-all', {}, { preserveScroll: true });
+    notificationsOpen.value = false;
 }
 
 function initials(u: { first_name: string; last_name: string }) {
@@ -31,6 +44,13 @@ function initials(u: { first_name: string; last_name: string }) {
 <template>
     <Toast position="top-right" />
     <div class="min-h-screen bg-gray-50 dark:bg-dark-950 text-gray-900 dark:text-gray-100 transition-colors">
+        <!-- Impersonation banner -->
+        <div v-if="isImpersonating" class="bg-amber-500/90 text-white px-4 py-2 text-sm flex items-center justify-between">
+            <div><i class="pi pi-user-edit mr-2"></i>You are impersonating <strong>{{ user?.email }}</strong>.</div>
+            <button @click="leaveImpersonation" class="px-3 py-1 rounded bg-white/20 hover:bg-white/30 text-sm">
+                <i class="pi pi-sign-out mr-1"></i>Stop impersonating
+            </button>
+        </div>
         <!-- Navigation -->
         <nav class="border-b border-gray-200 dark:border-dark-800 bg-white dark:bg-dark-900 transition-colors">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -70,6 +90,46 @@ function initials(u: { first_name: string; last_name: string }) {
                     <div class="flex items-center gap-3">
                         <LanguageSwitcher />
                         <DarkModeToggle />
+
+                        <!-- Notification bell -->
+                        <template v-if="user">
+                            <div class="relative">
+                                <button
+                                    @click="notificationsOpen = !notificationsOpen"
+                                    class="relative p-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-dark-800 cursor-pointer"
+                                    aria-label="Notifications"
+                                >
+                                    <i class="pi pi-bell text-lg text-gray-600 dark:text-gray-300"></i>
+                                    <span
+                                        v-if="unreadCount > 0"
+                                        class="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center"
+                                    >{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+                                </button>
+                                <Transition
+                                    enter-active-class="transition ease-out duration-100"
+                                    enter-from-class="opacity-0 scale-95"
+                                    enter-to-class="opacity-100 scale-100"
+                                    leave-active-class="transition ease-in duration-75"
+                                    leave-from-class="opacity-100 scale-100"
+                                    leave-to-class="opacity-0 scale-95"
+                                >
+                                    <div
+                                        v-if="notificationsOpen"
+                                        class="absolute right-0 mt-2 w-80 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 shadow-lg py-2 z-50"
+                                    >
+                                        <div class="flex items-center justify-between px-4 pb-2 border-b border-gray-100 dark:border-dark-700">
+                                            <span class="text-sm font-medium">Notifications</span>
+                                            <button v-if="unreadCount > 0" @click="markAllRead" class="text-xs text-indigo-500 hover:underline">Mark all read</button>
+                                        </div>
+                                        <p v-if="unreadCount === 0" class="px-4 py-6 text-center text-sm text-gray-400">You're all caught up.</p>
+                                        <p v-else class="px-4 py-6 text-center text-sm text-gray-500">
+                                            {{ unreadCount }} unread {{ unreadCount === 1 ? 'notification' : 'notifications' }}
+                                        </p>
+                                    </div>
+                                </Transition>
+                                <div v-if="notificationsOpen" @click="notificationsOpen = false" class="fixed inset-0 z-40"></div>
+                            </div>
+                        </template>
 
                         <!-- User dropdown -->
                         <template v-if="user">

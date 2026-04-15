@@ -23,5 +23,9 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('viewPulse', function ($user = null) {
             return $user !== null && $user->hasRole('Admin');
         });
+
+        Gate::define('viewLogViewer', function ($user = null) {
+            return $user !== null && $user->hasRole('Admin');
+        });
     }
 }

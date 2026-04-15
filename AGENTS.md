@@ -42,7 +42,17 @@ Gated by `role:Admin` (spatie). All pages live under `/admin/*`:
 - `/horizon` — queue dashboard (admin-only gate in `HorizonServiceProvider::gate()`)
 - `/pulse` — app metrics (admin-only gate in `AppServiceProvider::boot()` via `viewPulse`)
 
-Supervisor programs (`docker/supervisord.conf`): php-fpm, nginx, reverb, **horizon**, vite.
+Supervisor programs (`docker/supervisord.conf`): php-fpm, nginx, reverb, **horizon**, **pulse-check**, **pulse-work**, **scheduler**, vite.
+
+## Observability, Backups & Productivity Stack
+
+- **Sentry** (`sentry/sentry-laravel`) — set `SENTRY_LARAVEL_DSN` in `.env` to enable. Exceptions route through `\Sentry\Laravel\Integration::handles()` in `bootstrap/app.php`. Leave DSN blank for local dev.
+- **Backups** (`spatie/laravel-backup`) — `config/backup.php` reads `DB_CONNECTION`. Schedule (from `routes/console.php`): `backup:clean` at 01:30, `backup:run` at 02:00, `backup:monitor` at 06:00. Admin UI at `/admin/backups`. Requires `pg_dump` (installed in the Dockerfile via `postgresql-client`). The `scheduler` supervisor program (runs `schedule:work`) drives the cron.
+- **Log Viewer** (`opcodesio/log-viewer`) — mounted at `/log-viewer`, gated by the `viewLogViewer` Gate in `AppServiceProvider` (Admin only). Shows raw `storage/logs/*` files — distinct from the activity log.
+- **Impersonation** (`lab404/laravel-impersonate`) — Admins see a yellow "login as" button next to each non-admin in `/admin/users`. Taking over redirects to `/dashboard` with an amber banner; pressing "Stop impersonating" returns to the original admin. Both actions write to the `impersonation` activity log.
+- **Notifications inbox** — DB-backed. `$user->unreadNotifications()->count()` is shared via Inertia as `auth.user.unread_notifications_count` and rendered as a red badge on the bell icon in `AppLayout.vue`. Endpoints: `GET /notifications`, `POST /notifications/{id}/read`, `POST /notifications/read-all`, `DELETE /notifications/{id}`.
+- **Static analysis** — Larastan (`phpstan.neon`, level 5). Run with `make stan` or `vendor/bin/phpstan analyse`. Part of the backend CI job.
+- **Pre-commit hooks** — Husky + lint-staged. PHP → `pint --dirty`, TS/Vue → `vue-tsc --noEmit`. Configured in `package.json` (`lint-staged` key) and `.husky/pre-commit`. Install hooks with `npm install` (Husky's `prepare` script runs automatically).
 
 ## Core Principle
 

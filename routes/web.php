@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\Admin\ActivityLogController;
+use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\HealthController;
+use App\Http\Controllers\Admin\ImpersonateController;
 use App\Http\Controllers\Admin\MailSettingsController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\RoleController;
@@ -9,6 +11,7 @@ use App\Http\Controllers\Admin\SystemInfoController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\DevLoginController;
 use App\Http\Controllers\AvatarController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -35,6 +38,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', fn () => Inertia::render('Profile'))->name('profile');
     Route::post('/profile/avatar', [AvatarController::class, 'store'])->name('profile.avatar.store');
     Route::delete('/profile/avatar', [AvatarController::class, 'destroy'])->name('profile.avatar.destroy');
+
+    // Notifications inbox
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.readAll');
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
 });
 
 // Admin routes
@@ -63,4 +72,15 @@ Route::middleware(['auth', 'verified', 'role:Admin'])
 
         Route::get('system', [SystemInfoController::class, 'show'])->name('system.show');
         Route::get('health', fn () => redirect()->route('admin.system.show'))->name('health.show');
+
+        Route::get('backups', [BackupController::class, 'index'])->name('backups.index');
+        Route::post('backups/run', [BackupController::class, 'run'])->name('backups.run');
+        Route::post('backups/clean', [BackupController::class, 'clean'])->name('backups.clean');
+
+        Route::post('users/{user}/impersonate', [ImpersonateController::class, 'take'])->name('users.impersonate');
     });
+
+// Impersonation — leave action must be available from within the impersonated session
+Route::middleware('auth')->group(function () {
+    Route::post('/impersonate/leave', [ImpersonateController::class, 'leave'])->name('impersonate.leave');
+});

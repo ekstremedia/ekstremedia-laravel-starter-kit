@@ -35,6 +35,14 @@ function destroy(u: UserRow) {
         accept: () => router.delete(`/admin/users/${u.id}`),
     });
 }
+
+function impersonate(u: UserRow) {
+    router.post(`/admin/users/${u.id}/impersonate`);
+}
+
+function canImpersonate(u: UserRow) {
+    return ! (u.roles ?? []).some((r: any) => (typeof r === 'string' ? r : r.name) === 'Admin');
+}
 </script>
 
 <template>
@@ -63,11 +71,20 @@ function destroy(u: UserRow) {
                 <Tag v-for="r in data.roles" :key="r.id" :value="r.name" class="mr-1" severity="info" />
             </template>
         </Column>
-        <Column header="Actions" style="width: 14rem">
+        <Column header="Actions" style="width: 20rem">
             <template #body="{ data }">
                 <Link :href="`/admin/users/${data.id}/edit`">
-                    <Button label="Edit" icon="pi pi-pencil" size="small" severity="secondary" class="mr-2" />
+                    <Button label="Edit" icon="pi pi-pencil" size="small" severity="secondary" class="mr-1" />
                 </Link>
+                <Button
+                    v-if="canImpersonate(data)"
+                    icon="pi pi-user-edit"
+                    size="small"
+                    severity="warn"
+                    class="mr-1"
+                    title="Log in as this user"
+                    @click="impersonate(data)"
+                />
                 <Button label="Delete" icon="pi pi-trash" size="small" severity="danger" @click="destroy(data)" />
             </template>
         </Column>

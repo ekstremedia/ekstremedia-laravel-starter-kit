@@ -65,6 +65,9 @@ jobs:
       - name: Run Pint (check only)
         run: vendor/bin/pint --test
 
+      - name: Run Larastan
+        run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+
       - name: Run Pest tests
         env:
           DB_CONNECTION: pgsql

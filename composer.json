@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.3",
         "inertiajs/inertia-laravel": "^3.0",
+        "lab404/laravel-impersonate": "^1.7",
         "laravel/fortify": "^1.36",
         "laravel/framework": "^13.0",
         "laravel/horizon": "^5.45",
@@ -15,13 +16,17 @@
         "laravel/reverb": "^1.10",
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^3.0",
+        "opcodesio/log-viewer": "^3.24",
         "pusher/pusher-php-server": "^7.2",
+        "sentry/sentry-laravel": "^4.25",
         "spatie/laravel-activitylog": "^5.0",
+        "spatie/laravel-backup": "^10.2",
         "spatie/laravel-medialibrary": "^11.0",
         "spatie/laravel-permission": "^7.3"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
+        "larastan/larastan": "^3.0",
         "laravel/boost": "^2.4",
         "laravel/pail": "^1.2.5",
         "laravel/pint": "^1.27",

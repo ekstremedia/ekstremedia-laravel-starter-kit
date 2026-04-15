@@ -11,9 +11,11 @@ const cards = [
     { title: 'Activity Log', href: '/admin/activity', icon: 'pi-list', desc: 'Who changed what, when.' },
     { title: 'Health', href: '/admin/health', icon: 'pi-heart', desc: 'Queue, Reverb, Redis pings.' },
     { title: 'Mail Settings', href: '/admin/mail', icon: 'pi-envelope', desc: 'SMTP + test send.' },
-    { title: 'System Info', href: '/admin/system', icon: 'pi-server', desc: 'PHP, Laravel, drivers.' },
+    { title: 'Backups', href: '/admin/backups', icon: 'pi-cloud-upload', desc: 'Scheduled DB + files backups.' },
+    { title: 'Server & System', href: '/admin/system', icon: 'pi-server', desc: 'Health + runtime snapshot.' },
     { title: 'Horizon', href: '/horizon', icon: 'pi-compass', desc: 'Queue dashboard.', external: true },
     { title: 'Pulse', href: '/pulse', icon: 'pi-chart-line', desc: 'App metrics.', external: true },
+    { title: 'Logs', href: '/log-viewer', icon: 'pi-file', desc: 'Raw Laravel logs.', external: true },
 ];
 </script>
 
