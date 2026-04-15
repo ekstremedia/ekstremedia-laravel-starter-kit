@@ -13,7 +13,10 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.php": "docker compose exec -T app vendor/bin/pint --dirty --format agent --",
+    "*.php": [
+      "docker compose exec -T app vendor/bin/pint --dirty --format agent --",
+      "bash -c 'docker compose exec -T app vendor/bin/phpstan analyse --memory-limit=1G --no-progress'"
+    ],
     "*.{ts,vue}": "bash -c 'docker compose exec -T app npm run typecheck'"
   },
   "devDependencies": {

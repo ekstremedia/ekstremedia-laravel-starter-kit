@@ -63,7 +63,9 @@ test: ## Run Pest tests
 test-js: ## Run Vitest frontend tests
 	docker compose exec $(APP_SERVICE) npm test
 
-test-all: ## Run Pest + Vitest + vue-tsc
+test-all: ## Run full CI locally (Pint, Larastan, Pest, tsc, Vitest)
+	docker compose exec $(APP_SERVICE) vendor/bin/pint --test
+	docker compose exec $(APP_SERVICE) vendor/bin/phpstan analyse --memory-limit=1G --no-progress
 	docker compose exec $(APP_SERVICE) php artisan test --compact
 	docker compose exec $(APP_SERVICE) npm run typecheck
 	docker compose exec $(APP_SERVICE) npm test
