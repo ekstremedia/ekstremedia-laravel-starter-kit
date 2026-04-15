@@ -21,7 +21,7 @@ endif
 help: ## Show this help
 	@echo "Laravel Starter Kit - Available commands:"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -hE '^[a-zA-Z_-]+:.*## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":[^#]*## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 init: ## Initialize .env for a new project
 	@[ -f .env ] || cp .env.example .env
@@ -59,6 +59,14 @@ shell: ## Open a shell in the app container
 
 test: ## Run Pest tests
 	docker compose exec $(APP_SERVICE) php artisan test
+
+test-js: ## Run Vitest frontend tests
+	docker compose exec $(APP_SERVICE) npm test
+
+test-all: ## Run Pest + Vitest + vue-tsc
+	docker compose exec $(APP_SERVICE) php artisan test --compact
+	docker compose exec $(APP_SERVICE) npm run typecheck
+	docker compose exec $(APP_SERVICE) npm test
 
 migrate: ## Run database migrations
 	docker compose exec $(APP_SERVICE) php artisan migrate

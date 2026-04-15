@@ -11,6 +11,8 @@ export interface User {
     two_factor_enabled?: boolean;
     created_at?: string;
     full_name: string;
+    avatar_url?: string | null;
+    avatar_thumb_url?: string | null;
     roles?: string[];
     permissions?: string[];
 }

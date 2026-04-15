@@ -6,23 +6,33 @@ RUN apt-get update && apt-get install -y \
     curl \
     libpq-dev \
     libpng-dev \
+    libjpeg-dev \
+    libwebp-dev \
+    libfreetype6-dev \
     libonig-dev \
     libxml2-dev \
     libzip-dev \
+    libmagickwand-dev \
+    imagemagick \
     zip \
     unzip \
     nodejs \
     npm \
     supervisor \
     nginx \
+    && docker-php-ext-configure gd --with-jpeg --with-webp --with-freetype \
     && docker-php-ext-install pdo pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
+    && pecl install redis imagick \
+    && docker-php-ext-enable redis imagick \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Handy `a` shim for `php artisan` so `docker compose exec app a queue:flush` works
+RUN printf '#!/bin/sh\nexec php /var/www/html/artisan "$@"\n' > /usr/local/bin/a \
+    && chmod +x /usr/local/bin/a
 
 # Set working directory
 WORKDIR /var/www/html

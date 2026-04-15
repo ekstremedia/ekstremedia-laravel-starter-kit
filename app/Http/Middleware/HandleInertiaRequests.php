@@ -48,6 +48,8 @@ class HandleInertiaRequests extends Middleware
                     'created_at' => $request->user()->created_at,
                     'two_factor_enabled' => ! is_null($request->user()->two_factor_confirmed_at),
                     'full_name' => $request->user()->fullName(),
+                    'avatar_url' => $request->user()->avatarUrl('avatar'),
+                    'avatar_thumb_url' => $request->user()->avatarUrl('thumb'),
                     'roles' => $request->user()->getRoleNames()->toArray(),
                     'permissions' => $request->user()->getAllPermissions()->pluck('name')->toArray(),
                 ] : null,

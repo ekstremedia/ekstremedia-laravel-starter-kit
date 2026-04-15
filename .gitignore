@@ -25,3 +25,13 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 /database/*.sqlite
+
+# Agent/tool personal state
+/.agents
+/.claude
+/.codex
+CLAUDE.md
+Plan.md
+
+# Media uploads (dev)
+/storage/media-library

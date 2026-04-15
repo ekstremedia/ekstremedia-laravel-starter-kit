@@ -11,6 +11,7 @@ import type { PageProps } from '@/types';
 const { t } = useI18n();
 const page = usePage<PageProps>();
 const user = computed(() => page.props.auth?.user);
+const isAdmin = computed(() => user.value?.roles?.includes('Admin') ?? false);
 const appName = import.meta.env.VITE_APP_NAME || t('app.name');
 
 const dropdownOpen = ref(false);
@@ -51,6 +52,16 @@ function initials(u: { first_name: string; last_name: string }) {
                                 >
                                     {{ t('nav.dashboard') }}
                                 </Link>
+                                <Link
+                                    v-if="isAdmin"
+                                    href="/admin"
+                                    class="px-3 py-2 text-sm font-medium rounded-lg transition-colors"
+                                    :class="$page.url.startsWith('/admin')
+                                        ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10'
+                                        : 'text-gray-600 dark:text-dark-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-dark-800'"
+                                >
+                                    Admin
+                                </Link>
                             </div>
                         </template>
                     </div>
@@ -67,7 +78,16 @@ function initials(u: { first_name: string; last_name: string }) {
                                     @click="dropdownOpen = !dropdownOpen"
                                     class="flex items-center gap-2 cursor-pointer rounded-lg px-2 py-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-dark-800"
                                 >
-                                    <div class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-semibold">
+                                    <img
+                                        v-if="user.avatar_thumb_url"
+                                        :src="user.avatar_thumb_url"
+                                        :alt="user.full_name"
+                                        class="w-8 h-8 rounded-full object-cover"
+                                    />
+                                    <div
+                                        v-else
+                                        class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-semibold"
+                                    >
                                         {{ initials(user) }}
                                     </div>
                                     <span class="text-sm text-gray-700 dark:text-gray-300 hidden sm:inline">
@@ -103,6 +123,13 @@ function initials(u: { first_name: string; last_name: string }) {
                                             class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800"
                                         >
                                             {{ t('nav.profile') }}
+                                        </Link>
+                                        <Link
+                                            v-if="isAdmin"
+                                            href="/admin"
+                                            class="block px-4 py-2 text-sm text-indigo-600 dark:text-indigo-400 hover:bg-gray-100 dark:hover:bg-dark-800"
+                                        >
+                                            <i class="pi pi-shield mr-2 text-xs"></i>Admin
                                         </Link>
                                         <div class="border-t border-gray-100 dark:border-dark-700 my-1"></div>
                                         <button
