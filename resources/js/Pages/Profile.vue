@@ -49,13 +49,14 @@ function onAvatarChange(e: Event) {
     const form = new FormData();
     form.append('avatar', file);
     avatarUploading.value = true;
+    // Flash messages from the controller drive the toast; only surface
+    // client-side validation errors here.
     router.post('/profile/avatar', form, {
         preserveScroll: true,
         forceFormData: true,
-        onSuccess: () => toast.add({ severity: 'success', detail: 'Photo updated', life: 3000 }),
         onError: (errors) => {
             const first = Object.values(errors)[0] as string;
-            toast.add({ severity: 'error', detail: first ?? 'Upload failed', life: 4000 });
+            if (first) toast.add({ severity: 'error', detail: first, life: 4000 });
         },
         onFinish: () => {
             avatarUploading.value = false;
@@ -65,10 +66,7 @@ function onAvatarChange(e: Event) {
 }
 
 function removeAvatar() {
-    router.delete('/profile/avatar', {
-        preserveScroll: true,
-        onSuccess: () => toast.add({ severity: 'success', detail: 'Photo removed', life: 3000 }),
-    });
+    router.delete('/profile/avatar', { preserveScroll: true });
 }
 
 // --- Profile Info ---
