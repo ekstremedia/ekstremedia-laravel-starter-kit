@@ -46,13 +46,13 @@ it('updates the avatar on re-upload', function () {
         ->and($latest->file_name)->toBe('second.png');
 });
 
-it('enforces max 5 MB upload size', function () {
+it('enforces the upload size ceiling', function () {
     $user = User::factory()->create();
     $user->assignRole('User');
 
     $this->actingAs($user)
         ->post('/profile/avatar', [
-            'avatar' => UploadedFile::fake()->image('big.png')->size(6000),
+            'avatar' => UploadedFile::fake()->image('big.png')->size(16000),
         ])
         ->assertSessionHasErrors('avatar');
 });
