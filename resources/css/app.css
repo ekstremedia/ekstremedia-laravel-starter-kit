@@ -38,6 +38,12 @@
 }
 
 /* PrimeVue DataTable — dark mode tint that matches our blue palette */
+.dark .p-datatable .p-datatable-header,
+.dark .p-datatable .p-datatable-footer {
+    background-color: var(--color-dark-850);
+    border-color: var(--color-dark-700);
+    color: #e5e7eb;
+}
 .dark .p-datatable .p-datatable-thead > tr > th {
     background-color: var(--color-dark-850);
     color: #c7d2fe;

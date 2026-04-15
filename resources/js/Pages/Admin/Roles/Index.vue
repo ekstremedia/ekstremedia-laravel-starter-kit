@@ -5,6 +5,8 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import InputText from 'primevue/inputtext';
+import IconField from 'primevue/iconfield';
+import InputIcon from 'primevue/inputicon';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
 import ConfirmDialog from 'primevue/confirmdialog';
@@ -42,11 +44,12 @@ function destroy(r: Role) {
                v-model:filters="filters" :globalFilterFields="['name', 'permissions']"
                class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
         <template #header>
-            <div class="flex justify-end">
-                <span class="relative">
-                    <i class="pi pi-search absolute top-1/2 -translate-y-1/2 left-3 text-gray-400"></i>
-                    <InputText v-model="filters['global'].value" placeholder="Filter roles" class="pl-9" />
-                </span>
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-500 dark:text-gray-400">{{ roles.length }} roles</span>
+                <IconField>
+                    <InputIcon class="pi pi-search" />
+                    <InputText v-model="filters['global'].value" placeholder="Filter roles" />
+                </IconField>
             </div>
         </template>
         <Column field="id" header="ID" style="width: 5rem" sortable />
