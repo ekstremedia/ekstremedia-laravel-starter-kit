@@ -8,6 +8,7 @@ use Faker\Generator;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Spatie\Permission\Exceptions\RoleDoesNotExist;
 
 class UserSeeder extends Seeder
 {
@@ -23,7 +24,7 @@ class UserSeeder extends Seeder
                 'email_verified_at' => now(),
             ],
         );
-        $admin->assignRole('Admin');
+        $this->safeAssignRole($admin, 'Admin');
 
         if (! env('SEED_DEMO_USERS', false)) {
             return;
@@ -45,7 +46,7 @@ class UserSeeder extends Seeder
                 'email_verified_at' => null,
             ],
         );
-        $unverified->assignRole('User');
+        $this->safeAssignRole($unverified, 'User');
     }
 
     private function seedRole(Generator $faker, string $role, int $count, string $password): void
@@ -69,7 +70,16 @@ class UserSeeder extends Seeder
                 'password' => $password,
                 'email_verified_at' => now(),
             ]);
+            $this->safeAssignRole($user, $role);
+        }
+    }
+
+    private function safeAssignRole(User $user, string $role): void
+    {
+        try {
             $user->assignRole($role);
+        } catch (RoleDoesNotExist) {
+            $this->command->warn("Role '{$role}' not found; skipping assignment for {$user->email}. Run RoleAndPermissionSeeder first.");
         }
     }
 }

@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use Database\Seeders\RoleAndPermissionSeeder;
+use Illuminate\Support\Facades\Queue;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -111,6 +112,10 @@ it('logs mail settings updates', function () {
 });
 
 it('logs backup actions', function () {
+    // Don't actually run backup:run / backup:clean in CI — they'd touch the
+    // real disk and can be slow. Queue::fake swallows the dispatched jobs.
+    Queue::fake();
+
     $this->actingAs($this->admin)->post('/admin/backups/run')->assertRedirect();
 
     $run = Activity::where('log_name', 'backup')->where('event', 'run')->latest()->first();

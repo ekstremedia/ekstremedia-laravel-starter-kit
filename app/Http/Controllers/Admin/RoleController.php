@@ -15,12 +15,16 @@ class RoleController extends Controller
     public function index(): Response
     {
         return Inertia::render('Admin/Roles/Index', [
-            'roles' => Role::with('permissions:id,name')->orderBy('name')->get()->map(fn ($r) => [
-                'id' => $r->id,
-                'name' => $r->name,
-                'permissions' => $r->permissions->pluck('name')->toArray(),
-                'users_count' => $r->users()->count(),
-            ]),
+            'roles' => Role::with('permissions:id,name')
+                ->withCount('users')
+                ->orderBy('name')
+                ->get()
+                ->map(fn ($r) => [
+                    'id' => $r->id,
+                    'name' => $r->name,
+                    'permissions' => $r->permissions->pluck('name')->toArray(),
+                    'users_count' => $r->users_count,
+                ]),
         ]);
     }
 

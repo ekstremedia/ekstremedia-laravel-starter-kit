@@ -254,7 +254,7 @@ Component specs live in `tests/frontend/Components/`. The `tests/frontend/setup.
 make test-all
 ```
 
-CI (`.github/workflows/tests.yml`) runs two parallel jobs — **Backend** (Postgres + Redis service containers, Pint, Larastan, Pest) and **Frontend** (typecheck, Vitest, build).
+GitHub Actions (`.github/workflows/tests.yml`) runs two parallel jobs — **Backend** (Postgres + Redis service containers, Pint, Larastan, Pest) and **Frontend** (typecheck, Vitest, build).
 
 ## What To Customize First
 

@@ -13,7 +13,7 @@ defineOptions({ layout: AdminLayout });
 interface Props {
     settings: {
         mailer: string; host: string | null; port: number | null; encryption: string | null;
-        username: string | null; password: string | null; from_address: string | null; from_name: string | null;
+        username: string | null; has_password: boolean; from_address: string | null; from_name: string | null;
         enabled: boolean;
     };
 }
@@ -81,7 +81,7 @@ function sendTest() {
             </div>
             <div>
                 <label class="block text-sm mb-1">Password</label>
-                <Password v-model="form.password" toggleMask :feedback="false" class="w-full" inputClass="w-full" placeholder="(unchanged)" />
+                <Password v-model="form.password" toggleMask :feedback="false" class="w-full" inputClass="w-full" :placeholder="settings.has_password ? '(unchanged)' : 'Set a password'" />
             </div>
         </div>
         <div class="grid grid-cols-2 gap-4">

@@ -7,6 +7,7 @@ use App\Mail\TestMail;
 use App\Models\MailSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -25,7 +26,10 @@ class MailSettingsController extends Controller
                 'port' => $settings->port,
                 'encryption' => $settings->encryption,
                 'username' => $settings->username,
-                'password' => $settings->password ? '••••••' : null,
+                // Never send the stored password (or a mask of it) to the frontend;
+                // expose a boolean so the UI can hint "saved" without round-tripping
+                // a sentinel that could accidentally be written back as the password.
+                'has_password' => ! empty($settings->password),
                 'from_address' => $settings->from_address,
                 'from_name' => $settings->from_name,
                 'enabled' => $settings->enabled,
@@ -49,7 +53,9 @@ class MailSettingsController extends Controller
 
         $settings = MailSetting::current();
 
-        if (empty($data['password'])) {
+        // Empty password field = "leave existing unchanged".
+        $passwordChanged = ! empty($data['password']);
+        if (! $passwordChanged) {
             unset($data['password']);
         }
 
@@ -57,7 +63,7 @@ class MailSettingsController extends Controller
 
         activity('mail_settings')
             ->performedOn($settings)
-            ->withProperties(['password_changed' => isset($data['password'])])
+            ->withProperties(['password_changed' => $passwordChanged])
             ->event('updated')
             ->log('Updated mail settings');
 
@@ -71,7 +77,9 @@ class MailSettingsController extends Controller
         try {
             Mail::to($request->user()->email)->queue(new TestMail('Sent from Admin → Mail Settings'));
         } catch (Throwable $e) {
-            return back()->with('error', 'Mail test failed: '.$e->getMessage());
+            Log::error('Admin mail test failed', ['exception' => $e]);
+
+            return back()->with('error', 'Mail test failed. Check server logs.');
         }
 
         return back()->with('success', 'Test mail queued to '.$request->user()->email);

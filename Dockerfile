@@ -17,14 +17,22 @@ RUN apt-get update && apt-get install -y \
     imagemagick \
     zip \
     unzip \
-    nodejs \
-    npm \
+    ca-certificates \
+    gnupg \
     supervisor \
     nginx \
     && docker-php-ext-configure gd --with-jpeg --with-webp --with-freetype \
     && docker-php-ext-install pdo pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip \
     && pecl install redis imagick \
     && docker-php-ext-enable redis imagick \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 22 LTS (Debian's nodejs ships an old 18.x that can't build
+# Vite 8 / vue-tsc). Keep this step after the apt cleanup so the NodeSource
+# layer caches independently.
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

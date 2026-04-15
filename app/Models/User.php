@@ -24,17 +24,19 @@ use Spatie\Permission\Traits\HasRoles;
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements HasMedia, MustVerifyEmail
 {
+    public const ROLE_ADMIN = 'Admin';
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasRoles, Impersonate, InteractsWithMedia, LogsActivity, Notifiable, TwoFactorAuthenticatable;
 
     public function canImpersonate(): bool
     {
-        return $this->hasRole('Admin');
+        return $this->hasRole(self::ROLE_ADMIN);
     }
 
     public function canBeImpersonated(): bool
     {
-        return ! $this->hasRole('Admin');
+        return ! $this->hasRole(self::ROLE_ADMIN);
     }
 
     public function isBanned(): bool

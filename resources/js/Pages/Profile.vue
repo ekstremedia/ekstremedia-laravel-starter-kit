@@ -285,9 +285,9 @@ function getToken(): string {
             <div ref="sectionsRef" class="space-y-6">
                 <!-- Profile Photo -->
                 <div class="p-6 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Profile photo</h2>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('profile.photo_title') }}</h2>
                     <p class="text-sm text-gray-500 dark:text-dark-400 mt-1 mb-5">
-                        JPG, PNG, WebP or GIF. Up to 50&nbsp;MB. A square image works best.
+                        {{ t('profile.photo_desc') }}
                     </p>
 
                     <div class="flex items-center gap-6">
@@ -326,7 +326,7 @@ function getToken(): string {
                                 @click="pickAvatar"
                                 class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
                             >
-                                <i class="pi pi-upload mr-2 text-xs"></i>{{ avatarPreview ? 'Replace photo' : 'Upload photo' }}
+                                <i class="pi pi-upload mr-2 text-xs"></i>{{ avatarPreview ? t('profile.photo_replace') : t('profile.photo_upload') }}
                             </button>
                             <button
                                 v-if="avatarPreview"
@@ -335,7 +335,7 @@ function getToken(): string {
                                 @click="removeAvatar"
                                 class="px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
                             >
-                                <i class="pi pi-trash mr-2 text-xs"></i>Remove
+                                <i class="pi pi-trash mr-2 text-xs"></i>{{ t('profile.photo_remove') }}
                             </button>
                         </div>
                     </div>

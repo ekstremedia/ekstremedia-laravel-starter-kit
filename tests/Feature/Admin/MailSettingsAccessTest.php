@@ -18,11 +18,12 @@ it('renders the mail settings page for admins', function () {
             ->component('Admin/Mail')
             ->has('settings.mailer')
             ->has('settings.from_address')
-            ->where('settings.password', null)
+            ->where('settings.has_password', false)
+            ->missing('settings.password')
         );
 });
 
-it('masks the password in the response after save', function () {
+it('exposes has_password=true after saving a password', function () {
     $admin = User::factory()->create();
     $admin->assignRole('Admin');
 
@@ -41,7 +42,8 @@ it('masks the password in the response after save', function () {
     $this->actingAs($admin)
         ->get('/admin/mail')
         ->assertInertia(fn ($page) => $page
-            ->where('settings.password', '••••••')
+            ->where('settings.has_password', true)
+            ->missing('settings.password')
         );
 });
 

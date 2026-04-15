@@ -276,14 +276,16 @@ docker compose exec app php artisan test
 
 ## Laravel Boost MCP
 
-The repo ships a `.mcp.json` that launches Laravel Boost **inside the `app` container** so PHP/Composer/Artisan all run against the containerized stack:
+The repo ships a `.mcp.json` that launches Laravel Boost **inside the `app` container** so PHP/Composer/Artisan all run against the containerized stack.
+
+**Replace `<PROJECT_ROOT>` below with the absolute path to your clone** — MCP clients launch this command from their own CWD, so a relative path to `docker-compose.yml` will not work:
 
 ```json
 {
     "mcpServers": {
         "laravel-boost": {
             "command": "docker",
-            "args": ["compose", "-f", "/www/laravel-starter-kit/docker-compose.yml",
+            "args": ["compose", "-f", "<PROJECT_ROOT>/docker-compose.yml",
                      "exec", "-T", "app", "php", "artisan", "boost:mcp"]
         }
     }
@@ -472,7 +474,7 @@ This project has domain-specific skills available. You MUST activate the relevan
 - If you're creating a generic PHP class, use `php artisan make:class`.
 - Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
 
-### Model Creation
+## Model Creation
 
 - When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `php artisan make:model --help` to check the available options.
 
