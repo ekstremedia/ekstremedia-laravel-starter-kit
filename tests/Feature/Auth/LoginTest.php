@@ -26,7 +26,7 @@ it('logs in a verified user', function () {
     $this->post('/login', [
         'email' => 'test@example.com',
         'password' => 'password123',
-    ])->assertRedirect('/dashboard');
+    ])->assertRedirect('/app');
 
     $this->assertAuthenticatedAs($user);
 });
@@ -88,7 +88,7 @@ it('redirects authenticated users away from login page', function () {
 
     $this->actingAs($user)
         ->get('/login')
-        ->assertRedirect('/dashboard');
+        ->assertRedirect('/app');
 });
 
 it('shows easy login on the login page when enabled', function () {
@@ -109,7 +109,7 @@ it('logs in user one with easy login when enabled', function () {
     ]);
 
     $this->post('/login/dev')
-        ->assertRedirect('/dashboard');
+        ->assertRedirect('/app');
 
     $this->assertAuthenticatedAs($user);
 });

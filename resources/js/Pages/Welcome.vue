@@ -25,7 +25,7 @@ const appName = import.meta.env.VITE_APP_NAME || t('app.name');
                     {{ t('welcome.hero_subtitle') }}
                 </p>
                 <Link
-                    :href="user ? '/dashboard' : '/register'"
+                    :href="user ? '/app' : '/register'"
                     class="inline-block px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors"
                 >
                     {{ user ? t('nav.dashboard') : t('welcome.get_started') }}

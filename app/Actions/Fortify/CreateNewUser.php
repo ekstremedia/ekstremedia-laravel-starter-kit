@@ -3,6 +3,7 @@
 namespace App\Actions\Fortify;
 
 use App\Models\AppSetting;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\WelcomeNotification;
 use Illuminate\Support\Facades\Validator;
@@ -48,6 +49,30 @@ class CreateNewUser implements CreatesNewUsers
             $user->notify(new WelcomeNotification);
         }
 
+        $this->attachToDefaultCustomer($user);
+
         return $user;
+    }
+
+    /**
+     * When multi-tenancy is enabled, new sign-ups auto-join the default customer
+     * configured in `tenancy.default_customer_slug` (env: `TENANCY_DEFAULT_CUSTOMER`).
+     * In single-tenant mode this is a no-op. If the slug exists but the customer
+     * hasn't been seeded yet, we skip silently — an admin can attach the user
+     * later from the landlord UI.
+     */
+    private function attachToDefaultCustomer(User $user): void
+    {
+        if (! config('tenancy.enabled')) {
+            return;
+        }
+
+        $slug = config('tenancy.default_customer_slug', 'default');
+
+        $customer = Tenant::query()->where('slug', $slug)->first();
+
+        if ($customer !== null) {
+            $user->customers()->syncWithoutDetaching([$customer->id]);
+        }
     }
 }

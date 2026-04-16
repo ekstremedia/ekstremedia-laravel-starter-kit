@@ -3,8 +3,10 @@
 namespace App\Http\Middleware;
 
 use App\Models\AppSetting;
+use App\Models\Tenant;
 use App\Models\UserSetting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Middleware;
 use Throwable;
 
@@ -74,7 +76,68 @@ class HandleInertiaRequests extends Middleware
                 'status' => fn () => $request->session()->get('status'),
             ],
             'app_settings' => fn () => $this->appSettings(),
+            'tenancy' => [
+                'enabled' => (bool) config('tenancy.enabled'),
+            ],
+            'customer' => fn () => $this->currentCustomer($request),
+            'customers' => fn () => $this->availableCustomers($request),
         ];
+    }
+
+    /**
+     * The customer the request is currently scoped to, or null on central routes.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function currentCustomer(Request $request): ?array
+    {
+        if (! tenancy()->initialized) {
+            return null;
+        }
+
+        /** @var Tenant $customer */
+        $customer = tenancy()->tenant;
+
+        return [
+            'id' => $customer->id,
+            'slug' => $customer->slug,
+            'name' => $customer->name,
+        ];
+    }
+
+    /**
+     * Customers the authenticated user can enter. Admins see every active one;
+     * non-admins see only the customers they are a member of.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function availableCustomers(Request $request): array
+    {
+        if (! config('tenancy.enabled')) {
+            return [];
+        }
+
+        $user = $request->user();
+
+        if (! $user) {
+            return [];
+        }
+
+        $query = $user->hasRole('Admin')
+            ? Tenant::query()->where('status', 'active')
+            : $user->customers()->where('status', 'active');
+
+        /** @var Collection<int, Tenant> $customers */
+        $customers = $query->orderBy('name')->get();
+
+        return $customers
+            ->map(fn (Tenant $customer) => [
+                'id' => $customer->id,
+                'slug' => $customer->slug,
+                'name' => $customer->name,
+            ])
+            ->values()
+            ->all();
     }
 
     /**

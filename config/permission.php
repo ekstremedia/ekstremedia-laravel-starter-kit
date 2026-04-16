@@ -126,13 +126,12 @@ return [
     'events_enabled' => false,
 
     /*
-     * Teams Feature.
-     * When set to true the package implements teams using the 'team_foreign_key'.
-     * If you want the migrations to register the 'team_foreign_key', you must
-     * set this to true before doing the migration.
-     * If you already did the migration then you must make a new migration to also
-     * add 'team_foreign_key' to 'roles', 'model_has_roles', and 'model_has_permissions'
-     * (view the latest version of this package's migration file)
+     * Teams Feature — left off on purpose.
+     * Roles (`Admin`, `Editor`, `User`) remain global: `Admin` is the system super-user
+     * across every tenant, and `Editor` / `User` are just generic application roles.
+     * Membership in a tenant is tracked by the `tenant_user` pivot, not by scoped roles.
+     * If you later need per-tenant roles (Owner / Manager / ...), flip this to `true`
+     * and add a migration that sets `team_id` on existing role assignments.
      */
 
     'teams' => false,

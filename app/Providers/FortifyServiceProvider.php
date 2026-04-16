@@ -41,7 +41,7 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::verifyEmailView(function (Request $request) {
             if ($request->user()->hasVerifiedEmail()) {
-                return redirect()->route('dashboard');
+                return redirect()->route('app.landing');
             }
 
             return Inertia::render('Auth/VerifyEmail');

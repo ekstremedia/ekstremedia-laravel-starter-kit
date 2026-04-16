@@ -3,9 +3,11 @@
 use App\Http\Middleware\EnforceAppSettings;
 use App\Http\Middleware\EnsureUserIsNotBanned;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\InitializeTenancyByPath;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Support\Facades\Route;
 use Sentry\Laravel\Integration;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
@@ -17,6 +19,21 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         channels: __DIR__.'/../routes/channels.php',
         health: '/up',
+        then: function (): void {
+            // Same routes file, two shapes. See `config/tenancy.php` and
+            // `routes/customer.php` for the contract.
+            $customerRoutes = __DIR__.'/../routes/customer.php';
+
+            if (config('tenancy.enabled')) {
+                Route::prefix('c/{customer}')
+                    ->middleware(['web', 'auth', 'verified', InitializeTenancyByPath::class])
+                    ->name('customer.')
+                    ->group($customerRoutes);
+            } else {
+                Route::middleware(['web', 'auth', 'verified'])
+                    ->group($customerRoutes);
+            }
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [

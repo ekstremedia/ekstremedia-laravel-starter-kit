@@ -15,7 +15,7 @@ else
 DISPLAY_URL := $(APP_URL):$(APP_HOST_PORT)
 endif
 
-.PHONY: help init build up down restart shell test migrate seed fresh logs tinker pint queue vite npm-install composer-install cache-clear reverb-restart
+.PHONY: help init build up down restart destroy shell test migrate seed fresh rebuild logs tinker pint queue vite npm-install composer-install cache-clear reverb-restart _require-local
 
 # Default target
 help: ## Show this help
@@ -50,7 +50,21 @@ down: ## Stop all containers
 restart: ## Restart all containers
 	docker compose restart
 
-destroy: ## Stop containers and remove volumes
+# Guard for destructive targets. Makefiles include .env at the top, so APP_ENV
+# is read straight from your local config. Anything that drops data or volumes
+# chains on this prerequisite — if APP_ENV isn't `local`, the guard aborts
+# before the destructive recipe runs.
+_require-local:
+	@if [ "$(APP_ENV)" != "local" ]; then \
+		echo ""; \
+		echo "  ✗ Refusing: APP_ENV is '$(APP_ENV)', not 'local'."; \
+		echo "    Destructive targets (destroy/fresh/rebuild) are local-only."; \
+		echo "    If you really need this, temporarily set APP_ENV=local in .env."; \
+		echo ""; \
+		exit 1; \
+	fi
+
+destroy: _require-local ## Stop containers and remove volumes (local only)
 	docker compose down -v
 
 # App commands
@@ -76,8 +90,22 @@ migrate: ## Run database migrations
 seed: ## Run database seeders
 	docker compose exec $(APP_SERVICE) php artisan db:seed
 
-fresh: ## Fresh migrate and seed
+fresh: _require-local ## Fresh migrate and seed (local only)
 	docker compose exec $(APP_SERVICE) php artisan migrate:fresh --seed
+
+rebuild: _require-local ## Reset starter kit to a clean slate: drop tenant schemas + migrate:fresh --seed + clear caches (local only)
+	@echo ""
+	@echo "  → Dropping leftover tenant<id> Postgres schemas"
+	docker compose exec $(APP_SERVICE) php artisan db:drop-tenant-schemas
+	@echo ""
+	@echo "  → Running migrate:fresh --seed"
+	docker compose exec $(APP_SERVICE) php artisan migrate:fresh --seed
+	@echo ""
+	@echo "  → Clearing caches"
+	docker compose exec $(APP_SERVICE) php artisan optimize:clear
+	@echo ""
+	@echo "  ✓ Starter kit reset complete."
+	@echo ""
 
 rollback: ## Rollback last migration
 	docker compose exec $(APP_SERVICE) php artisan migrate:rollback

@@ -5,15 +5,27 @@ import Toast from 'primevue/toast';
 import DarkModeToggle from '@/Components/DarkModeToggle.vue';
 import LanguageSwitcher from '@/Components/LanguageSwitcher.vue';
 import { useFlashToast } from '@/composables/useFlashToast';
+import { useCustomer } from '@/composables/useCustomer';
 import type { PageProps } from '@/types';
 
 const page = usePage<PageProps>();
 const user = computed(() => page.props.auth?.user);
 const currentPath = computed(() => page.url);
+const { tenancyEnabled } = useCustomer();
 useFlashToast();
 
-const nav = [
+interface NavItem {
+    label: string;
+    href: string;
+    icon: string;
+    match?: (p: string) => boolean;
+    external?: boolean;
+    customerOnly?: boolean;
+}
+
+const navItems: NavItem[] = [
     { label: 'Overview', href: '/admin', icon: 'pi-home', match: (p: string) => p === '/admin' },
+    { label: 'Customers', href: '/admin/customers', icon: 'pi-building', match: (p: string) => p.startsWith('/admin/customers'), customerOnly: true },
     { label: 'Users', href: '/admin/users', icon: 'pi-users', match: (p: string) => p.startsWith('/admin/users') },
     { label: 'Roles', href: '/admin/roles', icon: 'pi-shield', match: (p: string) => p.startsWith('/admin/roles') },
     { label: 'Permissions', href: '/admin/permissions', icon: 'pi-key', match: (p: string) => p.startsWith('/admin/permissions') },
@@ -26,6 +38,8 @@ const nav = [
     { label: 'Pulse', href: '/pulse', icon: 'pi-chart-line', external: true },
     { label: 'Logs', href: '/log-viewer', icon: 'pi-file', external: true },
 ];
+
+const nav = computed<NavItem[]>(() => navItems.filter((item) => !item.customerOnly || tenancyEnabled.value));
 
 const mobileOpen = ref(false);
 const userMenuOpen = ref(false);
@@ -53,7 +67,7 @@ watch(currentPath, () => {
         <aside class="fixed inset-y-0 left-0 w-64 max-w-[80%] bg-white dark:bg-dark-900 border-r border-gray-200 dark:border-dark-800 transform transition-transform z-40"
                :class="mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'">
             <div class="h-16 flex items-center justify-between px-4 sm:px-6 border-b border-gray-200 dark:border-dark-800">
-                <Link href="/dashboard" class="text-lg font-semibold text-indigo-600 dark:text-indigo-400">
+                <Link href="/app" class="text-lg font-semibold text-indigo-600 dark:text-indigo-400">
                     Admin
                 </Link>
                 <button @click="mobileOpen = false" class="md:hidden text-gray-500 dark:text-gray-400 p-1 cursor-pointer"
@@ -91,7 +105,7 @@ watch(currentPath, () => {
 
                 <!-- Desktop utility bar -->
                 <div class="hidden md:flex items-center gap-3 ml-auto">
-                    <Link href="/dashboard" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
+                    <Link href="/app" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
                         <i class="pi pi-arrow-left mr-1"></i> Back to app
                     </Link>
                     <LanguageSwitcher />
@@ -125,10 +139,10 @@ watch(currentPath, () => {
                                     <p class="text-sm font-medium truncate">{{ user?.full_name }}</p>
                                     <p class="text-xs text-gray-500 truncate">{{ user?.email }}</p>
                                 </div>
-                                <Link href="/dashboard" class="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-dark-800">
+                                <Link href="/app" class="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-dark-800">
                                     <i class="pi pi-arrow-left mr-2 text-xs"></i>Back to app
                                 </Link>
-                                <Link href="/profile" class="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-dark-800">
+                                <Link href="/app" class="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-dark-800">
                                     <i class="pi pi-user mr-2 text-xs"></i>Profile
                                 </Link>
                                 <div class="border-t border-gray-100 dark:border-dark-800 my-1"></div>

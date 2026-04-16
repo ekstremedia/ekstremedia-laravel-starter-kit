@@ -145,10 +145,11 @@ make build              # Build and start containers
 make up                 # Start containers
 make down               # Stop containers
 make restart            # Restart containers
-make destroy            # Stop containers and remove volumes
+make destroy            # Stop containers and remove volumes (local only)
 
 make test               # Run Pest tests in the app container
-make fresh              # Fresh migrate and seed
+make fresh              # Fresh migrate and seed (local only)
+make rebuild            # Reset DB to a clean slate: drop tenant schemas + migrate:fresh --seed + clear caches (local only)
 make migrate            # Run migrations
 make seed               # Run seeders
 make rollback           # Roll back last migration
@@ -174,6 +175,8 @@ make npm-build          # Build frontend assets
 
 `make help` lists every target with a description.
 
+> **Destructive targets** (`destroy`, `fresh`, `rebuild`) refuse to run unless your `.env` has `APP_ENV=local`. This is a belt-and-braces guard so you can't wipe a staging/prod DB by muscle-memory. If you really need to reset a non-local clone, flip `APP_ENV=local` in `.env` first.
+
 ## Admin Surface
 
 All admin pages live under `/admin/*` and are gated by the `role:Admin` middleware.
@@ -193,6 +196,29 @@ All admin pages live under `/admin/*` and are gated by the `role:Admin` middlewa
 | `/log-viewer` | Raw `storage/logs/*` viewer |
 
 Impersonation writes a yellow banner across the top while active; clicking **Stop impersonating** returns you to the original admin account.
+
+## Multi-customer (optional)
+
+`stancl/tenancy` v3 is pre-wired but **disabled by default**. Clone the kit, run `make init && make build && make migrate`, and you get a plain single-tenant Laravel SPA (`/dashboard`, `/profile`, no `/c/...` prefix, no landlord UI).
+
+To turn it on, set `TENANCY_ENABLED=true` in `.env`, then:
+
+```bash
+docker compose exec app php artisan config:clear
+docker compose exec app php artisan migrate:fresh --seed
+```
+
+When enabled, the app routes users through `/c/{slug}/dashboard`, seeds a `default` customer, exposes `/admin/customers` for CRUD + member management, and provisions a dedicated Postgres schema (`tenant<id>`) per customer. Same code path, same auth, same Admin role — it's a pure add-on.
+
+**Vocabulary note:** the word "Customer" is what shows up in URLs, admin UI, and controllers. Underneath we still lean on the `stancl/tenancy` package, so the Eloquent model is `App\Models\Tenant`, the DB tables are `tenants` / `tenant_user`, and the config file is `config/tenancy.php`. That boundary is intentional — the user-visible layer is Customer, the package-facing plumbing stays Tenant.
+
+When disabled, the `tenants` and `tenant_user` tables still exist but stay empty, so flipping the flag on later requires no migration. See `AGENTS.md` → "Multi-tenancy" for the architecture details.
+
+## Table prefix (optional)
+
+Every migration in this kit runs through Laravel's Schema builder / Eloquent, so they inherit the connection-level `prefix` from `config/database.php`. Set `DB_TABLE_PREFIX=ekstremedia_` (trailing separator included) in `.env`, run `php artisan migrate:fresh`, and you get `ekstremedia_users`, `ekstremedia_roles`, `ekstremedia_tenants`, etc. — all 26 core tables, including Spatie Permission, Pulse, Media Library, Activity Log, Fortify/Sanctum, jobs/cache, and the tenancy tables.
+
+Good when cohabiting a database with other apps and you want every table under one recognisable namespace. Skip it if you use a dedicated DB per app (cleaner). **Caveat**: only queries that go through Eloquent / Query Builder / Schema inherit the prefix — raw SQL (`DB::select('SELECT ... FROM users')`) must call `DB::getTablePrefix()` manually. External tooling (pgAdmin, Metabase, dashboard screenshots, one-off SQL scripts) now sees the prefixed names too.
 
 ## Key Env Vars
 
@@ -223,6 +249,13 @@ PULSE_CACHE_DRIVER=database
 
 # Log viewer (opcodesio) — list every host the SPA might be served from
 LOG_VIEWER_API_STATEFUL_DOMAINS=starter-kit.test,localhost
+
+# Table prefix applied to every migration + query (empty = stock names)
+DB_TABLE_PREFIX=
+
+# Multi-customer (off by default — see "Multi-customer (optional)" above)
+TENANCY_ENABLED=false
+TENANCY_DEFAULT_CUSTOMER=default
 ```
 
 ## Testing
