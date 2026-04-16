@@ -2,9 +2,11 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\AppSetting;
 use App\Models\UserSetting;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Throwable;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -48,16 +50,22 @@ class HandleInertiaRequests extends Middleware
                     'created_at' => $request->user()->created_at,
                     'two_factor_enabled' => ! is_null($request->user()->two_factor_confirmed_at),
                     'full_name' => $request->user()->fullName(),
+                    'avatar_url' => $request->user()->avatarUrl('avatar'),
+                    'avatar_thumb_url' => $request->user()->avatarUrl('thumb'),
                     'roles' => $request->user()->getRoleNames()->toArray(),
                     'permissions' => $request->user()->getAllPermissions()->pluck('name')->toArray(),
+                    'unread_notifications_count' => $request->user()->unreadNotifications()->count(),
+                    'is_impersonating' => session()->has('impersonated_by'),
                 ] : null,
             ],
             'locale' => app()->getLocale(),
             'debug' => [
                 'easy_login_enabled' => (app()->isLocal() || app()->runningUnitTests()) && config('dev.easy_login_enabled'),
             ],
-            // Resolved settings for authenticated users, defaults for guests
-            'settings' => $request->user()
+            // Resolved per-user preferences for authenticated users, defaults for
+            // guests. Named `user_settings` so it cannot collide with a page-level
+            // `settings` prop on admin pages (app settings, mail settings, …).
+            'user_settings' => $request->user()
                 ? $request->user()->settings()->resolved()
                 : UserSetting::$defaults,
             'flash' => [
@@ -65,6 +73,31 @@ class HandleInertiaRequests extends Middleware
                 'error' => fn () => $request->session()->get('error'),
                 'status' => fn () => $request->session()->get('status'),
             ],
+            'app_settings' => fn () => $this->appSettings(),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function appSettings(): array
+    {
+        try {
+            $s = AppSetting::current();
+
+            return [
+                'registration_open' => $s->registration_open,
+                'login_enabled' => $s->login_enabled,
+                'announcement' => $s->announcement_banner
+                    ? ['text' => $s->announcement_banner, 'severity' => $s->announcement_severity]
+                    : null,
+            ];
+        } catch (Throwable) {
+            return [
+                'registration_open' => true,
+                'login_enabled' => true,
+                'announcement' => null,
+            ];
+        }
     }
 }

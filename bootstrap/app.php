@@ -1,9 +1,15 @@
 <?php
 
+use App\Http\Middleware\EnforceAppSettings;
+use App\Http\Middleware\EnsureUserIsNotBanned;
+use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
-use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Configuration\Middleware;
+use Sentry\Laravel\Integration;
+use Spatie\Permission\Middleware\PermissionMiddleware;
+use Spatie\Permission\Middleware\RoleMiddleware;
+use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -15,8 +21,16 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
             HandleInertiaRequests::class,
+            EnsureUserIsNotBanned::class,
+            EnforceAppSettings::class,
+        ]);
+
+        $middleware->alias([
+            'role' => RoleMiddleware::class,
+            'permission' => PermissionMiddleware::class,
+            'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        Integration::handles($exceptions);
     })->create();

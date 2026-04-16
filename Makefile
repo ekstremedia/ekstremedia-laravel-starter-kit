@@ -21,7 +21,7 @@ endif
 help: ## Show this help
 	@echo "Laravel Starter Kit - Available commands:"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -hE '^[a-zA-Z_-]+:.*## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":[^#]*## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 init: ## Initialize .env for a new project
 	@[ -f .env ] || cp .env.example .env
@@ -60,6 +60,16 @@ shell: ## Open a shell in the app container
 test: ## Run Pest tests
 	docker compose exec $(APP_SERVICE) php artisan test
 
+test-js: ## Run Vitest frontend tests
+	docker compose exec $(APP_SERVICE) npm test
+
+test-all: ## Run full CI locally (Pint, Larastan, Pest, tsc, Vitest)
+	docker compose exec $(APP_SERVICE) vendor/bin/pint --test
+	docker compose exec $(APP_SERVICE) vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+	docker compose exec $(APP_SERVICE) php artisan test --compact
+	docker compose exec $(APP_SERVICE) npm run typecheck
+	docker compose exec $(APP_SERVICE) npm test
+
 migrate: ## Run database migrations
 	docker compose exec $(APP_SERVICE) php artisan migrate
 
@@ -78,6 +88,20 @@ tinker: ## Open Laravel Tinker
 
 pint: ## Run Laravel Pint (code formatter)
 	docker compose exec $(APP_SERVICE) ./vendor/bin/pint
+
+stan: ## Run Larastan static analysis
+	docker compose exec $(APP_SERVICE) ./vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+
+ide-helper: ## Regenerate IDE helper files (facades, models, meta) for PhpStorm
+	docker compose exec $(APP_SERVICE) php artisan ide-helper:generate
+	docker compose exec $(APP_SERVICE) php artisan ide-helper:meta
+	docker compose exec $(APP_SERVICE) php artisan ide-helper:models --nowrite --reset
+
+backup: ## Run a manual backup
+	docker compose exec $(APP_SERVICE) php artisan backup:run
+
+backup-clean: ## Clean old backups
+	docker compose exec $(APP_SERVICE) php artisan backup:clean
 
 logs: ## Show app container logs
 	docker compose logs -f $(APP_SERVICE)

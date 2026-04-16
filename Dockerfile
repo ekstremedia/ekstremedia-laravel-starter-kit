@@ -5,24 +5,50 @@ RUN apt-get update && apt-get install -y \
     git \
     curl \
     libpq-dev \
+    postgresql-client \
     libpng-dev \
+    libjpeg-dev \
+    libwebp-dev \
+    libfreetype6-dev \
     libonig-dev \
     libxml2-dev \
     libzip-dev \
+    libmagickwand-dev \
+    imagemagick \
     zip \
     unzip \
-    nodejs \
-    npm \
+    ca-certificates \
+    gnupg \
     supervisor \
     nginx \
+    && docker-php-ext-configure gd --with-jpeg --with-webp --with-freetype \
     && docker-php-ext-install pdo pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
+    && pecl install redis imagick \
+    && docker-php-ext-enable redis imagick \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Node.js 22 LTS (Debian's nodejs ships an old 18.x that can't build
+# Vite 8 / vue-tsc). Keep this step after the apt cleanup so the NodeSource
+# layer caches independently.
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upload limits — kept slightly below nginx's client_max_body_size
+RUN { \
+        echo 'upload_max_filesize=50M'; \
+        echo 'post_max_size=55M'; \
+        echo 'memory_limit=512M'; \
+    } > /usr/local/etc/php/conf.d/uploads.ini
+
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Handy `a` shim for `php artisan` so `docker compose exec app a queue:flush` works
+RUN printf '#!/bin/sh\nexec php /var/www/html/artisan "$@"\n' > /usr/local/bin/a \
+    && chmod +x /usr/local/bin/a
 
 # Set working directory
 WORKDIR /var/www/html

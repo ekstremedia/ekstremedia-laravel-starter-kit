@@ -102,17 +102,17 @@ it('shares settings as inertia props for authenticated users', function () {
     $this->actingAs($user)
         ->get('/')
         ->assertInertia(fn ($page) => $page
-            ->has('settings')
-            ->where('settings.locale', 'no')
+            ->has('user_settings')
+            ->where('user_settings.locale', 'no')
         );
 });
 
 it('shares default settings as inertia props for guests', function () {
     $this->get('/')
         ->assertInertia(fn ($page) => $page
-            ->has('settings')
-            ->where('settings.locale', UserSetting::$defaults['locale'])
-            ->where('settings.dark_mode', UserSetting::$defaults['dark_mode'])
+            ->has('user_settings')
+            ->where('user_settings.locale', UserSetting::$defaults['locale'])
+            ->where('user_settings.dark_mode', UserSetting::$defaults['dark_mode'])
         );
 });
 

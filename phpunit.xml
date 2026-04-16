@@ -32,5 +32,7 @@
         <env name="PULSE_ENABLED" value="false" force="true"/>
         <env name="TELESCOPE_ENABLED" value="false" force="true"/>
         <env name="NIGHTWATCH_ENABLED" value="false" force="true"/>
+        <env name="IMAGE_DRIVER" value="imagick" force="true"/>
+        <env name="QUEUE_CONVERSIONS_BY_DEFAULT" value="false" force="true"/>
     </php>
 </phpunit>

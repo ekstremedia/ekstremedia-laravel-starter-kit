@@ -18,7 +18,7 @@ class UserSetting extends Model
      * Add new settings here — they are automatically merged when reading.
      */
     public static array $defaults = [
-        'locale'    => 'en',
+        'locale' => 'en',
         'dark_mode' => true,
     ];
 

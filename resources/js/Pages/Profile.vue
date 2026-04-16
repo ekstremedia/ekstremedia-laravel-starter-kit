@@ -29,6 +29,46 @@ onMounted(() => {
     }
 });
 
+// --- Avatar ---
+const avatarInput = ref<HTMLInputElement | null>(null);
+const avatarUploading = ref(false);
+const avatarPreview = computed(() => user.value.avatar_url);
+const avatarInitials = computed(() => {
+    const f = (user.value.first_name?.trim() ?? '')[0] ?? '';
+    const l = (user.value.last_name?.trim() ?? '')[0] ?? '';
+    return (f + l).toUpperCase();
+});
+
+function pickAvatar() {
+    avatarInput.value?.click();
+}
+
+function onAvatarChange(e: Event) {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const form = new FormData();
+    form.append('avatar', file);
+    avatarUploading.value = true;
+    // Flash messages from the controller drive the toast; only surface
+    // client-side validation errors here.
+    router.post('/profile/avatar', form, {
+        preserveScroll: true,
+        forceFormData: true,
+        onError: (errors) => {
+            const first = Object.values(errors)[0] as string;
+            if (first) toast.add({ severity: 'error', detail: first, life: 4000 });
+        },
+        onFinish: () => {
+            avatarUploading.value = false;
+            if (avatarInput.value) avatarInput.value.value = '';
+        },
+    });
+}
+
+function removeAvatar() {
+    router.delete('/profile/avatar', { preserveScroll: true });
+}
+
 // --- Profile Info ---
 const profileForm = useForm({
     first_name: user.value.first_name,
@@ -243,6 +283,64 @@ function getToken(): string {
             </h1>
 
             <div ref="sectionsRef" class="space-y-6">
+                <!-- Profile Photo -->
+                <div class="p-6 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('profile.photo_title') }}</h2>
+                    <p class="text-sm text-gray-500 dark:text-dark-400 mt-1 mb-5">
+                        {{ t('profile.photo_desc') }}
+                    </p>
+
+                    <div class="flex items-center gap-6">
+                        <div class="relative">
+                            <img
+                                v-if="avatarPreview"
+                                :src="avatarPreview"
+                                :alt="user.full_name"
+                                class="w-24 h-24 rounded-full object-cover ring-2 ring-gray-200 dark:ring-dark-700"
+                            />
+                            <div
+                                v-else
+                                class="w-24 h-24 rounded-full bg-indigo-600 text-white flex items-center justify-center text-2xl font-semibold ring-2 ring-gray-200 dark:ring-dark-700"
+                            >
+                                {{ avatarInitials }}
+                            </div>
+                            <div
+                                v-if="avatarUploading"
+                                class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center"
+                            >
+                                <i class="pi pi-spin pi-spinner text-white text-xl"></i>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col gap-2">
+                            <input
+                                ref="avatarInput"
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp,image/gif"
+                                class="hidden"
+                                @change="onAvatarChange"
+                            />
+                            <button
+                                type="button"
+                                :disabled="avatarUploading"
+                                @click="pickAvatar"
+                                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                            >
+                                <i class="pi pi-upload mr-2 text-xs"></i>{{ avatarPreview ? t('profile.photo_replace') : t('profile.photo_upload') }}
+                            </button>
+                            <button
+                                v-if="avatarPreview"
+                                type="button"
+                                :disabled="avatarUploading"
+                                @click="removeAvatar"
+                                class="px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                            >
+                                <i class="pi pi-trash mr-2 text-xs"></i>{{ t('profile.photo_remove') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Profile Information -->
                 <div class="p-6 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700">
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
@@ -253,7 +351,7 @@ function getToken(): string {
                     </p>
 
                     <form @submit.prevent="saveProfile" class="space-y-4">
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <TextInput
                                 v-model="profileForm.first_name"
                                 :label="t('auth.first_name')"

@@ -1,0 +1,23 @@
+{
+    "agents": [
+        "claude_code",
+        "codex",
+        "opencode"
+    ],
+    "guidelines": true,
+    "mcp": true,
+    "nightwatch_mcp": false,
+    "packages": [
+        "spatie/laravel-permission"
+    ],
+    "sail": false,
+    "skills": [
+        "fortify-development",
+        "laravel-best-practices",
+        "pest-testing",
+        "inertia-vue-development",
+        "echo-development",
+        "tailwindcss-development",
+        "laravel-permission-development"
+    ]
+}
