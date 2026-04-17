@@ -19,7 +19,6 @@ pest()->extend(TestCase::class)
         // the central (in-memory) DB. Integration tests that *do* exercise the
         // Postgres schema flow should run against the dev Postgres setup.
         config()->set('tenancy.bootstrappers', []);
-        TenantCreated::class; // ensure autoload
         Event::forget(TenantCreated::class);
         Event::forget(TenantDeleted::class);
     })

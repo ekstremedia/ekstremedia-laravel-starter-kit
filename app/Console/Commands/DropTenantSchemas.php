@@ -29,8 +29,11 @@ class DropTenantSchemas extends Command
             return self::SUCCESS;
         }
 
+        // Match only the exact naming scheme stancl/tenancy produces
+        // (`tenant<id>` where id is numeric) — don't touch unrelated schemas
+        // like `tenant_audit` that a future migration might introduce.
         $schemas = $connection->select(
-            "SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE 'tenant%'"
+            "SELECT schema_name FROM information_schema.schemata WHERE schema_name ~ '^tenant[0-9]+$'"
         );
 
         if ($schemas === []) {

@@ -15,22 +15,26 @@ return [
      * Master switch.
      *
      * When `false` (default) the app behaves like a plain single-tenant Laravel
-     * SPA: routes live at `/dashboard`, `/profile`, etc., no `/t/{slug}` prefix,
-     * no landlord UI, no default-tenant seeding, and new registrations are not
-     * attached to any tenant. The `tenants` and `tenant_user` tables still exist
-     * in the central DB but stay empty.
+     * SPA: routes live at `/dashboard`, `/profile`, etc., no `/c/{customer}`
+     * prefix, no landlord UI, no default-customer seeding, and new
+     * registrations are not attached to any customer. The `tenants` and
+     * `tenant_user` tables still exist in the central DB but stay empty.
      *
      * Flip to `true` (set `TENANCY_ENABLED=true` in `.env` and clear config) to
-     * activate multi-tenancy: routes move under `/t/{slug}/...`, `/app` becomes
-     * the post-login picker, `/admin/tenants` exposes the landlord UI, and
-     * `TenantSeeder` provisions a `default` workspace on `migrate --seed`.
+     * activate multi-tenancy: routes move under `/c/{customer}/...`, `/app`
+     * becomes the post-login picker, `/admin/customers` exposes the landlord
+     * UI, and `CustomerSeeder` provisions a `default` workspace on `migrate
+     * --seed`.
      */
     'enabled' => env('TENANCY_ENABLED', false),
 
     'tenant_model' => Tenant::class,
 
-    // Auto-increment integer IDs so schema names are clean (tenant1, tenant2, ...) and
-    // Spatie Permission teams' default unsignedBigInteger team_id column fits as-is.
+    // We don't generate tenant IDs in application code — the `tenants` table's
+    // auto-increment primary key supplies them, and stancl then derives schema
+    // names as `tenant<id>` (e.g. tenant1, tenant2, ...). Flip this to a custom
+    // generator class if you want UUIDs or another scheme instead; note you'd
+    // need to adjust the tenants migration + Spatie team_id column types to match.
     'id_generator' => null,
 
     /**
@@ -40,7 +44,7 @@ return [
      */
     'default_customer_slug' => env('TENANCY_DEFAULT_CUSTOMER', 'default'),
 
-    // Domain-based identification is unused (we use path prefix /t/{slug}).
+    // Domain-based identification is unused (we use the path prefix /c/{customer}).
     // The Domain model and table were intentionally removed from this starter kit.
     'domain_model' => Domain::class,
 
@@ -80,7 +84,8 @@ return [
 
         'template_tenant_connection' => null,
 
-        // Schema names look like "tenant<id>" (e.g. tenant0198-..-uuid).
+        // Schema names look like "tenant<id>" (e.g. tenant1, tenant2) because
+        // `id_generator` is null and IDs come from the auto-increment PK.
         'prefix' => 'tenant',
         'suffix' => '',
 

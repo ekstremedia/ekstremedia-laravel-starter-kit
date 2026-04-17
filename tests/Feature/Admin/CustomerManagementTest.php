@@ -85,6 +85,16 @@ it('rejects duplicate slugs', function () {
         ->assertSessionHasErrors('slug');
 });
 
+it('rejects a name that cannot produce a valid auto-slug', function () {
+    // `Str::slug('★★★')` → '' — the re-validation must block this before the
+    // row lands in the DB with an empty slug (which would break /c/<slug> URLs).
+    $this->actingAs($this->admin)
+        ->post('/admin/customers', ['name' => '★★★'])
+        ->assertSessionHasErrors('slug');
+
+    expect(Tenant::query()->count())->toBe(0);
+});
+
 it('renders the edit form with the customer payload', function () {
     $customer = createCustomer('acme', 'Acme Corp');
 

@@ -25,7 +25,7 @@ class ImpersonateController extends Controller
 
         $manager->take($me, $user);
 
-        return redirect('/app');
+        return redirect()->route('app.landing');
     }
 
     public function leave(ImpersonateManager $manager): RedirectResponse

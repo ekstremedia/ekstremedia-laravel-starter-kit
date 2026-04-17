@@ -216,7 +216,7 @@ When disabled, the `tenants` and `tenant_user` tables still exist but stay empty
 
 ## Table prefix (optional)
 
-Every migration in this kit runs through Laravel's Schema builder / Eloquent, so they inherit the connection-level `prefix` from `config/database.php`. Set `DB_TABLE_PREFIX=ekstremedia_` (trailing separator included) in `.env`, run `php artisan migrate:fresh`, and you get `ekstremedia_users`, `ekstremedia_roles`, `ekstremedia_tenants`, etc. — all 26 core tables, including Spatie Permission, Pulse, Media Library, Activity Log, Fortify/Sanctum, jobs/cache, and the tenancy tables.
+Every migration in this kit runs through Laravel's Schema builder / Eloquent, so they inherit the connection-level `prefix` from `config/database.php`. Set `DB_TABLE_PREFIX=acme_` (trailing separator included) in `.env`, run `php artisan migrate:fresh`, and you get `acme_users`, `acme_roles`, `acme_tenants`, etc. — all 26 core tables, including Spatie Permission, Pulse, Media Library, Activity Log, Fortify/Sanctum, jobs/cache, and the tenancy tables.
 
 Good when cohabiting a database with other apps and you want every table under one recognisable namespace. Skip it if you use a dedicated DB per app (cleaner). **Caveat**: only queries that go through Eloquent / Query Builder / Schema inherit the prefix — raw SQL (`DB::select('SELECT ... FROM users')`) must call `DB::getTablePrefix()` manually. External tooling (pgAdmin, Metabase, dashboard screenshots, one-off SQL scripts) now sees the prefixed names too.
 

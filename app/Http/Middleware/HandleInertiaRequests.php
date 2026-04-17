@@ -7,6 +7,7 @@ use App\Models\Tenant;
 use App\Models\UserSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Inertia\Inertia;
 use Inertia\Middleware;
 use Throwable;
 
@@ -79,8 +80,11 @@ class HandleInertiaRequests extends Middleware
             'tenancy' => [
                 'enabled' => (bool) config('tenancy.enabled'),
             ],
-            'customer' => fn () => $this->currentCustomer($request),
-            'customers' => fn () => $this->availableCustomers($request),
+            'customer' => fn () => $this->currentCustomer(),
+            // `customers` is only consumed by the picker page (which already
+            // receives the list as an explicit controller prop) — keep it off
+            // shared props unless a page opts in with Inertia::only/Inertia::reload.
+            'customers' => Inertia::optional(fn () => $this->availableCustomers($request)),
         ];
     }
 
@@ -89,7 +93,7 @@ class HandleInertiaRequests extends Middleware
      *
      * @return array<string, mixed>|null
      */
-    private function currentCustomer(Request $request): ?array
+    private function currentCustomer(): ?array
     {
         if (! tenancy()->initialized) {
             return null;

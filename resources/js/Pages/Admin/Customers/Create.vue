@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
@@ -15,13 +16,21 @@ function submit() {
     form.post('/admin/customers');
 }
 
+function slugify(value: string): string {
+    return value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 63);
+}
+
+// Live preview that mirrors the server-side fallback (`Str::slug($name)`): if
+// the user hasn't typed a slug, show what we'd derive from the current name.
+const effectiveSlug = computed(() => form.slug || slugify(form.name));
+
 function onNameBlur() {
     if (!form.slug && form.name) {
-        form.slug = form.name
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, '')
-            .slice(0, 63);
+        form.slug = slugify(form.name);
     }
 }
 </script>
@@ -44,7 +53,7 @@ function onNameBlur() {
             <label class="block text-sm mb-1">Slug</label>
             <InputText v-model="form.slug" class="w-full" placeholder="acme" />
             <p class="text-xs text-gray-500 dark:text-dark-400 mt-1">
-                Used in the URL (/c/<strong>{{ form.slug || 'slug' }}</strong>). Lowercase letters, digits and hyphens.
+                Used in the URL (/c/<strong>{{ effectiveSlug || 'slug' }}</strong>). Lowercase letters, digits and hyphens.
             </p>
             <p v-if="form.errors.slug" class="text-xs text-red-500 mt-1">{{ form.errors.slug }}</p>
         </div>

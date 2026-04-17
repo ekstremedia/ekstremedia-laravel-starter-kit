@@ -117,20 +117,20 @@ it('lets admins enter any customer without a pivot row', function () {
         ->assertOk();
 });
 
-it('exposes the user-visible customers list on every Inertia response', function () {
+it('keeps the shared customers prop off the default payload (Inertia::optional)', function () {
     $acme = createCustomer('acme');
     $globex = createCustomer('globex');
-    createCustomer('widgets'); // user is NOT a member of this one
 
     $user = User::factory()->create();
     joinCustomer($user, $acme);
     joinCustomer($user, $globex);
 
+    // Normal page visit → picker receives the list as an *explicit* controller
+    // prop ('customers'), but the shared-layer optional prop is not resolved.
     $this->actingAs($user)
         ->get('/app')
         ->assertInertia(fn ($page) => $page
+            ->has('customers', 2)
             ->where('customers.0.slug', 'acme')
-            ->where('customers.1.slug', 'globex')
-            ->missing('customers.2')
         );
 });

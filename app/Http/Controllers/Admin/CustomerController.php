@@ -9,6 +9,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -59,10 +60,16 @@ class CustomerController extends Controller
 
         $slug = $data['slug'] ?? Str::slug($data['name']);
 
-        // Guard against a duplicate when slug was auto-generated.
-        if (Tenant::query()->where('slug', $slug)->exists()) {
-            return back()->withErrors(['slug' => 'Slug is already taken; please provide a custom one.'])->withInput();
-        }
+        // The request-level rules above only fire when the client sent a slug.
+        // When we fall back to `Str::slug($name)` an odd name can produce an
+        // empty string, an over-length value, or collide with an existing
+        // customer — re-run the same rules against the resolved slug so the
+        // auto-generated branch can't bypass them.
+        Validator::make(['slug' => $slug], [
+            'slug' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', Rule::unique('tenants', 'slug')],
+        ], [
+            'slug.*' => 'Could not derive a valid slug from the name; please provide one explicitly.',
+        ])->validate();
 
         $customer = Tenant::create([
             'name' => $data['name'],

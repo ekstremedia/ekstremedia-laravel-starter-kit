@@ -27,6 +27,7 @@ class CustomerLandingController extends Controller
             return redirect('/dashboard');
         }
 
+        // `/app` is behind `['auth','verified']`, so `user()` is guaranteed non-null.
         $user = $request->user();
 
         // Admins can enter any active customer; regular users only their memberships.
@@ -42,6 +43,9 @@ class CustomerLandingController extends Controller
             return redirect()->route('customer.dashboard', ['customer' => $only->slug]);
         }
 
+        // The picker itself handles the empty case with a friendly "ask an admin
+        // to add you" message — let it render so the user sees *why* they can't
+        // enter anywhere rather than getting a bare redirect.
         return $this->picker($customers);
     }
 

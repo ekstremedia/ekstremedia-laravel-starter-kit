@@ -88,7 +88,7 @@ function initials(u: { first_name: string; last_name: string }) {
                                     v-if="showCustomerNav"
                                     :href="dashboardUrl"
                                     class="px-3 py-2 text-sm font-medium rounded-lg transition-colors"
-                                    :class="$page.url === dashboardUrl
+                                    :class="$page.url.startsWith(dashboardUrl)
                                         ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10'
                                         : 'text-gray-600 dark:text-dark-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-dark-800'"
                                 >
