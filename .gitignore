@@ -35,6 +35,10 @@ Thumbs.db
 /.mcp.json
 CLAUDE.md
 Plan.md
+# PR review scratchpad — paste a CodeRabbit / CI comment into cr.md locally,
+# work through it, and commit the fixes. The raw review log itself stays out
+# of git.
+cr.md
 
 # Media uploads (dev)
 /storage/media-library

@@ -212,7 +212,9 @@ When enabled, the app routes users through `/c/{slug}/dashboard`, seeds a `defau
 
 **Vocabulary note:** the word "Customer" is what shows up in URLs, admin UI, and controllers. Underneath we still lean on the `stancl/tenancy` package, so the Eloquent model is `App\Models\Tenant`, the DB tables are `tenants` / `tenant_user`, and the config file is `config/tenancy.php`. That boundary is intentional — the user-visible layer is Customer, the package-facing plumbing stays Tenant.
 
-When disabled, the `tenants` and `tenant_user` tables still exist but stay empty, so flipping the flag on later requires no migration. See `AGENTS.md` → "Multi-tenancy" for the architecture details.
+When disabled, the `tenants` and `tenant_user` tables still exist but stay empty, so flipping the flag on later requires no migration. See `AGENTS.md` → "Multi-customer / multi-tenancy" for the full architecture breakdown, including the Customer-vs-Tenant vocabulary boundary.
+
+`make rebuild` (local-only) is a one-shot reset: drops every `tenant<id>` Postgres schema, runs `migrate:fresh --seed`, and clears caches. Useful when flipping the flag mid-dev.
 
 ## Table prefix (optional)
 
