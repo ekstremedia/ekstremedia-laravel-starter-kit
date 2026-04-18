@@ -9,10 +9,6 @@ use App\Services\MjmlCompiler;
 use Database\Seeders\EmailTemplateSeeder;
 use Illuminate\Support\Facades\Notification;
 
-beforeEach(function () {
-    $this->seed(EmailTemplateSeeder::class);
-});
-
 it('compiles valid MJML to HTML', function () {
     $compiler = app(MjmlCompiler::class);
 
@@ -23,11 +19,15 @@ it('compiles valid MJML to HTML', function () {
 });
 
 it('seeds all 14 templates', function () {
+    $this->seed(EmailTemplateSeeder::class);
+
     expect(EmailTemplate::count())->toBe(14);
     expect(EmailTemplate::whereNotNull('compiled_html')->count())->toBe(14);
 });
 
 it('finds template by slug and locale', function () {
+    $this->seed(EmailTemplateSeeder::class);
+
     $template = EmailTemplate::forSlug('welcome', 'no');
 
     expect($template)->not->toBeNull();
@@ -36,7 +36,8 @@ it('finds template by slug and locale', function () {
 });
 
 it('falls back to English when locale template is missing', function () {
-    // Delete the Norwegian version
+    $this->seed(EmailTemplateSeeder::class);
+
     EmailTemplate::query()->where('slug', 'welcome')->where('locale', 'no')->delete();
 
     $template = EmailTemplate::forSlug('welcome', 'no');
@@ -46,6 +47,8 @@ it('falls back to English when locale template is missing', function () {
 });
 
 it('interpolates variables in rendered HTML', function () {
+    $this->seed(EmailTemplateSeeder::class);
+
     $template = EmailTemplate::forSlug('welcome', 'en');
 
     $html = $template->render(['user_name' => 'Alice', 'app_name' => 'TestApp', 'app_url' => 'https://test.com']);
@@ -54,6 +57,8 @@ it('interpolates variables in rendered HTML', function () {
 });
 
 it('interpolates subject variables', function () {
+    $this->seed(EmailTemplateSeeder::class);
+
     $template = EmailTemplate::forSlug('welcome', 'en');
 
     $subject = $template->interpolateSubject(['app_name' => 'TestApp']);
@@ -89,6 +94,8 @@ it('sends admin test notification with template', function () {
 });
 
 it('recompiles when template is updated', function () {
+    $this->seed(EmailTemplateSeeder::class);
+
     $template = EmailTemplate::forSlug('welcome', 'en');
     $originalHtml = $template->compiled_html;
 
