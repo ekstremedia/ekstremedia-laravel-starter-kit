@@ -89,5 +89,5 @@ it('redirects authenticated users away from forgot password page', function () {
 
     $this->actingAs($user)
         ->get('/forgot-password')
-        ->assertRedirect('/dashboard');
+        ->assertRedirect('/app');
 });

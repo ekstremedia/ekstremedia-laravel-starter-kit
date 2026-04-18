@@ -6,6 +6,7 @@ import Toast from 'primevue/toast';
 import LanguageSwitcher from '@/Components/LanguageSwitcher.vue';
 import DarkModeToggle from '@/Components/DarkModeToggle.vue';
 import { useFlashToast } from '@/composables/useFlashToast';
+import { useCustomer } from '@/composables/useCustomer';
 import type { PageProps } from '@/types';
 
 const { t } = useI18n();
@@ -13,6 +14,13 @@ const page = usePage<PageProps>();
 const user = computed(() => page.props.auth?.user);
 const isAdmin = computed(() => user.value?.roles?.includes('Admin') ?? false);
 const appName = import.meta.env.VITE_APP_NAME || t('app.name');
+const { customer, tenancyEnabled, customerUrl } = useCustomer();
+const dashboardUrl = computed(() => customerUrl('/dashboard'));
+const profileUrl = computed(() => customerUrl('/profile'));
+const notificationsReadAllUrl = computed(() => customerUrl('/notifications/read-all'));
+// Customer-scoped nav entries show in the layout when either tenancy is off
+// (single-tenant mode, routes at root) or a customer is actively in scope.
+const showCustomerNav = computed(() => !tenancyEnabled.value || Boolean(customer.value));
 
 const dropdownOpen = ref(false);
 const notificationsOpen = ref(false);
@@ -37,7 +45,11 @@ function leaveImpersonation() {
 }
 
 function markAllRead() {
-    router.post('/notifications/read-all', {}, { preserveScroll: true });
+    if (!showCustomerNav.value) {
+        return;
+    }
+
+    router.post(notificationsReadAllUrl.value, {}, { preserveScroll: true });
     notificationsOpen.value = false;
 }
 
@@ -77,9 +89,10 @@ function initials(u: { first_name: string; last_name: string }) {
                         <template v-if="user">
                             <div class="hidden sm:flex items-center gap-1">
                                 <Link
-                                    href="/dashboard"
+                                    v-if="showCustomerNav"
+                                    :href="dashboardUrl"
                                     class="px-3 py-2 text-sm font-medium rounded-lg transition-colors"
-                                    :class="$page.url === '/dashboard'
+                                    :class="$page.url.startsWith(dashboardUrl)
                                         ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10'
                                         : 'text-gray-600 dark:text-dark-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-dark-800'"
                                 >
@@ -186,13 +199,15 @@ function initials(u: { first_name: string; last_name: string }) {
                                         class="absolute right-0 mt-2 w-48 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 shadow-lg dark:shadow-dark-950/50 py-1 z-50"
                                     >
                                         <Link
-                                            href="/dashboard"
+                                            v-if="showCustomerNav"
+                                            :href="dashboardUrl"
                                             class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800 sm:hidden"
                                         >
                                             {{ t('nav.dashboard') }}
                                         </Link>
                                         <Link
-                                            href="/profile"
+                                            v-if="showCustomerNav"
+                                            :href="profileUrl"
                                             class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800"
                                         >
                                             {{ t('nav.profile') }}

@@ -78,13 +78,50 @@ Gated by `role:Admin` (spatie). All pages live under `/admin/*`:
 
 Supervisor programs (`docker/supervisord.conf`): php-fpm, nginx, reverb, **horizon**, **pulse-check**, **pulse-work**, **scheduler**, vite.
 
+## Table prefix (optional)
+
+Every connection in `config/database.php` reads its `prefix` from `DB_TABLE_PREFIX` (empty by default). Setting `DB_TABLE_PREFIX=ekstremedia_` and re-running `migrate:fresh` prefixes all 26 tables — `ekstremedia_users`, `ekstremedia_permissions`, `ekstremedia_tenants`, etc. — because every migration and model in the kit uses Laravel's Schema builder / Eloquent. Raw SQL in custom code must call `DB::getTablePrefix()`; external tooling sees the prefixed names. Verified by flipping the env var + `migrate:fresh` and confirming login/dashboard/admin all work unchanged.
+
+## Multi-customer / multi-tenancy (optional — off by default)
+
+The starter bundles `stancl/tenancy` v3 but keeps it **disabled by default** so a fresh clone behaves exactly like a plain Laravel SPA (`/dashboard`, `/profile`, `/notifications`, …). Flip `TENANCY_ENABLED=true` in `.env`, run `php artisan config:clear && php artisan migrate:fresh --seed`, and the multi-customer stack lights up without any code changes.
+
+**Vocabulary boundary.** "Customer" is the user-facing name: URLs, admin UI, controllers, Inertia props. "Tenant" is the package-facing name that stays in code where we extend `stancl/tenancy`:
+
+| User-facing "Customer"                              | Package-facing "Tenant"                                     |
+|-----------------------------------------------------|-------------------------------------------------------------|
+| `/c/{customer}/...` URLs                            | `App\Models\Tenant` (extends `Stancl\Tenancy\Database\Models\Tenant`) |
+| `/admin/customers` landlord UI                      | `tenants` / `tenant_user` DB tables                          |
+| `App\Http\Controllers\Admin\CustomerController`     | `config/tenancy.php`, `TENANCY_ENABLED`                      |
+| `routes/customer.php`, `CustomerLandingController`  | `InitializeTenancyByPath` middleware                         |
+| `resources/js/Pages/{Admin/Customers,Customers}/*`, `useCustomer()` | `tenancy()`, `TenantCreated`/`TenantDeleted` events |
+| Inertia shared props `customer` / `customers`       | `App\Models\User::customers()` (BelongsToMany → `Tenant`)    |
+
+**What the flag controls** (read via `config('tenancy.enabled')` server-side and `$page.props.tenancy.enabled` in Vue via `useCustomer().tenancyEnabled`):
+
+- **Route shape** — `routes/customer.php` is mounted in one of two ways by `bootstrap/app.php`: under `/c/{customer}` with `InitializeTenancyByPath` when enabled, or at root with plain `auth,verified` when disabled. The file itself is just a flat list of definitions; all prefix/middleware lives in `bootstrap/app.php`.
+- **Landlord UI** — `/admin/customers` (CRUD + member management in `Admin\CustomerController`) is only registered when enabled. `AdminLayout.vue` filters the "Customers" nav entry on `tenancyEnabled`.
+- **Post-login landing** — `/app` (`CustomerLandingController`) always exists; when disabled it simply `redirect('/dashboard')`, when enabled it returns the picker (`resources/js/Pages/Customers/Picker.vue`) or skips straight to a single customer. Every PHP-side redirect (`LoginResponse`, `FortifyServiceProvider::verifyEmailView`, `DevLoginController`, `ImpersonateController::take`, `RedirectIfAuthenticated::redirectUsing`) points at `/app` in both modes.
+- **Default-customer seeding + Fortify signups** — `CustomerSeeder::run()` and `CreateNewUser::attachToDefaultCustomer()` early-return when disabled. In single-tenant mode the `tenants` / `tenant_user` tables stay empty; they still exist in the central DB so flipping the flag on later needs no migration.
+
+**Multi-customer architecture** (when enabled):
+
+- **Path-based identification** — every customer-facing URL is `/c/{slug}/...`. No wildcard DNS required.
+- **PostgreSQL schema per customer** — one database, one schema per customer (`tenant1`, `tenant2`, …). `config/tenancy.php` maps `pgsql → PostgreSQLSchemaManager`; IDs are auto-increment integers so schema names stay clean. Only the **database** and **queue** bootstrappers are active; cache, filesystem, and redis stay central.
+- **Shared users** — `users`, Spatie permission tables, sessions, jobs, media, activity log and settings all live in `public`. A `tenant_user` pivot (`Tenant::users()` ↔ `User::customers()`) controls membership. Roles remain global (`teams=false`): `Admin` is the **system super-user** across every customer, not a customer-level role.
+- **Customer resolution** — `App\Http\Middleware\InitializeTenancyByPath` resolves `{customer}` (a slug) → `Tenant`, initialises tenancy (PG `search_path`), and 403s non-members. Admins bypass the membership check. (Class name stays "Tenancy" because it's the stancl package concept; the `customer` parameter name surfaces the user-facing vocabulary.)
+- **Landlord pipeline** — creating a customer via `/admin/customers` fires stancl's `TenantCreated` → `CreateDatabase → MigrateDatabase` pipeline, which creates the Postgres schema and runs `database/migrations/tenant/` against it. Deleting drops the schema.
+- **Per-customer business models** go in `database/migrations/tenant/` (empty by default; keep the folder name — stancl's migrator hardcodes it).
+
+**Testing** — `phpunit.xml` and `.env.testing` force `TENANCY_ENABLED=true` so the full Pest suite exercises the multi-customer path (routing, membership, landlord UI). Single-tenant mode is a proper subset; verify it manually by clearing `TENANCY_ENABLED` and hitting `/dashboard`. `tests/Pest.php` strips stancl's bootstrappers and `TenantCreated`/`TenantDeleted` event listeners so the SQLite in-memory test DB doesn't try to provision per-customer files. Helpers: `createCustomer()`, `joinCustomer($user, $c)`, `customerUrl($c, '/path')`.
+
 ## Observability, Backups & Productivity Stack
 
 - **Sentry** (`sentry/sentry-laravel`) — set `SENTRY_LARAVEL_DSN` in `.env` to enable. Exceptions route through `\Sentry\Laravel\Integration::handles()` in `bootstrap/app.php`. Leave DSN blank for local dev.
 - **Backups** (`spatie/laravel-backup`) — `config/backup.php` reads `DB_CONNECTION`. Schedule (from `routes/console.php`): `backup:clean` at 01:30, `backup:run` at 02:00, `backup:monitor` at 06:00. Admin UI at `/admin/backups`. Requires `pg_dump` (installed in the Dockerfile via `postgresql-client`). The `scheduler` supervisor program (runs `schedule:work`) drives the cron.
 - **Log Viewer** (`opcodesio/log-viewer`) — mounted at `/log-viewer`, gated by the `viewLogViewer` Gate in `AppServiceProvider` (Admin only). Shows raw `storage/logs/*` files — distinct from the activity log.
-- **Impersonation** (`lab404/laravel-impersonate`) — Admins see a yellow "login as" button next to each non-admin in `/admin/users`. Taking over redirects to `/dashboard` with an amber banner; pressing "Stop impersonating" returns to the original admin. Both actions write to the `impersonation` activity log.
-- **Notifications inbox** — DB-backed. `$user->unreadNotifications()->count()` is shared via Inertia as `auth.user.unread_notifications_count` and rendered as a red badge on the bell icon in `AppLayout.vue`. Endpoints: `GET /notifications`, `POST /notifications/{id}/read`, `POST /notifications/read-all`, `DELETE /notifications/{id}`.
+- **Impersonation** (`lab404/laravel-impersonate`) — Admins see a yellow "login as" button next to each non-admin in `/admin/users`. Taking over redirects to `/app` with an amber banner; pressing "Stop impersonating" returns to the original admin. Both actions write to the `impersonation` activity log.
+- **Notifications inbox** — DB-backed. `$user->unreadNotifications()->count()` is shared via Inertia as `auth.user.unread_notifications_count` and rendered as a red badge on the bell icon in `AppLayout.vue`. Endpoints are customer-scoped: `GET /c/{customer}/notifications`, `POST /c/{customer}/notifications/{id}/read`, `POST /c/{customer}/notifications/read-all`, `DELETE /c/{customer}/notifications/{id}`.
 - **Static analysis** — Larastan (`phpstan.neon`, level 5). Run with `make stan` or `vendor/bin/phpstan analyse`. Part of the backend CI job.
 - **Pre-commit hooks** — Husky + lint-staged. PHP → `pint --dirty`, TS/Vue → `vue-tsc --noEmit`. Configured in `package.json` (`lint-staged` key) and `.husky/pre-commit`. Install hooks with `npm install` (Husky's `prepare` script runs automatically).
 
@@ -276,9 +313,25 @@ docker compose exec app php artisan test
 
 ## Laravel Boost MCP
 
-The repo ships a `.mcp.json` that launches Laravel Boost **inside the `app` container** so PHP/Composer/Artisan all run against the containerized stack.
+The repo ships `.mcp.json.example` — a template that launches Laravel Boost **inside the `app` container** so PHP/Composer/Artisan all run against the containerized stack.
 
-**Replace `<PROJECT_ROOT>` below with the absolute path to your clone** — MCP clients launch this command from their own CWD, so a relative path to `docker-compose.yml` will not work:
+`.mcp.json` is **gitignored** because it must contain the absolute path to *your* clone, which differs per machine. MCP clients launch this command from their own CWD, so a relative `-f` path to `docker-compose.yml` will not work.
+
+### First-time setup on each machine
+
+```bash
+cp .mcp.json.example .mcp.json
+# then replace <PROJECT_ROOT> in .mcp.json with the absolute path to your clone,
+# e.g. /Users/you/projects/ekstremedia-laravel-starter-kit
+```
+
+One-liner (macOS/Linux):
+
+```bash
+sed -i.bak "s|<PROJECT_ROOT>|$(pwd)|g" .mcp.json && rm .mcp.json.bak
+```
+
+The template:
 
 ```json
 {
@@ -298,6 +351,7 @@ Notes:
 - `docker compose exec` requires the `app` service to already be running (`docker compose up -d` or `make build`). It will not auto-start the stack.
 - Sanity check the wiring with `docker compose exec -T app php artisan boost:mcp <<< ''` — a JSON-RPC parse error reply means the server is alive.
 - If your MCP client cannot find `docker` on PATH, replace `"command": "docker"` with the absolute path from `which docker`.
+- After editing `.mcp.json`, reconnect the MCP server in your client (Claude Code: run `/mcp` and reconnect, or restart the session).
 
 ## Websockets
 

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\AppSettingsController;
 use App\Http\Controllers\Admin\BackupController;
+use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\HealthController;
 use App\Http\Controllers\Admin\ImpersonateController;
 use App\Http\Controllers\Admin\MailSettingsController;
@@ -11,8 +12,7 @@ use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SystemInfoController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\DevLoginController;
-use App\Http\Controllers\AvatarController;
-use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\CustomerLandingController;
 use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -28,26 +28,17 @@ if (app()->isLocal() || app()->runningUnitTests()) {
     });
 }
 
-// Authenticated routes
+// Authenticated routes (user-level, customer-agnostic)
 Route::middleware('auth')->group(function () {
     Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');
 });
 
-// Authenticated + verified routes
+// Post-login landing — redirects to the user's customer or renders the picker.
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/dashboard', fn () => Inertia::render('Dashboard'))->name('dashboard');
-    Route::get('/profile', fn () => Inertia::render('Profile'))->name('profile');
-    Route::post('/profile/avatar', [AvatarController::class, 'store'])->name('profile.avatar.store');
-    Route::delete('/profile/avatar', [AvatarController::class, 'destroy'])->name('profile.avatar.destroy');
-
-    // Notifications inbox
-    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
-    Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
-    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.readAll');
-    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+    Route::get('/app', CustomerLandingController::class)->name('app.landing');
 });
 
-// Admin routes
+// Admin routes (system super-user — spans all tenants)
 Route::middleware(['auth', 'verified', 'role:Admin'])
     ->prefix('admin')
     ->name('admin.')
@@ -89,6 +80,15 @@ Route::middleware(['auth', 'verified', 'role:Admin'])
         Route::get('backups', [BackupController::class, 'index'])->name('backups.index');
         Route::post('backups/run', [BackupController::class, 'run'])->name('backups.run');
         Route::post('backups/clean', [BackupController::class, 'clean'])->name('backups.clean');
+
+        // Landlord — customer management. Only registered when multi-tenancy is
+        // active so single-tenant installs don't expose a CRUD for a concept
+        // that doesn't apply.
+        if (config('tenancy.enabled')) {
+            Route::resource('customers', CustomerController::class)->except(['show']);
+            Route::post('customers/{customer}/members', [CustomerController::class, 'attachMember'])->name('customers.members.attach');
+            Route::delete('customers/{customer}/members/{user}', [CustomerController::class, 'detachMember'])->name('customers.members.detach');
+        }
 
         Route::post('users/{user}/impersonate', [ImpersonateController::class, 'take'])->name('users.impersonate');
     });

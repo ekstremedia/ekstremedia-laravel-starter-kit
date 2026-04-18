@@ -9,19 +9,23 @@ beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
     Storage::fake('public');
 
+    $this->customer = createCustomer();
     $this->user = User::factory()->create();
     $this->user->assignRole('User');
+    joinCustomer($this->user, $this->customer);
+
+    $this->avatarUrl = customerUrl($this->customer, '/profile/avatar');
 });
 
 it('requires authentication to upload an avatar', function () {
-    $this->post('/profile/avatar', [
+    $this->post($this->avatarUrl, [
         'avatar' => UploadedFile::fake()->image('a.png'),
     ])->assertRedirect('/login');
 });
 
 it('uploads an avatar and stores it in the collection', function () {
     $this->actingAs($this->user)
-        ->post('/profile/avatar', [
+        ->post($this->avatarUrl, [
             'avatar' => UploadedFile::fake()->image('avatar.png', 400, 400),
         ])
         ->assertRedirect();
@@ -31,7 +35,7 @@ it('uploads an avatar and stores it in the collection', function () {
 
 it('rejects non-image uploads', function () {
     $this->actingAs($this->user)
-        ->post('/profile/avatar', [
+        ->post($this->avatarUrl, [
             'avatar' => UploadedFile::fake()->create('doc.pdf', 100, 'application/pdf'),
         ])
         ->assertSessionHasErrors('avatar');
@@ -44,7 +48,7 @@ it('removes the avatar', function () {
     expect($this->user->fresh()->getFirstMedia('avatar'))->not->toBeNull();
 
     $this->actingAs($this->user)
-        ->delete('/profile/avatar')
+        ->delete($this->avatarUrl)
         ->assertRedirect();
 
     expect($this->user->fresh()->getFirstMedia('avatar'))->toBeNull();

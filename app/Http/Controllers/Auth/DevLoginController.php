@@ -30,6 +30,6 @@ class DevLoginController extends Controller
             return redirect()->route('verification.notice');
         }
 
-        return redirect()->intended(route('dashboard'));
+        return redirect()->intended(route('app.landing'));
     }
 }

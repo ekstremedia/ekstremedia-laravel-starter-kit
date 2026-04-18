@@ -5,7 +5,7 @@
             "args": [
                 "compose",
                 "-f",
-                "/www/laravel-starter-kit/docker-compose.yml",
+                "<PROJECT_ROOT>/docker-compose.yml",
                 "exec",
                 "-T",
                 "app",

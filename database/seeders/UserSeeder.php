@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Tenant;
 use App\Models\User;
 use Faker\Factory as Faker;
 use Faker\Generator;
@@ -14,6 +15,10 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
+        $defaultCustomer = Tenant::query()
+            ->where('slug', config('tenancy.default_customer_slug', 'default'))
+            ->first();
+
         // Admin (from .env)
         $admin = User::firstOrCreate(
             ['email' => env('STARTER_ADMIN_EMAIL', 'admin@example.test')],
@@ -25,6 +30,7 @@ class UserSeeder extends Seeder
             ],
         );
         $this->safeAssignRole($admin, 'Admin');
+        $this->attachToCustomer($admin, $defaultCustomer);
 
         if (! env('SEED_DEMO_USERS', false)) {
             return;
@@ -33,8 +39,8 @@ class UserSeeder extends Seeder
         $faker = Faker::create('nb_NO');
         $password = Hash::make('password');
 
-        $this->seedRole($faker, 'Editor', 3, $password);
-        $this->seedRole($faker, 'User', 8, $password);
+        $this->seedRole($faker, 'Editor', 3, $password, $defaultCustomer);
+        $this->seedRole($faker, 'User', 8, $password, $defaultCustomer);
 
         // One unverified user so devs can exercise the verify flow
         $unverified = User::firstOrCreate(
@@ -47,9 +53,10 @@ class UserSeeder extends Seeder
             ],
         );
         $this->safeAssignRole($unverified, 'User');
+        $this->attachToCustomer($unverified, $defaultCustomer);
     }
 
-    private function seedRole(Generator $faker, string $role, int $count, string $password): void
+    private function seedRole(Generator $faker, string $role, int $count, string $password, ?Tenant $customer): void
     {
         for ($i = 0; $i < $count; $i++) {
             $first = $faker->firstName();
@@ -71,6 +78,7 @@ class UserSeeder extends Seeder
                 'email_verified_at' => now(),
             ]);
             $this->safeAssignRole($user, $role);
+            $this->attachToCustomer($user, $customer);
         }
     }
 
@@ -81,5 +89,14 @@ class UserSeeder extends Seeder
         } catch (RoleDoesNotExist) {
             $this->command->warn("Role '{$role}' not found; skipping assignment for {$user->email}. Run RoleAndPermissionSeeder first.");
         }
+    }
+
+    private function attachToCustomer(User $user, ?Tenant $customer): void
+    {
+        if ($customer === null) {
+            return;
+        }
+
+        $user->customers()->syncWithoutDetaching([$customer->id]);
     }
 }

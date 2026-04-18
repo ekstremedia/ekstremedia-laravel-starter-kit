@@ -16,6 +16,6 @@ class LoginResponse implements LoginResponseContract
 
         return $request->wantsJson()
             ? new JsonResponse('', 204)
-            : redirect()->intended(route('dashboard'));
+            : redirect()->intended(route('app.landing'));
     }
 }

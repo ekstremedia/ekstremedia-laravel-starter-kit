@@ -8,14 +8,17 @@ use Illuminate\Support\Facades\Storage;
 beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
     Storage::fake('public');
+    $this->customer = createCustomer();
+    $this->avatarUrl = customerUrl($this->customer, '/profile/avatar');
 });
 
 it('generates the thumb conversion synchronously on upload', function () {
     $user = User::factory()->create();
     $user->assignRole('User');
+    joinCustomer($user, $this->customer);
 
     $this->actingAs($user)
-        ->post('/profile/avatar', [
+        ->post($this->avatarUrl, [
             'avatar' => UploadedFile::fake()->image('a.png', 400, 400),
         ])
         ->assertRedirect();
@@ -29,15 +32,16 @@ it('generates the thumb conversion synchronously on upload', function () {
 it('updates the avatar on re-upload', function () {
     $user = User::factory()->create();
     $user->assignRole('User');
+    joinCustomer($user, $this->customer);
 
     $this->actingAs($user)
-        ->post('/profile/avatar', ['avatar' => UploadedFile::fake()->image('first.png', 400, 400)])
+        ->post($this->avatarUrl, ['avatar' => UploadedFile::fake()->image('first.png', 400, 400)])
         ->assertRedirect();
 
     $firstId = $user->fresh()->getFirstMedia('avatar')->id;
 
     $this->actingAs($user)
-        ->post('/profile/avatar', ['avatar' => UploadedFile::fake()->image('second.png', 400, 400)])
+        ->post($this->avatarUrl, ['avatar' => UploadedFile::fake()->image('second.png', 400, 400)])
         ->assertRedirect();
 
     $latest = $user->fresh()->getMedia('avatar')->last();
@@ -49,9 +53,10 @@ it('updates the avatar on re-upload', function () {
 it('enforces the upload size ceiling', function () {
     $user = User::factory()->create();
     $user->assignRole('User');
+    joinCustomer($user, $this->customer);
 
     $this->actingAs($user)
-        ->post('/profile/avatar', [
+        ->post($this->avatarUrl, [
             'avatar' => UploadedFile::fake()->image('big.png')->size(52000),
         ])
         ->assertSessionHasErrors('avatar');

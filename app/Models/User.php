@@ -7,6 +7,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -115,6 +116,24 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     public function setting(): HasOne
     {
         return $this->hasOne(UserSetting::class);
+    }
+
+    /**
+     * Customers (a.k.a. tenants in package-speak) this user is a member of.
+     * The underlying model is `App\Models\Tenant` because stancl/tenancy's base
+     * contract names it that way; at the application layer we call them customers.
+     *
+     * @return BelongsToMany<Tenant, $this>
+     */
+    public function customers(): BelongsToMany
+    {
+        return $this->belongsToMany(Tenant::class, 'tenant_user')
+            ->withTimestamps();
+    }
+
+    public function belongsToCustomer(Tenant $customer): bool
+    {
+        return $this->customers()->whereKey($customer->getKey())->exists();
     }
 
     /**

@@ -7,12 +7,15 @@ import { useToast } from 'primevue/usetoast';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import TextInput from '@/Components/TextInput.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import { useCustomer } from '@/composables/useCustomer';
 import type { PageProps } from '@/types';
 
 const { t } = useI18n();
 const toast = useToast();
 const page = usePage<PageProps>();
 const user = computed(() => page.props.auth.user!);
+const { customerUrl } = useCustomer();
+const avatarUrl = computed(() => customerUrl('/profile/avatar'));
 
 const sectionsRef = ref<HTMLElement>();
 
@@ -51,7 +54,7 @@ function onAvatarChange(e: Event) {
     avatarUploading.value = true;
     // Flash messages from the controller drive the toast; only surface
     // client-side validation errors here.
-    router.post('/profile/avatar', form, {
+    router.post(avatarUrl.value, form, {
         preserveScroll: true,
         forceFormData: true,
         onError: (errors) => {
@@ -66,7 +69,7 @@ function onAvatarChange(e: Event) {
 }
 
 function removeAvatar() {
-    router.delete('/profile/avatar', { preserveScroll: true });
+    router.delete(avatarUrl.value, { preserveScroll: true });
 }
 
 // --- Profile Info ---

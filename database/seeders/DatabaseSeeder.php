@@ -2,17 +2,22 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
+    /**
+     * NOTE: we intentionally do NOT use the `WithoutModelEvents` trait here.
+     * stancl/tenancy's Tenant model relies on Eloquent `creating`/`created` events
+     * (mapped via `$dispatchesEvents`) to fire `TenantCreated`, which in turn runs
+     * the schema-creation + migration job pipeline. Silencing model events would
+     * leave freshly-seeded customers without a Postgres schema.
+     */
     public function run(): void
     {
         $this->call([
             RoleAndPermissionSeeder::class,
+            CustomerSeeder::class,
             UserSeeder::class,
         ]);
     }

@@ -25,6 +25,12 @@ export interface UserSettings {
     [key: string]: UserSettingValue;
 }
 
+export interface Customer {
+    id: number;
+    slug: string;
+    name: string;
+}
+
 export interface PageProps extends InertiaPageProps {
     auth: {
         user?: User;
@@ -39,4 +45,9 @@ export interface PageProps extends InertiaPageProps {
         error?: string;
         status?: string;
     };
+    tenancy: {
+        enabled: boolean;
+    };
+    customer: Customer | null;
+    customers: Customer[];
 }

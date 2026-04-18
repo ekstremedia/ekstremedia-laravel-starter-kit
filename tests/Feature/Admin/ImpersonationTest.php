@@ -17,7 +17,7 @@ beforeEach(function () {
 it('allows an admin to impersonate a non-admin', function () {
     $this->actingAs($this->admin)
         ->post("/admin/users/{$this->target->id}/impersonate")
-        ->assertRedirect('/dashboard');
+        ->assertRedirect('/app');
 
     expect(session('impersonated_by'))->not->toBeNull();
     expect(auth()->id())->toBe($this->target->id);

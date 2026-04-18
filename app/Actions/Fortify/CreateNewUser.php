@@ -3,8 +3,10 @@
 namespace App\Actions\Fortify;
 
 use App\Models\AppSetting;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\WelcomeNotification;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -48,6 +50,37 @@ class CreateNewUser implements CreatesNewUsers
             $user->notify(new WelcomeNotification);
         }
 
+        $this->attachToDefaultCustomer($user);
+
         return $user;
+    }
+
+    /**
+     * When multi-tenancy is enabled, new sign-ups auto-join the default customer
+     * configured in `tenancy.default_customer_slug` (env: `TENANCY_DEFAULT_CUSTOMER`).
+     * In single-tenant mode this is a no-op. When the configured slug exists but
+     * the row hasn't been seeded we log a warning — the user will hit 403 on
+     * every tenant route until an admin attaches them, which is worth surfacing.
+     */
+    private function attachToDefaultCustomer(User $user): void
+    {
+        if (! config('tenancy.enabled')) {
+            return;
+        }
+
+        $slug = config('tenancy.default_customer_slug', 'default');
+
+        $customer = Tenant::query()->where('slug', $slug)->first();
+
+        if ($customer !== null) {
+            $user->customers()->syncWithoutDetaching([$customer->id]);
+
+            return;
+        }
+
+        Log::warning('Default customer not found for new user; skipping auto-join.', [
+            'slug' => $slug,
+            'user_id' => $user->id,
+        ]);
     }
 }
