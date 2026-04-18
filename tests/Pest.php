@@ -47,7 +47,7 @@ function createCustomer(string $slug = 'acme', ?string $name = null): Tenant
  */
 function joinCustomer(User $user, ?Tenant $customer = null): Tenant
 {
-    $customer ??= createCustomer();
+    $customer ??= Tenant::query()->where('slug', 'acme')->first() ?? createCustomer();
     $user->customers()->syncWithoutDetaching([$customer->id]);
 
     return $customer;

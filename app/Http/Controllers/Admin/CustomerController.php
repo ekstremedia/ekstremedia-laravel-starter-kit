@@ -30,10 +30,11 @@ class CustomerController extends Controller
         $customers = Tenant::query()
             ->withCount('users')
             ->when($search !== '', function ($q) use ($search) {
-                $needle = '%'.mb_strtolower($search).'%';
+                $escaped = addcslashes(mb_strtolower($search), '%_\\');
+                $needle = '%'.$escaped.'%';
                 $q->where(function ($q) use ($needle) {
-                    $q->whereRaw('LOWER(name) LIKE ?', [$needle])
-                        ->orWhereRaw('LOWER(slug) LIKE ?', [$needle]);
+                    $q->whereRaw("LOWER(name) LIKE ? ESCAPE '\\'", [$needle])
+                        ->orWhereRaw("LOWER(slug) LIKE ? ESCAPE '\\'", [$needle]);
                 });
             })
             ->orderBy('id', 'desc')

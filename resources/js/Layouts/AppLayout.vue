@@ -45,6 +45,10 @@ function leaveImpersonation() {
 }
 
 function markAllRead() {
+    if (!showCustomerNav.value) {
+        return;
+    }
+
     router.post(notificationsReadAllUrl.value, {}, { preserveScroll: true });
     notificationsOpen.value = false;
 }
