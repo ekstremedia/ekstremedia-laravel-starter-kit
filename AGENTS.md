@@ -242,9 +242,38 @@ For Inertia requests, settings updates return an Inertia-safe redirect. For JSON
 
 ## Localization
 
-The starter supports English (`en`) and Norwegian (`no`). Always update both translation files when adding user-facing text.
+The starter supports English (`en`) and Norwegian (`no`). **Every user-facing string must be translated** — never commit hardcoded English text in Vue templates.
+
+### Rules
+
+1. **Every** visible string in a `.vue` file must use `t('key')` from vue-i18n. This includes labels, headings, buttons, placeholders, empty states, dialog headers, confirmation messages, tooltips, and aria-labels.
+2. When adding or changing any UI text, update **both** `resources/js/i18n/en.ts` and `resources/js/i18n/no.ts` in the same commit. Missing translations break the Norwegian UI.
+3. Group keys by domain: `admin.users.*`, `admin.mail.*`, `notifications.*`, `common.*`, etc. Reuse `common.*` keys for shared words (`Save`, `Cancel`, `Delete`, `Back`, `Search`, etc.).
+4. For dynamic strings with variables, use named interpolation: `t('admin.users.confirm_delete', { email: user.email })`.
+5. Import `useI18n` and call `const { t } = useI18n()` in every component that renders text. If `t()` needs to be used in a reactive `const` array (e.g. nav items), wrap it in a `computed()`.
+6. PrimeVue component props that accept labels (`label`, `placeholder`, `header`) must use the dynamic binding form (`:label="t('...')"`) instead of the static form (`label="..."`).
 
 The localStorage key is controlled by `VITE_APP_STORAGE_KEY` so each generated app can keep its own browser settings namespace.
+
+## Notifications
+
+The app uses Laravel's database notification system with an MJML email template layer. When building features, consider whether the user should receive a notification.
+
+### When to send notifications
+
+- **Account lifecycle**: welcome, email verification, password reset, account banned/unbanned
+- **Customer membership**: added to or removed from a customer
+- **Admin actions on a user**: role changes, 2FA reset, password reset sent
+- **Content/workflow events**: when another user does something relevant (e.g. assigned a task, mentioned, invited)
+
+### How to add a notification
+
+1. Create a notification class: `php artisan make:notification SomethingHappened`
+2. Use the `UsesEmailTemplate` trait so the email version uses the MJML template system.
+3. Set `via()` to `['database', 'mail']` (database for the in-app bell, mail for email).
+4. In `toArray()`, return `['title' => '...', 'message' => '...', 'icon' => 'pi-...']` — these render in the notification dropdown.
+5. Add an email template: create rows in `EmailTemplateSeeder` for both `en` and `no` locales, with the template slug matching what you pass to `renderTemplate()`.
+6. When the action is admin-initiated and optional, add a "Notify user" checkbox in the UI (see the customer membership attach/detach pattern in `Admin/Users/Edit.vue`).
 
 ## Authentication
 
