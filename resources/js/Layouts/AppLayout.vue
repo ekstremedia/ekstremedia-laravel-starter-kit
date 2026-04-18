@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
 import { usePage, Link, router } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import Toast from 'primevue/toast';
 import LanguageSwitcher from '@/Components/LanguageSwitcher.vue';
 import DarkModeToggle from '@/Components/DarkModeToggle.vue';
@@ -27,6 +27,56 @@ const notificationsOpen = ref(false);
 useFlashToast();
 
 const unreadCount = computed(() => user.value?.unread_notifications_count ?? 0);
+
+// ── Notification inbox ──────────────────────────────────────────
+interface NotificationItem {
+    id: string;
+    type: string;
+    data: { title?: string; message?: string; icon?: string };
+    read_at: string | null;
+    created_at: string;
+}
+const notifications = ref<NotificationItem[]>([]);
+const loadingNotifications = ref(false);
+
+const notificationsUrl = computed(() => customerUrl('/notifications'));
+
+function fetchNotifications() {
+    if (!showCustomerNav.value) return;
+
+    loadingNotifications.value = true;
+    fetch(notificationsUrl.value, {
+        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    })
+        .then(r => r.json())
+        .then(json => { notifications.value = json.recent ?? []; })
+        .finally(() => { loadingNotifications.value = false; });
+}
+
+watch(notificationsOpen, (open) => {
+    if (open) fetchNotifications();
+});
+
+function markOneRead(n: NotificationItem) {
+    if (n.read_at) return;
+    router.post(customerUrl(`/notifications/${n.id}/read`), {}, {
+        preserveScroll: true,
+        onSuccess: () => {
+            n.read_at = new Date().toISOString();
+        },
+    });
+}
+
+function timeAgo(iso: string): string {
+    const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+}
 const isImpersonating = computed(() => user.value?.is_impersonating ?? false);
 const announcement = computed(() => (page.props as any).app_settings?.announcement as { text: string; severity: string } | null);
 const announcementClass: Record<string, string> = {
@@ -49,7 +99,12 @@ function markAllRead() {
         return;
     }
 
-    router.post(notificationsReadAllUrl.value, {}, { preserveScroll: true });
+    router.post(notificationsReadAllUrl.value, {}, {
+        preserveScroll: true,
+        onSuccess: () => {
+            notifications.value.forEach(n => { n.read_at = n.read_at ?? new Date().toISOString(); });
+        },
+    });
     notificationsOpen.value = false;
 }
 
@@ -145,12 +200,29 @@ function initials(u: { first_name: string; last_name: string }) {
                                     >
                                         <div class="flex items-center justify-between px-4 pb-2 border-b border-gray-100 dark:border-dark-700">
                                             <span class="text-sm font-medium">Notifications</span>
-                                            <button v-if="unreadCount > 0" @click="markAllRead" class="text-xs text-indigo-500 hover:underline">Mark all read</button>
+                                            <button v-if="unreadCount > 0" @click="markAllRead" class="text-xs text-indigo-500 hover:underline cursor-pointer">Mark all read</button>
                                         </div>
-                                        <p v-if="unreadCount === 0" class="px-4 py-6 text-center text-sm text-gray-400">You're all caught up.</p>
-                                        <p v-else class="px-4 py-6 text-center text-sm text-gray-500">
-                                            {{ unreadCount }} unread {{ unreadCount === 1 ? 'notification' : 'notifications' }}
-                                        </p>
+                                        <div v-if="loadingNotifications" class="px-4 py-6 text-center">
+                                            <i class="pi pi-spin pi-spinner text-gray-400"></i>
+                                        </div>
+                                        <div v-else-if="notifications.length === 0" class="px-4 py-6 text-center text-sm text-gray-400">
+                                            You're all caught up.
+                                        </div>
+                                        <ul v-else class="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-dark-800">
+                                            <li v-for="n in notifications" :key="n.id"
+                                                class="px-4 py-3 flex items-start gap-3 cursor-pointer transition-colors"
+                                                :class="n.read_at ? 'opacity-60' : 'bg-indigo-50/50 dark:bg-dark-800/50'"
+                                                @click="markOneRead(n)">
+                                                <i :class="n.data.icon ? `pi ${n.data.icon}` : 'pi pi-bell'"
+                                                   class="mt-0.5 text-sm text-indigo-500"></i>
+                                                <div class="flex-1 min-w-0">
+                                                    <p class="text-sm font-medium truncate">{{ n.data.title ?? n.type }}</p>
+                                                    <p v-if="n.data.message" class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{{ n.data.message }}</p>
+                                                    <p class="text-[10px] text-gray-400 mt-1">{{ timeAgo(n.created_at) }}</p>
+                                                </div>
+                                                <span v-if="!n.read_at" class="mt-1.5 w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
+                                            </li>
+                                        </ul>
                                     </div>
                                 </Transition>
                                 <div v-if="notificationsOpen" @click="notificationsOpen = false" class="fixed inset-0 z-40"></div>
