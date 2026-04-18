@@ -3,8 +3,8 @@
 use App\Models\User;
 use App\Notifications\AccountBannedNotification;
 use App\Notifications\AdminTestNotification;
+use App\Notifications\VerifyEmailNotification as VerifyEmail;
 use Database\Seeders\RoleAndPermissionSeeder;
-use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 

@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Concerns\UsesEmailTemplate;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -9,6 +10,7 @@ use Illuminate\Notifications\Notification;
 class AdminTestNotification extends Notification
 {
     use Queueable;
+    use UsesEmailTemplate;
 
     public function __construct(public string $message = 'Hello from the admin panel!') {}
 
@@ -22,11 +24,9 @@ class AdminTestNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
-            ->subject('Test notification')
-            ->greeting("Hi {$notifiable->first_name},")
-            ->line($this->message)
-            ->line('This is a test notification sent from the admin dashboard.');
+        return $this->renderTemplate('admin-test', $notifiable, [
+            'message' => $this->message,
+        ]);
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Mail\TestMail;
+use App\Models\EmailTemplate;
 use App\Models\MailSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,6 +20,27 @@ class MailSettingsController extends Controller
     {
         $settings = MailSetting::current();
 
+        $templates = EmailTemplate::query()
+            ->orderBy('slug')
+            ->orderBy('locale')
+            ->get()
+            ->groupBy('slug')
+            ->map(fn ($group) => [
+                'name' => $group->first()->name,
+                'slug' => $group->first()->slug,
+                'variables' => $group->first()->variables,
+                'locales' => $group->map(fn (EmailTemplate $t) => [
+                    'id' => $t->id,
+                    'locale' => $t->locale,
+                    'subject' => $t->subject,
+                    'heading' => $t->heading,
+                    'body' => $t->body,
+                    'action_text' => $t->action_text,
+                    'action_url' => $t->action_url,
+                    'has_compiled' => ! empty($t->compiled_html),
+                ])->values()->all(),
+            ])->values()->all();
+
         return Inertia::render('Admin/Mail', [
             'settings' => [
                 'mailer' => $settings->mailer,
@@ -26,14 +48,12 @@ class MailSettingsController extends Controller
                 'port' => $settings->port,
                 'encryption' => $settings->encryption,
                 'username' => $settings->username,
-                // Never send the stored password (or a mask of it) to the frontend;
-                // expose a boolean so the UI can hint "saved" without round-tripping
-                // a sentinel that could accidentally be written back as the password.
                 'has_password' => ! empty($settings->password),
                 'from_address' => $settings->from_address,
                 'from_name' => $settings->from_name,
                 'enabled' => $settings->enabled,
             ],
+            'templates' => $templates,
         ]);
     }
 

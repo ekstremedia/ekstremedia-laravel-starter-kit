@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Concerns\UsesEmailTemplate;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -9,6 +10,7 @@ use Illuminate\Notifications\Notification;
 class AccountBannedNotification extends Notification
 {
     use Queueable;
+    use UsesEmailTemplate;
 
     public function __construct(public ?string $reason = null) {}
 
@@ -22,16 +24,9 @@ class AccountBannedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $mail = (new MailMessage)
-            ->subject('Your account has been suspended')
-            ->greeting("Hi {$notifiable->first_name},")
-            ->line('Your account has been suspended by an administrator.');
-
-        if ($this->reason) {
-            $mail->line("Reason: {$this->reason}");
-        }
-
-        return $mail->line('Contact support if you believe this is a mistake.');
+        return $this->renderTemplate('account-banned', $notifiable, [
+            'reason' => $this->reason ?? '',
+        ]);
     }
 
     /**

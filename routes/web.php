@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\AppSettingsController;
 use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\CustomerController;
+use App\Http\Controllers\Admin\EmailTemplateController;
 use App\Http\Controllers\Admin\HealthController;
 use App\Http\Controllers\Admin\ImpersonateController;
 use App\Http\Controllers\Admin\MailSettingsController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Admin\SystemInfoController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\DevLoginController;
 use App\Http\Controllers\CustomerLandingController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -31,6 +33,18 @@ if (app()->isLocal() || app()->runningUnitTests()) {
 // Authenticated routes (user-level, customer-agnostic)
 Route::middleware('auth')->group(function () {
     Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');
+
+    // Central routes — accessible without a customer context (e.g. from the
+    // picker page or admin panel). The customer-scoped copies in customer.php
+    // take precedence when a customer is active.
+    Route::middleware('verified')->group(function () {
+        Route::get('/profile', fn () => Inertia::render('Profile'))->name('profile.central');
+        Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.central.index');
+        Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.central.read');
+        Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.central.readAll');
+        Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.central.destroy');
+        Route::delete('/notifications', [NotificationController::class, 'destroyAll'])->name('notifications.central.destroyAll');
+    });
 });
 
 // Post-login landing — redirects to the user's customer or renders the picker.
@@ -67,6 +81,10 @@ Route::middleware(['auth', 'verified', 'role:Admin'])
         Route::post('health/broadcast', [HealthController::class, 'broadcastPing'])->name('health.broadcast');
         Route::get('health/queue-last', [HealthController::class, 'queueLast'])->name('health.queue.last');
 
+        Route::patch('mail/templates/{template}', [EmailTemplateController::class, 'update'])->name('mail.templates.update');
+        Route::post('mail/templates/{template}/preview', [EmailTemplateController::class, 'preview'])->name('mail.templates.preview');
+        Route::post('mail/templates/{template}/test', [EmailTemplateController::class, 'testSend'])->name('mail.templates.test');
+
         Route::get('mail', [MailSettingsController::class, 'show'])->name('mail.show');
         Route::patch('mail', [MailSettingsController::class, 'update'])->name('mail.update');
         Route::post('mail/test', [MailSettingsController::class, 'test'])->name('mail.test');
@@ -88,6 +106,9 @@ Route::middleware(['auth', 'verified', 'role:Admin'])
             Route::resource('customers', CustomerController::class)->except(['show']);
             Route::post('customers/{customer}/members', [CustomerController::class, 'attachMember'])->name('customers.members.attach');
             Route::delete('customers/{customer}/members/{user}', [CustomerController::class, 'detachMember'])->name('customers.members.detach');
+
+            Route::post('users/{user}/customers', [UserController::class, 'attachCustomer'])->name('users.customers.attach');
+            Route::delete('users/{user}/customers/{customer}', [UserController::class, 'detachCustomer'])->name('users.customers.detach');
         }
 
         Route::post('users/{user}/impersonate', [ImpersonateController::class, 'take'])->name('users.impersonate');

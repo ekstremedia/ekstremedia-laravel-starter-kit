@@ -72,3 +72,24 @@
 .dark .p-datatable .p-sortable-column-icon {
     color: #8ba4c4;
 }
+
+/* PrimeVue Tabs — dark mode tint that matches our blue palette */
+.dark .p-tablist {
+    background-color: var(--color-dark-900);
+    border-color: var(--color-dark-700);
+}
+.dark .p-tab {
+    background-color: transparent;
+    color: var(--color-dark-400);
+}
+.dark .p-tab:hover {
+    color: #c7d2fe;
+    background-color: var(--color-dark-850);
+}
+.dark .p-tab[data-p-active='true'] {
+    color: #c7d2fe;
+    background-color: transparent;
+}
+.dark .p-tabpanels {
+    background-color: transparent;
+}

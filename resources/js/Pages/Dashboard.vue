@@ -5,6 +5,7 @@ import { computed, onMounted, ref } from 'vue';
 import { gsap } from 'gsap';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useCustomer } from '@/composables/useCustomer';
+import { formatDate } from '@/composables/useDateTime';
 import type { PageProps } from '@/types';
 
 const { t, locale } = useI18n();
@@ -106,7 +107,7 @@ onMounted(() => {
                         {{ t('dashboard.member_since') }}
                     </p>
                     <p class="text-sm font-medium text-gray-900 dark:text-white">
-                        {{ user.created_at ? new Date(user.created_at).toLocaleDateString(locale) : '—' }}
+                        {{ formatDate(user.created_at) }}
                     </p>
                 </div>
             </div>

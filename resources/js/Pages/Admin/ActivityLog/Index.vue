@@ -8,8 +8,12 @@ import Select from 'primevue/select';
 import DatePicker from 'primevue/datepicker';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
+import { useI18n } from 'vue-i18n';
+import { formatDateTime } from '@/composables/useDateTime';
 
 defineOptions({ layout: AdminLayout });
+
+const { t } = useI18n();
 
 interface Causer { id: number; email: string; first_name: string; last_name: string }
 interface Activity { id: number; log_name: string | null; description: string; event: string | null; subject_type: string | null; subject_id: number | null; causer: Causer | null; created_at: string; properties: any }
@@ -48,39 +52,39 @@ function reset() {
 
 <template>
     <Head title="Activity Log · Admin" />
-    <h1 class="text-2xl font-semibold mb-6">Activity Log</h1>
+    <h1 class="text-2xl font-semibold mb-6">{{ t('admin.activity.title') }}</h1>
 
     <div class="mb-6 p-4 bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Select v-model="f.user_id" :options="users" optionLabel="email" optionValue="id" placeholder="User" showClear class="w-full" />
-        <Select v-model="f.log_name" :options="logNames" placeholder="Log name" showClear class="w-full" />
-        <Select v-model="f.event" :options="events" placeholder="Event" showClear class="w-full" />
-        <DatePicker v-model="f.date_from" placeholder="From" dateFormat="yy-mm-dd" class="w-full" />
-        <DatePicker v-model="f.date_to" placeholder="To" dateFormat="yy-mm-dd" class="w-full" />
+        <Select v-model="f.user_id" :options="users" optionLabel="email" optionValue="id" :placeholder="t('admin.activity.user')" showClear class="w-full" />
+        <Select v-model="f.log_name" :options="logNames" :placeholder="t('admin.activity.log_name')" showClear class="w-full" />
+        <Select v-model="f.event" :options="events" :placeholder="t('admin.activity.event')" showClear class="w-full" />
+        <DatePicker v-model="f.date_from" :placeholder="t('admin.activity.from')" dateFormat="yy-mm-dd" class="w-full" />
+        <DatePicker v-model="f.date_to" :placeholder="t('admin.activity.to')" dateFormat="yy-mm-dd" class="w-full" />
         <div class="col-span-2 md:col-span-5 flex gap-2">
-            <Button label="Apply filters" icon="pi pi-filter" @click="apply" />
-            <Button label="Reset" severity="secondary" @click="reset" />
+            <Button :label="t('admin.activity.apply')" icon="pi pi-filter" @click="apply" />
+            <Button :label="t('admin.activity.reset')" severity="secondary" @click="reset" />
         </div>
     </div>
 
     <DataTable :value="activities.data" stripedRows removableSort scrollable
                class="bg-white dark:bg-dark-900 rounded-xl overflow-hidden">
-        <Column field="created_at" header="When" style="width: 12rem" sortable>
-            <template #body="{ data }">{{ new Date(data.created_at).toLocaleString() }}</template>
+        <Column field="created_at" :header="t('admin.activity.when')" style="width: 12rem" sortable>
+            <template #body="{ data }">{{ formatDateTime(data.created_at) }}</template>
         </Column>
-        <Column header="User" sortable :sortField="(d: any) => d.causer?.email ?? ''">
+        <Column :header="t('admin.activity.user')" sortable :sortField="(d: any) => d.causer?.email ?? ''">
             <template #body="{ data }">
                 <span v-if="data.causer">{{ data.causer.email }}</span>
-                <span v-else class="text-gray-400">system</span>
+                <span v-else class="text-gray-400">{{ t('admin.activity.system') }}</span>
             </template>
         </Column>
-        <Column field="log_name" header="Log" sortable>
+        <Column field="log_name" :header="t('admin.activity.log_name')" sortable>
             <template #body="{ data }"><Tag v-if="data.log_name" :value="data.log_name" severity="info" /></template>
         </Column>
-        <Column field="event" header="Event" sortable>
+        <Column field="event" :header="t('admin.activity.event')" sortable>
             <template #body="{ data }"><Tag v-if="data.event" :value="data.event" /></template>
         </Column>
-        <Column field="description" header="Description" sortable />
-        <Column header="Subject">
+        <Column field="description" :header="t('admin.activity.description')" sortable />
+        <Column :header="t('admin.activity.subject')">
             <template #body="{ data }">
                 <span v-if="data.subject_type" class="text-xs text-gray-500">{{ data.subject_type.split('\\').pop() }}#{{ data.subject_id }}</span>
             </template>

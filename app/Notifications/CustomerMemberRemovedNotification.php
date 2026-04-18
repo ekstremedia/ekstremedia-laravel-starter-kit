@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Notifications;
 
 use App\Notifications\Concerns\UsesEmailTemplate;
@@ -7,10 +9,12 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class WelcomeNotification extends Notification
+class CustomerMemberRemovedNotification extends Notification
 {
     use Queueable;
     use UsesEmailTemplate;
+
+    public function __construct(public string $customerName) {}
 
     /**
      * @return array<int, string>
@@ -22,9 +26,8 @@ class WelcomeNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        return $this->renderTemplate('welcome', $notifiable, [
-            'app_name' => config('app.name'),
-            'app_url' => config('app.url'),
+        return $this->renderTemplate('customer-member-removed', $notifiable, [
+            'customer_name' => $this->customerName,
         ]);
     }
 
@@ -34,9 +37,9 @@ class WelcomeNotification extends Notification
     public function toArray(object $notifiable): array
     {
         return [
-            'title' => 'Welcome aboard',
-            'message' => "We're glad to have you.",
-            'icon' => 'pi-star',
+            'title' => "Removed from {$this->customerName}",
+            'message' => "You have been removed from {$this->customerName}.",
+            'icon' => 'pi-building',
         ];
     }
 }

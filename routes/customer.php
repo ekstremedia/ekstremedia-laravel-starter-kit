@@ -34,3 +34,4 @@ Route::get('/notifications', [NotificationController::class, 'index'])->name('no
 Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
 Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.readAll');
 Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+Route::delete('/notifications', [NotificationController::class, 'destroyAll'])->name('notifications.destroyAll');

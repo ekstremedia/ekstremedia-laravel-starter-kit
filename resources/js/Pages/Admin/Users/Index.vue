@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
@@ -31,6 +32,7 @@ interface Props {
 }
 const props = defineProps<Props>();
 
+const { t } = useI18n();
 const search = ref(props.filters.search ?? '');
 const confirm = useConfirm();
 
@@ -61,15 +63,15 @@ function canImpersonate(u: UserRow) {
     <Head title="Users · Admin" />
     <ConfirmDialog />
     <div class="flex flex-wrap items-center justify-between gap-2 mb-6">
-        <h1 class="text-2xl font-semibold">Users</h1>
+        <h1 class="text-2xl font-semibold">{{ t('admin.users.title') }}</h1>
         <Link href="/admin/users/create">
-            <Button label="New user" icon="pi pi-plus" />
+            <Button :label="t('admin.users.new_user')" icon="pi pi-plus" />
         </Link>
     </div>
 
     <div class="mb-4 flex flex-wrap gap-2">
-        <InputText v-model="search" placeholder="Search name or email" class="flex-1 sm:flex-none sm:w-64" @keydown.enter="doSearch" />
-        <Button label="Search" icon="pi pi-search" severity="secondary" @click="doSearch" />
+        <InputText v-model="search" :placeholder="t('admin.users.search_placeholder')" class="flex-1 sm:flex-none sm:w-64" @keydown.enter="doSearch" />
+        <Button :label="t('common.search')" icon="pi pi-search" severity="secondary" @click="doSearch" />
     </div>
 
     <DataTable :value="users.data" stripedRows removableSort scrollable
