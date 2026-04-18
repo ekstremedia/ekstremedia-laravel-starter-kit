@@ -42,8 +42,6 @@ const loadingNotifications = ref(false);
 const notificationsUrl = computed(() => customerUrl('/notifications'));
 
 function fetchNotifications() {
-    if (!showCustomerNav.value) return;
-
     loadingNotifications.value = true;
     fetch(notificationsUrl.value, {
         headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
@@ -89,13 +87,13 @@ function clearAll() {
 
 function timeAgo(iso: string): string {
     const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-    if (seconds < 60) return 'just now';
+    if (seconds < 60) return t('notifications.just_now');
     const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 60) return t('notifications.minutes_ago', { n: minutes });
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) return t('notifications.hours_ago', { n: hours });
     const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    return t('notifications.days_ago', { n: days });
 }
 const isImpersonating = computed(() => user.value?.is_impersonating ?? false);
 const announcement = computed(() => (page.props as any).app_settings?.announcement as { text: string; severity: string } | null);
@@ -146,9 +144,9 @@ function initials(u: { first_name: string; last_name: string }) {
 
         <!-- Impersonation banner -->
         <div v-if="isImpersonating" class="bg-amber-500/90 text-white px-4 py-2 text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div class="truncate"><i class="pi pi-user-edit mr-2"></i>You are impersonating <strong>{{ user?.email }}</strong>.</div>
+            <div class="truncate"><i class="pi pi-user-edit mr-2"></i>{{ t('impersonation.banner') }} <strong>{{ user?.email }}</strong>.</div>
             <button @click="leaveImpersonation" class="self-start sm:self-auto px-3 py-1 rounded bg-white/20 hover:bg-white/30 text-sm cursor-pointer">
-                <i class="pi pi-sign-out mr-1"></i>Stop impersonating
+                <i class="pi pi-sign-out mr-1"></i>{{ t('impersonation.stop') }}
             </button>
         </div>
         <!-- Navigation -->
@@ -181,7 +179,7 @@ function initials(u: { first_name: string; last_name: string }) {
                                         ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10'
                                         : 'text-gray-600 dark:text-dark-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-dark-800'"
                                 >
-                                    Admin
+                                    {{ t('nav.admin') }}
                                 </Link>
                             </div>
                         </template>
@@ -219,17 +217,17 @@ function initials(u: { first_name: string; last_name: string }) {
                                         class="absolute right-0 mt-2 w-80 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 shadow-lg py-2 z-50"
                                     >
                                         <div class="flex items-center justify-between px-4 pb-2 border-b border-gray-100 dark:border-dark-700">
-                                            <span class="text-sm font-medium">Notifications</span>
+                                            <span class="text-sm font-medium">{{ t('notifications.title') }}</span>
                                             <div v-if="notifications.length > 0" class="flex gap-2">
-                                                <button v-if="unreadCount > 0" @click="markAllRead" class="text-xs text-indigo-500 hover:underline cursor-pointer">Mark all read</button>
-                                                <button @click="clearAll" class="text-xs text-red-400 hover:underline cursor-pointer">Clear all</button>
+                                                <button v-if="unreadCount > 0" @click="markAllRead" class="text-xs text-indigo-500 hover:underline cursor-pointer">{{ t('notifications.mark_all_read') }}</button>
+                                                <button @click="clearAll" class="text-xs text-red-400 hover:underline cursor-pointer">{{ t('notifications.clear_all') }}</button>
                                             </div>
                                         </div>
                                         <div v-if="loadingNotifications" class="px-4 py-6 text-center">
                                             <i class="pi pi-spin pi-spinner text-gray-400"></i>
                                         </div>
                                         <div v-else-if="notifications.length === 0" class="px-4 py-6 text-center text-sm text-gray-400">
-                                            You're all caught up.
+                                            {{ t('notifications.empty') }}
                                         </div>
                                         <ul v-else class="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-dark-800">
                                             <li v-for="n in notifications" :key="n.id"
@@ -315,7 +313,7 @@ function initials(u: { first_name: string; last_name: string }) {
                                             href="/admin"
                                             class="block px-4 py-2 text-sm text-indigo-600 dark:text-indigo-400 hover:bg-gray-100 dark:hover:bg-dark-800"
                                         >
-                                            <i class="pi pi-shield mr-2 text-xs"></i>Admin
+                                            <i class="pi pi-shield mr-2 text-xs"></i>{{ t('nav.admin') }}
                                         </Link>
                                         <div class="sm:hidden border-t border-gray-100 dark:border-dark-700 my-1"></div>
                                         <div class="sm:hidden px-4 py-2" @click.stop><LanguageSwitcher /></div>

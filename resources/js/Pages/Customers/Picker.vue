@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
+import { useI18n } from 'vue-i18n';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import type { Customer } from '@/types';
+
+const { t } = useI18n();
 
 defineProps<{
     customers: Customer[];
@@ -9,21 +12,21 @@ defineProps<{
 </script>
 
 <template>
-    <Head title="Choose where to continue" />
+    <Head :title="t('picker.title')" />
     <AppLayout>
         <div class="max-w-3xl mx-auto py-10 px-4 sm:px-6">
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                Choose where to continue
+                {{ t('picker.title') }}
             </h1>
             <p class="text-sm text-gray-500 dark:text-dark-400 mb-8">
-                Your account has access to the following. Pick one to continue.
+                {{ t('picker.subtitle') }}
             </p>
 
             <div v-if="customers.length === 0"
                  class="rounded-xl border border-dashed border-gray-300 dark:border-dark-700 p-8 text-center">
                 <i class="pi pi-building text-3xl text-gray-400 mb-3 block"></i>
                 <p class="text-sm text-gray-600 dark:text-dark-400">
-                    You aren't a member anywhere yet. Ask an administrator to add you.
+                    {{ t('picker.empty') }}
                 </p>
             </div>
 

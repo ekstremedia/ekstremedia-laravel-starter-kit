@@ -17,8 +17,11 @@ import TabPanel from 'primevue/tabpanel';
 import Tag from 'primevue/tag';
 import Dialog from 'primevue/dialog';
 import type { PageProps } from '@/types';
+import { useI18n } from 'vue-i18n';
 
 defineOptions({ layout: AdminLayout });
+
+const { t } = useI18n();
 
 interface LocaleData {
     id: number;
@@ -208,18 +211,18 @@ function closeEditor() {
     <Head title="Mail · Admin" />
 
     <!-- Preview dialog -->
-    <Dialog v-model:visible="previewDialogVisible" header="Email Preview" modal :style="{ width: '48rem' }" :dismissableMask="true">
+    <Dialog v-model:visible="previewDialogVisible" :header="t('admin.mail.preview_title')" modal :style="{ width: '48rem' }" :dismissableMask="true">
         <div class="bg-gray-100 dark:bg-dark-900 rounded-lg p-2" style="min-height: 400px">
             <iframe :srcdoc="previewHtml" sandbox="" referrerpolicy="no-referrer" title="Email preview" class="w-full rounded" style="min-height: 500px; border: none;" />
         </div>
     </Dialog>
 
-    <h1 class="text-2xl font-semibold mb-6">Mail</h1>
+    <h1 class="text-2xl font-semibold mb-6">{{ t('admin.mail.title') }}</h1>
 
     <Tabs value="smtp">
         <TabList>
-            <Tab value="smtp"><i class="pi pi-cog mr-2"></i>SMTP Configuration</Tab>
-            <Tab value="templates"><i class="pi pi-file-edit mr-2"></i>Email Templates</Tab>
+            <Tab value="smtp"><i class="pi pi-cog mr-2"></i>{{ t('admin.mail.smtp_tab') }}</Tab>
+            <Tab value="templates"><i class="pi pi-file-edit mr-2"></i>{{ t('admin.mail.templates_tab') }}</Tab>
         </TabList>
 
         <TabPanels>
@@ -228,51 +231,51 @@ function closeEditor() {
                 <form @submit.prevent="saveSmtp" class="max-w-3xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl p-6 space-y-4 mt-4">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm mb-1">Mailer</label>
+                            <label class="block text-sm mb-1">{{ t('admin.mail.mailer') }}</label>
                             <InputText v-model="smtpForm.mailer" class="w-full" />
                         </div>
                         <div class="flex items-center gap-3">
-                            <label class="text-sm">Enabled</label>
+                            <label class="text-sm">{{ t('admin.mail.enabled') }}</label>
                             <ToggleSwitch v-model="smtpForm.enabled" />
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div class="col-span-2">
-                            <label class="block text-sm mb-1">Host</label>
+                            <label class="block text-sm mb-1">{{ t('admin.mail.host') }}</label>
                             <InputText v-model="smtpForm.host" class="w-full" />
                         </div>
                         <div>
-                            <label class="block text-sm mb-1">Port</label>
+                            <label class="block text-sm mb-1">{{ t('admin.mail.port') }}</label>
                             <InputNumber v-model="smtpForm.port" class="w-full" :useGrouping="false" />
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
-                            <label class="block text-sm mb-1">Encryption</label>
+                            <label class="block text-sm mb-1">{{ t('admin.mail.encryption') }}</label>
                             <Select v-model="smtpForm.encryption" :options="encryptionOptions" optionLabel="label" optionValue="value" class="w-full" />
                         </div>
                         <div>
-                            <label class="block text-sm mb-1">Username</label>
+                            <label class="block text-sm mb-1">{{ t('admin.mail.username') }}</label>
                             <InputText v-model="smtpForm.username" class="w-full" />
                         </div>
                         <div>
-                            <label class="block text-sm mb-1">Password</label>
-                            <Password v-model="smtpForm.password" toggleMask :feedback="false" class="w-full" inputClass="w-full" :placeholder="settings.has_password ? '(unchanged)' : 'Set a password'" />
+                            <label class="block text-sm mb-1">{{ t('admin.mail.password') }}</label>
+                            <Password v-model="smtpForm.password" toggleMask :feedback="false" class="w-full" inputClass="w-full" :placeholder="settings.has_password ? t('admin.mail.password_unchanged') : t('admin.mail.password_set')" />
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm mb-1">From address</label>
+                            <label class="block text-sm mb-1">{{ t('admin.mail.from_address') }}</label>
                             <InputText v-model="smtpForm.from_address" class="w-full" />
                         </div>
                         <div>
-                            <label class="block text-sm mb-1">From name</label>
+                            <label class="block text-sm mb-1">{{ t('admin.mail.from_name') }}</label>
                             <InputText v-model="smtpForm.from_name" class="w-full" />
                         </div>
                     </div>
                     <div class="flex gap-2 pt-2">
-                        <Button type="submit" label="Save" icon="pi pi-check" :loading="smtpForm.processing" />
-                        <Button type="button" label="Send test email to me" icon="pi pi-send" severity="secondary" @click="sendTest" />
+                        <Button type="submit" :label="t('common.save')" icon="pi pi-check" :loading="smtpForm.processing" />
+                        <Button type="button" :label="t('admin.mail.send_test')" icon="pi pi-send" severity="secondary" @click="sendTest" />
                     </div>
                 </form>
             </TabPanel>
@@ -318,40 +321,40 @@ function closeEditor() {
 
                         <div class="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl p-6 space-y-4">
                             <div>
-                                <label class="block text-sm mb-1">Subject</label>
+                                <label class="block text-sm mb-1">{{ t('admin.mail.subject') }}</label>
                                 <InputText v-model="templateForm.subject" class="w-full" />
                             </div>
                             <div>
-                                <label class="block text-sm mb-1">Heading</label>
-                                <InputText v-model="templateForm.heading" class="w-full" placeholder="Optional greeting line" />
+                                <label class="block text-sm mb-1">{{ t('admin.mail.heading') }}</label>
+                                <InputText v-model="templateForm.heading" class="w-full" :placeholder="t('admin.mail.heading_placeholder')" />
                             </div>
                             <div>
-                                <label class="block text-sm mb-1">Body</label>
+                                <label class="block text-sm mb-1">{{ t('admin.mail.body') }}</label>
                                 <Textarea v-model="templateForm.body" class="w-full font-mono text-sm" rows="8" autoResize />
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label class="block text-sm mb-1">Button text</label>
-                                    <InputText v-model="templateForm.action_text" class="w-full" placeholder="Optional CTA button" />
+                                    <label class="block text-sm mb-1">{{ t('admin.mail.button_text') }}</label>
+                                    <InputText v-model="templateForm.action_text" class="w-full" :placeholder="t('admin.mail.button_text_placeholder')" />
                                 </div>
                                 <div>
-                                    <label class="block text-sm mb-1">Button URL</label>
+                                    <label class="block text-sm mb-1">{{ t('admin.mail.button_url') }}</label>
                                     <InputText v-model="templateForm.action_url" class="w-full" placeholder="https://..." />
                                 </div>
                             </div>
 
                             <!-- Variables helper -->
                             <div class="border-t border-gray-100 dark:border-dark-800 pt-3">
-                                <p class="text-xs text-gray-500 mb-2">Available variables:</p>
+                                <p class="text-xs text-gray-500 mb-2">{{ t('admin.mail.available_variables') }}</p>
                                 <div class="flex flex-wrap gap-1">
                                     <Tag v-for="v in editingTemplate.variables" :key="v" :value="`{{ ${v} }}`" severity="secondary" class="font-mono text-xs" />
                                 </div>
                             </div>
 
                             <div class="flex gap-2 pt-2">
-                                <Button label="Save" icon="pi pi-check" :loading="savingTemplate" @click="saveTemplate" />
-                                <Button label="Preview" icon="pi pi-eye" severity="secondary" :loading="loadingPreview" @click="previewTemplate" />
-                                <Button label="Send test to me" icon="pi pi-send" severity="secondary" :loading="sendingTest" @click="sendTemplateTest" />
+                                <Button :label="t('common.save')" icon="pi pi-check" :loading="savingTemplate" @click="saveTemplate" />
+                                <Button :label="t('admin.mail.preview')" icon="pi pi-eye" severity="secondary" :loading="loadingPreview" @click="previewTemplate" />
+                                <Button :label="t('admin.mail.send_test_to_me')" icon="pi pi-send" severity="secondary" :loading="sendingTest" @click="sendTemplateTest" />
                             </div>
                         </div>
                     </div>

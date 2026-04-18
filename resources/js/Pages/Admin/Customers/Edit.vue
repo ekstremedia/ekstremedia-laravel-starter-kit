@@ -7,8 +7,11 @@ import Button from 'primevue/button';
 import Tag from 'primevue/tag';
 import ConfirmDialog from 'primevue/confirmdialog';
 import { useConfirm } from 'primevue/useconfirm';
+import { useI18n } from 'vue-i18n';
 
 defineOptions({ layout: AdminLayout });
+
+const { t } = useI18n();
 
 interface Member { id: number; email: string; full_name: string }
 interface CustomerData {
@@ -69,35 +72,35 @@ function detach(member: Member) {
                 <Tag :value="customer.status" :severity="customer.status === 'active' ? 'success' : 'warn'" />
             </p>
         </div>
-        <Link href="/admin/customers" class="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">← Back</Link>
+        <Link href="/admin/customers" class="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">{{ t('common.back') }}</Link>
     </div>
 
     <div class="grid gap-6 lg:grid-cols-2">
         <section class="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl p-6">
-            <h2 class="text-lg font-medium mb-4">Settings</h2>
+            <h2 class="text-lg font-medium mb-4">{{ t('admin.customers.settings') }}</h2>
             <form @submit.prevent="save" class="space-y-4">
                 <div>
-                    <label class="block text-sm mb-1">Name</label>
+                    <label class="block text-sm mb-1">{{ t('common.name') }}</label>
                     <InputText v-model="form.name" class="w-full" />
                     <p v-if="form.errors.name" class="text-xs text-red-500 mt-1">{{ form.errors.name }}</p>
                 </div>
                 <div>
-                    <label class="block text-sm mb-1">Status</label>
+                    <label class="block text-sm mb-1">{{ t('common.status') }}</label>
                     <Select v-model="form.status" :options="statusOptions" optionLabel="label" optionValue="value" class="w-full" />
-                    <p class="text-xs text-gray-500 mt-1">Suspended customers reject all member traffic.</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ t('admin.customers.suspended_hint') }}</p>
                 </div>
                 <div>
-                    <Button type="submit" label="Save" icon="pi pi-check" :loading="form.processing" />
+                    <Button type="submit" :label="t('common.save')" icon="pi pi-check" :loading="form.processing" />
                 </div>
             </form>
         </section>
 
         <section class="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl p-6">
-            <h2 class="text-lg font-medium mb-4">Members ({{ customer.users.length }})</h2>
+            <h2 class="text-lg font-medium mb-4">{{ t('admin.customers.member_count', { count: customer.users.length }) }}</h2>
 
             <form @submit.prevent="attach" class="flex gap-2 mb-4">
-                <InputText v-model="memberForm.email" type="email" class="flex-1" placeholder="existing-user@example.com" />
-                <Button type="submit" label="Add" icon="pi pi-user-plus" :loading="memberForm.processing" />
+                <InputText v-model="memberForm.email" type="email" class="flex-1" :placeholder="t('admin.customers.add_member_placeholder')" />
+                <Button type="submit" :label="t('common.add')" icon="pi pi-user-plus" :loading="memberForm.processing" />
             </form>
             <p v-if="memberForm.errors.email" class="text-xs text-red-500 -mt-2 mb-4">{{ memberForm.errors.email }}</p>
 
@@ -110,7 +113,7 @@ function detach(member: Member) {
                     <Button icon="pi pi-times" severity="secondary" size="small" text @click="detach(member)" />
                 </li>
             </ul>
-            <p v-else class="text-sm text-gray-500">No members yet. Add an existing user by email above.</p>
+            <p v-else class="text-sm text-gray-500">{{ t('admin.customers.no_members') }}</p>
         </section>
     </div>
 </template>

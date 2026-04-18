@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\SystemInfoController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\DevLoginController;
 use App\Http\Controllers\CustomerLandingController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -33,11 +34,16 @@ if (app()->isLocal() || app()->runningUnitTests()) {
 Route::middleware('auth')->group(function () {
     Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');
 
-    // Central profile route — accessible without a customer context (e.g. from
-    // the picker page or admin panel). The customer-scoped copy in customer.php
-    // takes precedence when a customer is active.
+    // Central routes — accessible without a customer context (e.g. from the
+    // picker page or admin panel). The customer-scoped copies in customer.php
+    // take precedence when a customer is active.
     Route::middleware('verified')->group(function () {
         Route::get('/profile', fn () => Inertia::render('Profile'))->name('profile.central');
+        Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.central.index');
+        Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.central.read');
+        Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.central.readAll');
+        Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.central.destroy');
+        Route::delete('/notifications', [NotificationController::class, 'destroyAll'])->name('notifications.central.destroyAll');
     });
 });
 
