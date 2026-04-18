@@ -69,7 +69,7 @@ Route::middleware(['auth', 'verified', 'role:Admin'])
         Route::get('health/queue-last', [HealthController::class, 'queueLast'])->name('health.queue.last');
 
         Route::patch('mail/templates/{template}', [EmailTemplateController::class, 'update'])->name('mail.templates.update');
-        Route::get('mail/templates/{template}/preview', [EmailTemplateController::class, 'preview'])->name('mail.templates.preview');
+        Route::post('mail/templates/{template}/preview', [EmailTemplateController::class, 'preview'])->name('mail.templates.preview');
         Route::post('mail/templates/{template}/test', [EmailTemplateController::class, 'testSend'])->name('mail.templates.test');
 
         Route::get('mail', [MailSettingsController::class, 'show'])->name('mail.show');

@@ -149,13 +149,33 @@ function saveTemplate() {
     });
 }
 
+function draftPayload() {
+    return {
+        subject: templateForm.subject,
+        heading: templateForm.heading,
+        body: templateForm.body,
+        action_text: templateForm.action_text,
+        action_url: templateForm.action_url,
+    };
+}
+
 function previewTemplate() {
     const data = currentLocaleData();
     if (!data) return;
 
     loadingPreview.value = true;
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+
     fetch(`/admin/mail/templates/${data.id}/preview`, {
-        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': csrfToken,
+        },
+        body: JSON.stringify(draftPayload()),
     })
         .then(r => r.json())
         .then(json => {
@@ -170,7 +190,10 @@ function sendTemplateTest() {
     if (!data) return;
 
     sendingTest.value = true;
-    router.post(`/admin/mail/templates/${data.id}/test`, { email: userEmail.value }, {
+    router.post(`/admin/mail/templates/${data.id}/test`, {
+        email: userEmail.value,
+        ...draftPayload(),
+    }, {
         preserveScroll: true,
         onFinish: () => { sendingTest.value = false; },
     });
@@ -327,8 +350,8 @@ function closeEditor() {
 
                             <div class="flex gap-2 pt-2">
                                 <Button label="Save" icon="pi pi-check" :loading="savingTemplate" @click="saveTemplate" />
-                                <Button label="Preview" icon="pi pi-eye" severity="secondary" :loading="loadingPreview" :disabled="templateForm.isDirty" @click="previewTemplate" :title="templateForm.isDirty ? 'Save changes first' : ''" />
-                                <Button label="Send test to me" icon="pi pi-send" severity="secondary" :loading="sendingTest" :disabled="templateForm.isDirty" @click="sendTemplateTest" :title="templateForm.isDirty ? 'Save changes first' : ''" />
+                                <Button label="Preview" icon="pi pi-eye" severity="secondary" :loading="loadingPreview" @click="previewTemplate" />
+                                <Button label="Send test to me" icon="pi pi-send" severity="secondary" :loading="sendingTest" @click="sendTemplateTest" />
                             </div>
                         </div>
                     </div>

@@ -55,7 +55,7 @@ it('returns preview HTML for a template', function () {
     $template = EmailTemplate::forSlug('welcome', 'en');
 
     $this->actingAs($admin)
-        ->getJson("/admin/mail/templates/{$template->id}/preview")
+        ->postJson("/admin/mail/templates/{$template->id}/preview")
         ->assertOk()
         ->assertJsonStructure(['html']);
 });

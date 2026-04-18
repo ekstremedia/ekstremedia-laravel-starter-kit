@@ -7,16 +7,111 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Mail\TemplateMail;
 use App\Models\EmailTemplate;
+use App\Services\MjmlCompiler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\View;
 
 class EmailTemplateController extends Controller
 {
     public function update(Request $request, EmailTemplate $template): RedirectResponse
     {
+        $data = $request->validate($this->contentRules());
+
+        $template->update($data);
+        $template->compile();
+
+        return back()->with('success', "Template \"{$template->name}\" updated.");
+    }
+
+    public function preview(Request $request, EmailTemplate $template): JsonResponse
+    {
+        $draft = $this->resolveDraft($request, $template);
+        $sampleData = $this->sampleData($template);
+
+        return response()->json([
+            'html' => $this->renderDraft($draft, $sampleData),
+        ]);
+    }
+
+    public function testSend(Request $request, EmailTemplate $template): RedirectResponse
+    {
         $data = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        $draft = $this->resolveDraft($request, $template);
+        $sampleData = $this->sampleData($template);
+        $subject = $this->interpolate($draft['subject'], $sampleData);
+        $html = $this->renderDraft($draft, $sampleData);
+
+        Mail::to($data['email'])->send(new TemplateMail($subject, $html));
+
+        return back()->with('success', "Test email sent to {$data['email']}.");
+    }
+
+    /**
+     * Build the working draft: use request fields when present (unsaved edits),
+     * otherwise fall back to the persisted template.
+     *
+     * @return array{subject: string, heading: string, body: string, action_text: string|null, action_url: string|null}
+     */
+    private function resolveDraft(Request $request, EmailTemplate $template): array
+    {
+        return [
+            'subject' => $request->string('subject')->toString() ?: $template->subject,
+            'heading' => $request->string('heading')->toString() ?: ($template->heading ?? ''),
+            'body' => $request->string('body')->toString() ?: $template->body,
+            'action_text' => $request->string('action_text')->toString() ?: $template->action_text,
+            'action_url' => $request->string('action_url')->toString() ?: $template->action_url,
+        ];
+    }
+
+    /**
+     * Compile a draft through the MJML layout and interpolate sample data.
+     *
+     * @param  array{subject: string, heading: string, body: string, action_text: string|null, action_url: string|null}  $draft
+     * @param  array<string, string>  $data
+     */
+    private function renderDraft(array $draft, array $data): string
+    {
+        $mjml = View::make('mjml.layout', [
+            'heading' => $draft['heading'],
+            'body' => $draft['body'],
+            'actionText' => $draft['action_text'],
+            'actionUrl' => $draft['action_url'],
+        ])->render();
+
+        $compiler = app(MjmlCompiler::class);
+        $html = $compiler->compile($mjml);
+
+        foreach ($data as $key => $value) {
+            $html = str_replace('{{ '.$key.' }}', e($value), $html);
+        }
+
+        return $html;
+    }
+
+    /**
+     * @param  array<string, string>  $data
+     */
+    private function interpolate(string $text, array $data): string
+    {
+        foreach ($data as $key => $value) {
+            $text = str_replace('{{ '.$key.' }}', $value, $text);
+        }
+
+        return $text;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function contentRules(): array
+    {
+        return [
             'subject' => ['required', 'string', 'max:255'],
             'heading' => ['nullable', 'string', 'max:255'],
             'body' => ['required', 'string'],
@@ -39,44 +134,7 @@ class EmailTemplateController extends Controller
                     }
                 },
             ],
-        ]);
-
-        $template->update($data);
-        $template->compile();
-
-        return back()->with('success', "Template \"{$template->name}\" updated.");
-    }
-
-    public function preview(EmailTemplate $template): JsonResponse
-    {
-        if (! $template->compiled_html) {
-            $template->compile();
-        }
-
-        $sampleData = $this->sampleData($template);
-
-        return response()->json([
-            'html' => $template->render($sampleData),
-        ]);
-    }
-
-    public function testSend(Request $request, EmailTemplate $template): RedirectResponse
-    {
-        $data = $request->validate([
-            'email' => ['required', 'email'],
-        ]);
-
-        if (! $template->compiled_html) {
-            $template->compile();
-        }
-
-        $sampleData = $this->sampleData($template);
-        $subject = $template->interpolateSubject($sampleData);
-        $html = $template->render($sampleData);
-
-        Mail::to($data['email'])->send(new TemplateMail($subject, $html));
-
-        return back()->with('success', "Test email sent to {$data['email']}.");
+        ];
     }
 
     /**
