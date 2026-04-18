@@ -67,6 +67,26 @@ function markOneRead(n: NotificationItem) {
     });
 }
 
+function deleteOne(n: NotificationItem) {
+    router.delete(customerUrl(`/notifications/${n.id}`), {
+        preserveScroll: true,
+        onSuccess: () => {
+            notifications.value = notifications.value.filter(x => x.id !== n.id);
+        },
+    });
+}
+
+function clearAll() {
+    if (!showCustomerNav.value) return;
+    router.delete(customerUrl('/notifications'), {
+        preserveScroll: true,
+        onSuccess: () => {
+            notifications.value = [];
+            notificationsOpen.value = false;
+        },
+    });
+}
+
 function timeAgo(iso: string): string {
     const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
     if (seconds < 60) return 'just now';
@@ -200,7 +220,10 @@ function initials(u: { first_name: string; last_name: string }) {
                                     >
                                         <div class="flex items-center justify-between px-4 pb-2 border-b border-gray-100 dark:border-dark-700">
                                             <span class="text-sm font-medium">Notifications</span>
-                                            <button v-if="unreadCount > 0" @click="markAllRead" class="text-xs text-indigo-500 hover:underline cursor-pointer">Mark all read</button>
+                                            <div v-if="notifications.length > 0" class="flex gap-2">
+                                                <button v-if="unreadCount > 0" @click="markAllRead" class="text-xs text-indigo-500 hover:underline cursor-pointer">Mark all read</button>
+                                                <button @click="clearAll" class="text-xs text-red-400 hover:underline cursor-pointer">Clear all</button>
+                                            </div>
                                         </div>
                                         <div v-if="loadingNotifications" class="px-4 py-6 text-center">
                                             <i class="pi pi-spin pi-spinner text-gray-400"></i>
@@ -210,17 +233,21 @@ function initials(u: { first_name: string; last_name: string }) {
                                         </div>
                                         <ul v-else class="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-dark-800">
                                             <li v-for="n in notifications" :key="n.id"
-                                                class="px-4 py-3 flex items-start gap-3 cursor-pointer transition-colors"
-                                                :class="n.read_at ? 'opacity-60' : 'bg-indigo-50/50 dark:bg-dark-800/50'"
-                                                @click="markOneRead(n)">
+                                                class="group px-4 py-3 flex items-start gap-3 transition-colors"
+                                                :class="n.read_at ? 'opacity-60' : 'bg-indigo-50/50 dark:bg-dark-800/50'">
                                                 <i :class="n.data.icon ? `pi ${n.data.icon}` : 'pi pi-bell'"
                                                    class="mt-0.5 text-sm text-indigo-500"></i>
-                                                <div class="flex-1 min-w-0">
+                                                <div class="flex-1 min-w-0 cursor-pointer" @click="markOneRead(n)">
                                                     <p class="text-sm font-medium truncate">{{ n.data.title ?? n.type }}</p>
                                                     <p v-if="n.data.message" class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{{ n.data.message }}</p>
                                                     <p class="text-[10px] text-gray-400 mt-1">{{ timeAgo(n.created_at) }}</p>
                                                 </div>
-                                                <span v-if="!n.read_at" class="mt-1.5 w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
+                                                <div class="flex items-center gap-1 shrink-0 mt-0.5">
+                                                    <span v-if="!n.read_at" class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                                    <button @click.stop="deleteOne(n)" class="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-opacity cursor-pointer" aria-label="Delete notification">
+                                                        <i class="pi pi-times text-xs"></i>
+                                                    </button>
+                                                </div>
                                             </li>
                                         </ul>
                                     </div>
@@ -278,7 +305,6 @@ function initials(u: { first_name: string; last_name: string }) {
                                             {{ t('nav.dashboard') }}
                                         </Link>
                                         <Link
-                                            v-if="showCustomerNav"
                                             :href="profileUrl"
                                             class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800"
                                         >

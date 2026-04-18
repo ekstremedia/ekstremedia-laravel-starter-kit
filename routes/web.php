@@ -32,6 +32,13 @@ if (app()->isLocal() || app()->runningUnitTests()) {
 // Authenticated routes (user-level, customer-agnostic)
 Route::middleware('auth')->group(function () {
     Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');
+
+    // Central profile route — accessible without a customer context (e.g. from
+    // the picker page or admin panel). The customer-scoped copy in customer.php
+    // takes precedence when a customer is active.
+    Route::middleware('verified')->group(function () {
+        Route::get('/profile', fn () => Inertia::render('Profile'))->name('profile.central');
+    });
 });
 
 // Post-login landing — redirects to the user's customer or renders the picker.
