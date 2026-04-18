@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Concerns\UsesEmailTemplate;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -9,21 +10,22 @@ use Illuminate\Notifications\Notification;
 class WelcomeNotification extends Notification
 {
     use Queueable;
+    use UsesEmailTemplate;
 
     /**
      * @return array<int, string>
      */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return ['database', 'mail'];
     }
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
-            ->subject('Welcome!')
-            ->greeting("Welcome, {$notifiable->first_name}!")
-            ->line('Your account is ready to go.');
+        return $this->renderTemplate('welcome', $notifiable, [
+            'app_name' => config('app.name'),
+            'app_url' => config('app.url'),
+        ]);
     }
 
     /**

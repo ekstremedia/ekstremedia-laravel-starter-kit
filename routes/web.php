@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\AppSettingsController;
 use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\CustomerController;
+use App\Http\Controllers\Admin\EmailTemplateController;
 use App\Http\Controllers\Admin\HealthController;
 use App\Http\Controllers\Admin\ImpersonateController;
 use App\Http\Controllers\Admin\MailSettingsController;
@@ -67,6 +68,10 @@ Route::middleware(['auth', 'verified', 'role:Admin'])
         Route::post('health/broadcast', [HealthController::class, 'broadcastPing'])->name('health.broadcast');
         Route::get('health/queue-last', [HealthController::class, 'queueLast'])->name('health.queue.last');
 
+        Route::patch('mail/templates/{template}', [EmailTemplateController::class, 'update'])->name('mail.templates.update');
+        Route::get('mail/templates/{template}/preview', [EmailTemplateController::class, 'preview'])->name('mail.templates.preview');
+        Route::post('mail/templates/{template}/test', [EmailTemplateController::class, 'testSend'])->name('mail.templates.test');
+
         Route::get('mail', [MailSettingsController::class, 'show'])->name('mail.show');
         Route::patch('mail', [MailSettingsController::class, 'update'])->name('mail.update');
         Route::post('mail/test', [MailSettingsController::class, 'test'])->name('mail.test');
@@ -88,6 +93,9 @@ Route::middleware(['auth', 'verified', 'role:Admin'])
             Route::resource('customers', CustomerController::class)->except(['show']);
             Route::post('customers/{customer}/members', [CustomerController::class, 'attachMember'])->name('customers.members.attach');
             Route::delete('customers/{customer}/members/{user}', [CustomerController::class, 'detachMember'])->name('customers.members.detach');
+
+            Route::post('users/{user}/customers', [UserController::class, 'attachCustomer'])->name('users.customers.attach');
+            Route::delete('users/{user}/customers/{customer}', [UserController::class, 'detachCustomer'])->name('users.customers.detach');
         }
 
         Route::post('users/{user}/impersonate', [ImpersonateController::class, 'take'])->name('users.impersonate');

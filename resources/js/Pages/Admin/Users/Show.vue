@@ -13,6 +13,7 @@ import { useConfirm } from 'primevue/useconfirm';
 defineOptions({ layout: AdminLayout });
 
 interface ActivityItem { id: number; log_name: string | null; description: string; event: string | null; created_at: string }
+interface CustomerItem { id: number; name: string; slug: string }
 interface Props {
     user: {
         id: number; first_name: string; last_name: string; full_name: string; email: string;
@@ -20,8 +21,10 @@ interface Props {
         last_login_at: string | null; created_at: string; two_factor_enabled: boolean;
         roles: string[]; avatar_url: string | null; avatar_thumb_url: string | null;
         unread_notifications_count: number;
+        customers: CustomerItem[];
     };
     activity: ActivityItem[];
+    tenancy_enabled: boolean;
 }
 const props = defineProps<Props>();
 
@@ -195,6 +198,17 @@ function formatDate(iso: string | null) {
                 <dd v-if="user.banned_reason" class="font-mono">{{ user.banned_reason }}</dd>
                 <dt class="text-gray-500">Unread notifications</dt><dd class="font-mono">{{ user.unread_notifications_count }}</dd>
             </dl>
+        </section>
+
+        <!-- Customer memberships -->
+        <section v-if="tenancy_enabled" class="lg:col-span-3 bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-2xl p-5">
+            <h2 class="font-semibold mb-3">Customer memberships</h2>
+            <div v-if="user.customers.length" class="flex flex-wrap gap-2">
+                <Link v-for="c in user.customers" :key="c.id" :href="`/admin/customers/${c.id}/edit`">
+                    <Tag :value="c.name" severity="info" icon="pi pi-building" class="cursor-pointer hover:opacity-80" />
+                </Link>
+            </div>
+            <p v-else class="text-sm text-gray-400 italic">Not a member of any customer.</p>
         </section>
 
         <!-- Activity -->

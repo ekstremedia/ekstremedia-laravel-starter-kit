@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreUserRequest;
 use App\Http\Requests\Admin\UpdateUserRequest;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\AccountBannedNotification;
 use App\Notifications\AdminTestNotification;
+use App\Notifications\CustomerMemberAddedNotification;
+use App\Notifications\CustomerMemberRemovedNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -90,7 +93,7 @@ class UserController extends Controller
 
     public function show(User $user): Response
     {
-        $user->load('roles:id,name', 'media');
+        $user->load('roles:id,name', 'media', 'customers');
 
         $recentActivity = Activity::query()
             ->where(function ($q) use ($user) {
@@ -128,13 +131,19 @@ class UserController extends Controller
                 'avatar_url' => $user->avatarUrl('avatar'),
                 'avatar_thumb_url' => $user->avatarUrl('thumb'),
                 'unread_notifications_count' => $user->unreadNotifications()->count(),
+                'customers' => config('tenancy.enabled')
+                    ? $user->customers()->orderBy('name')->get(['tenants.id', 'name', 'slug'])->toArray()
+                    : [],
             ],
             'activity' => $recentActivity,
+            'tenancy_enabled' => (bool) config('tenancy.enabled'),
         ]);
     }
 
     public function edit(User $user): Response
     {
+        $tenancyEnabled = (bool) config('tenancy.enabled');
+
         return Inertia::render('Admin/Users/Edit', [
             'user' => [
                 'id' => $user->id,
@@ -142,8 +151,15 @@ class UserController extends Controller
                 'last_name' => $user->last_name,
                 'email' => $user->email,
                 'roles' => $user->roles->pluck('name')->toArray(),
+                'customers' => $tenancyEnabled
+                    ? $user->customers()->orderBy('name')->get(['tenants.id', 'name', 'slug'])->toArray()
+                    : [],
             ],
             'roles' => Role::orderBy('name')->get(['id', 'name']),
+            'tenancy_enabled' => $tenancyEnabled,
+            'all_customers' => $tenancyEnabled
+                ? Tenant::query()->where('status', 'active')->orderBy('name')->get(['id', 'name', 'slug'])->toArray()
+                : [],
         ]);
     }
 
@@ -297,6 +313,52 @@ class UserController extends Controller
         }
 
         return redirect()->route('admin.users.index')->with('success', 'User updated.');
+    }
+
+    public function attachCustomer(Request $request, User $user): RedirectResponse
+    {
+        $data = $request->validate([
+            'customer_id' => ['required', 'exists:tenants,id'],
+            'notify' => ['boolean'],
+        ]);
+
+        $customer = Tenant::findOrFail($data['customer_id']);
+
+        $user->customers()->syncWithoutDetaching([$customer->id]);
+
+        if ($data['notify'] ?? false) {
+            $user->notify(new CustomerMemberAddedNotification($customer));
+        }
+
+        activity('user')
+            ->performedOn($user)
+            ->withProperties(['customer' => $customer->name, 'notify' => $data['notify'] ?? false])
+            ->event('customer_attached')
+            ->log("Added {$user->email} to {$customer->name}");
+
+        return back()->with('success', "Added {$user->email} to {$customer->name}.");
+    }
+
+    public function detachCustomer(Request $request, User $user, Tenant $customer): RedirectResponse
+    {
+        $data = $request->validate([
+            'notify' => ['boolean'],
+        ]);
+
+        $customerName = $customer->name;
+        $user->customers()->detach($customer->id);
+
+        if ($data['notify'] ?? false) {
+            $user->notify(new CustomerMemberRemovedNotification($customerName));
+        }
+
+        activity('user')
+            ->performedOn($user)
+            ->withProperties(['customer' => $customerName, 'notify' => $data['notify'] ?? false])
+            ->event('customer_detached')
+            ->log("Removed {$user->email} from {$customerName}");
+
+        return back()->with('success', "Removed {$user->email} from {$customerName}.");
     }
 
     public function destroy(Request $request, User $user): RedirectResponse

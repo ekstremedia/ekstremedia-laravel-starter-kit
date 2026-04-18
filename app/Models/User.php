@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Notifications\ResetPasswordNotification;
+use App\Notifications\VerifyEmailNotification;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -156,6 +158,22 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     public function fullName(): string
     {
         return "{$this->first_name} {$this->last_name}";
+    }
+
+    /**
+     * Send the email verification notification using the MJML template.
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->notify(new VerifyEmailNotification);
+    }
+
+    /**
+     * Send the password reset notification using the MJML template.
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ResetPasswordNotification($token));
     }
 
     /**

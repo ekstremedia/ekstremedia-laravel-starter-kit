@@ -43,6 +43,7 @@
     "@vitejs/plugin-vue": "^6.0.5",
     "gsap": "^3.14.2",
     "laravel-echo": "^2.3.4",
+    "mjml": "^5.0.1",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.4",
     "pusher-js": "^8.5.0",
