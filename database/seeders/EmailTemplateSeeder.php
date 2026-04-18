@@ -14,16 +14,19 @@ class EmailTemplateSeeder extends Seeder
         $templates = $this->templates();
 
         foreach ($templates as $template) {
-            EmailTemplate::query()->updateOrCreate(
+            $model = EmailTemplate::query()->updateOrCreate(
                 ['slug' => $template['slug'], 'locale' => $template['locale']],
                 $template,
             );
-        }
 
-        // Compile all templates that haven't been compiled yet.
-        EmailTemplate::query()->whereNull('compiled_html')->each(function (EmailTemplate $t) {
-            $t->compile();
-        });
+            if (
+                empty($model->compiled_html)
+                || $model->wasRecentlyCreated
+                || $model->wasChanged(['heading', 'body', 'action_text', 'action_url'])
+            ) {
+                $model->compile();
+            }
+        }
     }
 
     /**
@@ -63,7 +66,7 @@ class EmailTemplateSeeder extends Seeder
                 'name' => 'Account Suspended',
                 'subject' => 'Your account has been suspended',
                 'heading' => 'Hi {{ user_name }},',
-                'body' => "Your account has been suspended by an administrator.\n\n{{ reason }}\n\nContact support if you believe this is a mistake.",
+                'body' => "Your account has been suspended by an administrator.\n\nReason: {{ reason }}\n\nContact support if you believe this is a mistake.",
                 'action_text' => null,
                 'action_url' => null,
                 'variables' => ['user_name', 'reason'],
@@ -74,7 +77,7 @@ class EmailTemplateSeeder extends Seeder
                 'name' => 'Konto suspendert',
                 'subject' => 'Kontoen din har blitt suspendert',
                 'heading' => 'Hei {{ user_name }},',
-                'body' => "Kontoen din har blitt suspendert av en administrator.\n\n{{ reason }}\n\nTa kontakt med brukerstøtte hvis du mener dette er en feil.",
+                'body' => "Kontoen din har blitt suspendert av en administrator.\n\nÅrsak: {{ reason }}\n\nTa kontakt med brukerstøtte hvis du mener dette er en feil.",
                 'action_text' => null,
                 'action_url' => null,
                 'variables' => ['user_name', 'reason'],

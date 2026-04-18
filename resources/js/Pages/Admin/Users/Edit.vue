@@ -49,6 +49,8 @@ const notifyOnAdd = ref(true);
 const notifyOnRemove = ref(true);
 const removeDialog = ref(false);
 const removingCustomer = ref<CustomerItem | null>(null);
+const addingCustomer = ref(false);
+const removingCustomerRequest = ref(false);
 
 const availableCustomers = () => {
     const currentIds = new Set(props.user.customers.map(c => c.id));
@@ -63,14 +65,14 @@ function openAddDialog() {
 
 function confirmAdd() {
     if (!selectedCustomerId.value) return;
+    addingCustomer.value = true;
     router.post(`/admin/users/${props.user.id}/customers`, {
         customer_id: selectedCustomerId.value,
         notify: notifyOnAdd.value,
     }, {
         preserveScroll: true,
-        onSuccess: () => {
-            addCustomerDialog.value = false;
-        },
+        onSuccess: () => { addCustomerDialog.value = false; },
+        onFinish: () => { addingCustomer.value = false; },
     });
 }
 
@@ -82,6 +84,7 @@ function openRemoveDialog(customer: CustomerItem) {
 
 function confirmRemove() {
     if (!removingCustomer.value) return;
+    removingCustomerRequest.value = true;
     router.delete(`/admin/users/${props.user.id}/customers/${removingCustomer.value.id}`, {
         data: { notify: notifyOnRemove.value },
         preserveScroll: true,
@@ -89,6 +92,7 @@ function confirmRemove() {
             removeDialog.value = false;
             removingCustomer.value = null;
         },
+        onFinish: () => { removingCustomerRequest.value = false; },
     });
 }
 </script>
@@ -113,12 +117,12 @@ function confirmRemove() {
             </div>
             <div class="flex items-center gap-2">
                 <Checkbox v-model="notifyOnAdd" :binary="true" inputId="notifyAdd" />
-                <label for="notifyAdd" class="text-sm">Notify user by email</label>
+                <label for="notifyAdd" class="text-sm">Notify user</label>
             </div>
         </div>
         <template #footer>
             <Button label="Cancel" severity="secondary" @click="addCustomerDialog = false" />
-            <Button label="Add" icon="pi pi-plus" :disabled="!selectedCustomerId" @click="confirmAdd" />
+            <Button label="Add" icon="pi pi-plus" :disabled="!selectedCustomerId" :loading="addingCustomer" @click="confirmAdd" />
         </template>
     </Dialog>
 
@@ -129,11 +133,11 @@ function confirmRemove() {
         </p>
         <div class="flex items-center gap-2">
             <Checkbox v-model="notifyOnRemove" :binary="true" inputId="notifyRemove" />
-            <label for="notifyRemove" class="text-sm">Notify user by email</label>
+            <label for="notifyRemove" class="text-sm">Notify user</label>
         </div>
         <template #footer>
             <Button label="Cancel" severity="secondary" @click="removeDialog = false" />
-            <Button label="Remove" icon="pi pi-times" severity="danger" @click="confirmRemove" />
+            <Button label="Remove" icon="pi pi-times" severity="danger" :loading="removingCustomerRequest" @click="confirmRemove" />
         </template>
     </Dialog>
 
@@ -197,7 +201,7 @@ function confirmRemove() {
                         </Link>
                         <p class="text-xs text-gray-500">/c/{{ customer.slug }}</p>
                     </div>
-                    <Button icon="pi pi-times" severity="secondary" size="small" text @click="openRemoveDialog(customer)" />
+                    <Button icon="pi pi-times" severity="secondary" size="small" text :aria-label="`Remove ${customer.name}`" @click="openRemoveDialog(customer)" />
                 </li>
             </ul>
             <p v-else class="text-sm text-gray-400 italic">Not a member of any customer.</p>

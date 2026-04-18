@@ -15,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Activitylog\Models\Activity;
@@ -93,7 +94,13 @@ class UserController extends Controller
 
     public function show(User $user): Response
     {
-        $user->load('roles:id,name', 'media', 'customers');
+        $tenancyEnabled = (bool) config('tenancy.enabled');
+
+        $user->load('roles:id,name', 'media');
+
+        if ($tenancyEnabled) {
+            $user->load('customers');
+        }
 
         $recentActivity = Activity::query()
             ->where(function ($q) use ($user) {
@@ -131,12 +138,12 @@ class UserController extends Controller
                 'avatar_url' => $user->avatarUrl('avatar'),
                 'avatar_thumb_url' => $user->avatarUrl('thumb'),
                 'unread_notifications_count' => $user->unreadNotifications()->count(),
-                'customers' => config('tenancy.enabled')
+                'customers' => $tenancyEnabled
                     ? $user->customers()->orderBy('name')->get(['tenants.id', 'name', 'slug'])->toArray()
                     : [],
             ],
             'activity' => $recentActivity,
-            'tenancy_enabled' => (bool) config('tenancy.enabled'),
+            'tenancy_enabled' => $tenancyEnabled,
         ]);
     }
 
@@ -318,11 +325,16 @@ class UserController extends Controller
     public function attachCustomer(Request $request, User $user): RedirectResponse
     {
         $data = $request->validate([
-            'customer_id' => ['required', 'exists:tenants,id'],
+            'customer_id' => [
+                'required',
+                Rule::exists('tenants', 'id')->where(fn ($query) => $query->where('status', 'active')),
+            ],
             'notify' => ['boolean'],
         ]);
 
-        $customer = Tenant::findOrFail($data['customer_id']);
+        $customer = Tenant::query()
+            ->where('status', 'active')
+            ->findOrFail($data['customer_id']);
 
         $user->customers()->syncWithoutDetaching([$customer->id]);
 
@@ -346,7 +358,11 @@ class UserController extends Controller
         ]);
 
         $customerName = $customer->name;
-        $user->customers()->detach($customer->id);
+        $detached = $user->customers()->detach($customer->id);
+
+        if ($detached === 0) {
+            return back()->with('error', "{$user->email} is not a member of {$customerName}.");
+        }
 
         if ($data['notify'] ?? false) {
             $user->notify(new CustomerMemberRemovedNotification($customerName));

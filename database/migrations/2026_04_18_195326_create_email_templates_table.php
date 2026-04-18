@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('action_text')->nullable();
             $table->string('action_url')->nullable();
             $table->jsonb('variables')->default('[]');
-            $table->text('compiled_html')->nullable();
+            $table->mediumText('compiled_html')->nullable();
             $table->timestamps();
 
             $table->unique(['slug', 'locale']);

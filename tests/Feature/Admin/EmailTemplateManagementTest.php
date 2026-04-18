@@ -1,9 +1,11 @@
 <?php
 
+use App\Mail\TemplateMail;
 use App\Models\EmailTemplate;
 use App\Models\User;
 use Database\Seeders\EmailTemplateSeeder;
 use Database\Seeders\RoleAndPermissionSeeder;
+use Illuminate\Support\Facades\Mail;
 
 beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
@@ -59,17 +61,22 @@ it('returns preview HTML for a template', function () {
 });
 
 it('sends a test email for a template', function () {
+    Mail::fake();
+
     $admin = User::factory()->create();
     $admin->assignRole('Admin');
 
     $template = EmailTemplate::forSlug('admin-test', 'en');
+    $email = fake()->safeEmail();
 
     $this->actingAs($admin)
         ->post("/admin/mail/templates/{$template->id}/test", [
-            'email' => 'test@example.com',
+            'email' => $email,
         ])
         ->assertRedirect()
         ->assertSessionHas('success');
+
+    Mail::assertSent(TemplateMail::class, fn (TemplateMail $mail) => $mail->hasTo($email));
 });
 
 it('rejects non-admin from updating templates', function () {

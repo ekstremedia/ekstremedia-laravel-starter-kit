@@ -25,7 +25,7 @@ class AccountBannedNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return $this->renderTemplate('account-banned', $notifiable, [
-            'reason' => $this->reason ? "Reason: {$this->reason}" : '',
+            'reason' => $this->reason ?? '',
         ]);
     }
 

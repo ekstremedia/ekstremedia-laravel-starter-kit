@@ -186,8 +186,8 @@ function closeEditor() {
 
     <!-- Preview dialog -->
     <Dialog v-model:visible="previewDialogVisible" header="Email Preview" modal :style="{ width: '48rem' }" :dismissableMask="true">
-        <div class="bg-gray-100 rounded-lg p-2" style="min-height: 400px">
-            <iframe :srcdoc="previewHtml" class="w-full rounded" style="min-height: 500px; border: none;" />
+        <div class="bg-gray-100 dark:bg-dark-900 rounded-lg p-2" style="min-height: 400px">
+            <iframe :srcdoc="previewHtml" sandbox="" referrerpolicy="no-referrer" title="Email preview" class="w-full rounded" style="min-height: 500px; border: none;" />
         </div>
     </Dialog>
 
@@ -259,9 +259,10 @@ function closeEditor() {
                 <div class="mt-4">
                     <!-- Template list -->
                     <div v-if="!editingTemplate" class="grid gap-3 max-w-4xl">
-                        <div v-for="group in templates" :key="group.slug"
-                             class="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
-                             @click="editTemplate(group)">
+                        <button v-for="group in templates" :key="group.slug"
+                                type="button"
+                                class="w-full text-left bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors focus-visible:outline-2 focus-visible:outline-indigo-500"
+                                @click="editTemplate(group)">
                             <div>
                                 <h3 class="font-medium">{{ group.name }}</h3>
                                 <p class="text-xs text-gray-500 mt-1">
@@ -272,7 +273,7 @@ function closeEditor() {
                                 </p>
                             </div>
                             <i class="pi pi-chevron-right text-gray-400"></i>
-                        </div>
+                        </button>
                     </div>
 
                     <!-- Template editor -->
@@ -326,8 +327,8 @@ function closeEditor() {
 
                             <div class="flex gap-2 pt-2">
                                 <Button label="Save" icon="pi pi-check" :loading="savingTemplate" @click="saveTemplate" />
-                                <Button label="Preview" icon="pi pi-eye" severity="secondary" :loading="loadingPreview" @click="previewTemplate" />
-                                <Button label="Send test to me" icon="pi pi-send" severity="secondary" :loading="sendingTest" @click="sendTemplateTest" />
+                                <Button label="Preview" icon="pi pi-eye" severity="secondary" :loading="loadingPreview" :disabled="templateForm.isDirty" @click="previewTemplate" :title="templateForm.isDirty ? 'Save changes first' : ''" />
+                                <Button label="Send test to me" icon="pi pi-send" severity="secondary" :loading="sendingTest" :disabled="templateForm.isDirty" @click="sendTemplateTest" :title="templateForm.isDirty ? 'Save changes first' : ''" />
                             </div>
                         </div>
                     </div>

@@ -23,7 +23,7 @@ class MjmlCompiler
             file_put_contents($tmpIn, $mjml);
 
             $process = new Process([
-                'npx', 'mjml', $tmpIn,
+                'npx', '--no-install', 'mjml', $tmpIn,
                 '-o', $tmpOut,
                 '--config.validationLevel', 'soft',
             ]);

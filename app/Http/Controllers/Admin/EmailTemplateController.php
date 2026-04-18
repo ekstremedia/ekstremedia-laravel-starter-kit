@@ -21,7 +21,24 @@ class EmailTemplateController extends Controller
             'heading' => ['nullable', 'string', 'max:255'],
             'body' => ['required', 'string'],
             'action_text' => ['nullable', 'string', 'max:255'],
-            'action_url' => ['nullable', 'string', 'max:500'],
+            'action_url' => [
+                'nullable',
+                'string',
+                'max:500',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! is_string($value) || $value === '') {
+                        return;
+                    }
+
+                    $hasPlaceholder = str_contains($value, '{{');
+                    $isHttpUrl = filter_var($value, FILTER_VALIDATE_URL)
+                        && in_array(parse_url($value, PHP_URL_SCHEME), ['http', 'https'], true);
+
+                    if (! $isHttpUrl && ! $hasPlaceholder) {
+                        $fail('The action URL must be an http(s) URL or contain a template placeholder.');
+                    }
+                },
+            ],
         ]);
 
         $template->update($data);
