@@ -21,7 +21,24 @@
 /storage/framework/views/*.php
 /vendor
 _ide_helper.php
+_ide_helper_models.php
+.phpstorm.meta.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
 /database/*.sqlite
+
+# Agent/tool personal state
+/.agents
+/.claude
+/.codex
+/.mcp.json
+CLAUDE.md
+Plan.md
+# PR review scratchpad — paste a CodeRabbit / CI comment into cr.md locally,
+# work through it, and commit the fixes. The raw review log itself stays out
+# of git.
+cr.md
+
+# Media uploads (dev)
+/storage/media-library

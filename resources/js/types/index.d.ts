@@ -11,14 +11,24 @@ export interface User {
     two_factor_enabled?: boolean;
     created_at?: string;
     full_name: string;
+    avatar_url?: string | null;
+    avatar_thumb_url?: string | null;
     roles?: string[];
     permissions?: string[];
+    unread_notifications_count?: number;
+    is_impersonating?: boolean;
 }
 
 export interface UserSettings {
     locale: string;
     dark_mode: boolean;
     [key: string]: UserSettingValue;
+}
+
+export interface Customer {
+    id: number;
+    slug: string;
+    name: string;
 }
 
 export interface PageProps extends InertiaPageProps {
@@ -29,10 +39,15 @@ export interface PageProps extends InertiaPageProps {
         easy_login_enabled: boolean;
     };
     locale: string;
-    settings: UserSettings;
+    user_settings: UserSettings;
     flash: {
         success?: string;
         error?: string;
         status?: string;
     };
+    tenancy: {
+        enabled: boolean;
+    };
+    customer: Customer | null;
+    customers: Customer[];
 }

@@ -36,3 +36,39 @@
     20%, 60% { transform: translateX(-4px); }
     40%, 80% { transform: translateX(4px); }
 }
+
+/* PrimeVue DataTable — dark mode tint that matches our blue palette */
+.dark .p-datatable .p-datatable-header,
+.dark .p-datatable .p-datatable-footer {
+    background-color: var(--color-dark-850);
+    border-color: var(--color-dark-700);
+    color: #e5e7eb;
+}
+.dark .p-datatable .p-datatable-thead > tr > th {
+    background-color: var(--color-dark-850);
+    color: #c7d2fe;
+    border-color: var(--color-dark-700);
+}
+.dark .p-datatable .p-datatable-tbody > tr > td {
+    background-color: var(--color-dark-900);
+    border-color: var(--color-dark-800);
+    color: #e5e7eb;
+}
+.dark .p-datatable.p-datatable-striped .p-datatable-tbody > tr.p-row-odd > td {
+    background-color: var(--color-dark-850);
+}
+.dark .p-datatable .p-datatable-tbody > tr:hover > td {
+    background-color: color-mix(in srgb, var(--color-dark-700) 80%, #6366f1 10%);
+}
+.dark .p-paginator {
+    background-color: var(--color-dark-900);
+    border-color: var(--color-dark-800);
+    color: #c7d2fe;
+}
+.dark .p-paginator .p-paginator-page.p-highlight {
+    background-color: var(--color-indigo-600, #4f46e5);
+    color: white;
+}
+.dark .p-datatable .p-sortable-column-icon {
+    color: #8ba4c4;
+}

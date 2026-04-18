@@ -7,20 +7,31 @@ on:
     branches: [main]
 
 jobs:
-  tests:
+  backend:
+    name: Backend (Pest)
     runs-on: ubuntu-latest
 
     services:
       postgres:
         image: postgres:17-alpine
         env:
-          POSTGRES_DB: huske_test
-          POSTGRES_USER: huske
+          POSTGRES_DB: starter_test
+          POSTGRES_USER: starter
           POSTGRES_PASSWORD: secret
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U huske"
+          --health-cmd="pg_isready -U starter"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -32,8 +43,49 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: pdo_pgsql, pgsql, mbstring, bcmath, gd, zip, redis
+          extensions: pdo_pgsql, pgsql, mbstring, bcmath, gd, zip, redis, imagick
           coverage: none
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ runner.os }}-${{ hashFiles('**/composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          php artisan storage:link
+
+      - name: Run Pint (check only)
+        run: vendor/bin/pint --test
+
+      - name: Run Larastan
+        run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+
+      - name: Run Pest tests
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: starter_test
+          DB_USERNAME: starter
+          DB_PASSWORD: secret
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+        run: php artisan test --compact
+
+  frontend:
+    name: Frontend (Vitest + tsc)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -41,26 +93,14 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install Composer dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
-
       - name: Install NPM dependencies
         run: npm ci
 
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run Vitest
+        run: npm test
+
       - name: Build assets
         run: npm run build
-
-      - name: Prepare environment
-        run: |
-          cp .env.example .env
-          php artisan key:generate
-
-      - name: Run tests
-        env:
-          DB_CONNECTION: pgsql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 5432
-          DB_DATABASE: huske_test
-          DB_USERNAME: huske
-          DB_PASSWORD: secret
-        run: php artisan test

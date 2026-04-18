@@ -4,11 +4,14 @@ import { useI18n } from 'vue-i18n';
 import { computed, onMounted, ref } from 'vue';
 import { gsap } from 'gsap';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import { useCustomer } from '@/composables/useCustomer';
 import type { PageProps } from '@/types';
 
 const { t, locale } = useI18n();
 const page = usePage<PageProps>();
 const user = computed(() => page.props.auth.user!);
+const { customerUrl } = useCustomer();
+const profileUrl = computed(() => customerUrl('/profile'));
 
 const cardsRef = ref<HTMLElement>();
 
@@ -111,7 +114,7 @@ onMounted(() => {
             <!-- Quick link -->
             <div class="mt-6">
                 <Link
-                    href="/profile"
+                    :href="profileUrl"
                     class="inline-flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
                 >
                     {{ t('dashboard.manage_profile') }}
