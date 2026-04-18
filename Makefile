@@ -6,10 +6,14 @@ endif
 APP_SERVICE ?= app
 DB_SERVICE ?= postgres
 
-# Build display URL: append port only when set and not 80
+# Build display URL: use APP_URL as-is when it already contains a port or
+# when APP_HOST_PORT is empty/80. Only append the port when needed.
+HAS_PORT := $(shell echo '$(APP_URL)' | grep -cE ':[0-9]+$$')
 ifeq ($(APP_HOST_PORT),)
 DISPLAY_URL := $(APP_URL)
 else ifeq ($(APP_HOST_PORT),80)
+DISPLAY_URL := $(APP_URL)
+else ifeq ($(HAS_PORT),1)
 DISPLAY_URL := $(APP_URL)
 else
 DISPLAY_URL := $(APP_URL):$(APP_HOST_PORT)
