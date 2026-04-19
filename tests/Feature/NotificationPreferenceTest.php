@@ -15,7 +15,7 @@ beforeEach(function () {
 
 it('renders the notification preferences page', function () {
     $this->actingAs($this->user)
-        ->get(customerUrl($this->customer, '/settings/notifications'))
+        ->get('/settings/notifications')
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('Settings/Notifications')
@@ -29,13 +29,13 @@ it('renders the notification preferences page', function () {
 });
 
 it('requires auth to view preferences', function () {
-    $this->get(customerUrl($this->customer, '/settings/notifications'))
+    $this->get('/settings/notifications')
         ->assertRedirect();
 });
 
 it('saves notification preferences', function () {
     $this->actingAs($this->user)
-        ->put(customerUrl($this->customer, '/settings/notifications'), [
+        ->put('/settings/notifications', [
             'notification_email_immediate' => true,
             'notification_digest' => 'daily',
             'notification_chat_messages' => false,
@@ -54,7 +54,7 @@ it('saves notification preferences', function () {
 
 it('validates digest frequency value', function () {
     $this->actingAs($this->user)
-        ->putJson(customerUrl($this->customer, '/settings/notifications'), [
+        ->putJson('/settings/notifications', [
             'notification_email_immediate' => true,
             'notification_digest' => 'hourly', // invalid
             'notification_chat_messages' => true,
@@ -67,7 +67,7 @@ it('validates digest frequency value', function () {
 
 it('requires all preference fields', function () {
     $this->actingAs($this->user)
-        ->putJson(customerUrl($this->customer, '/settings/notifications'), [
+        ->putJson('/settings/notifications', [
             'notification_email_immediate' => true,
             // missing other fields
         ])

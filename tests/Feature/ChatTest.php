@@ -26,9 +26,9 @@ beforeEach(function () {
     joinCustomer($this->charlie, $this->customer);
 });
 
-function chatUrl(mixed $customer, string $path = ''): string
+function chatUrl(string $path = ''): string
 {
-    return customerUrl($customer, '/chat'.$path);
+    return '/chat'.$path;
 }
 
 // ── Feature flag ────────────────────────────────────────────────
@@ -37,13 +37,13 @@ it('returns 404 when chat is disabled', function () {
     config()->set('chat.enabled', false);
 
     $this->actingAs($this->alice)
-        ->get(chatUrl($this->customer))
+        ->get(chatUrl())
         ->assertNotFound();
 });
 
 it('renders the chat page when enabled', function () {
     $this->actingAs($this->alice)
-        ->get(chatUrl($this->customer))
+        ->get(chatUrl())
         ->assertOk()
         ->assertInertia(fn ($page) => $page->component('Chat'));
 });
@@ -52,7 +52,7 @@ it('renders the chat page when enabled', function () {
 
 it('creates a 1:1 conversation', function () {
     $response = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id],
         ]);
 
@@ -68,13 +68,13 @@ it('creates a 1:1 conversation', function () {
 it('returns existing conversation for duplicate 1:1', function () {
     // Create first
     $first = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id],
         ]);
 
     // Try again
     $second = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id],
         ]);
 
@@ -87,7 +87,7 @@ it('returns existing conversation for duplicate 1:1', function () {
 
 it('creates a group conversation with multiple users', function () {
     $response = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id, $this->charlie->id],
         ]);
 
@@ -100,14 +100,14 @@ it('creates a group conversation with multiple users', function () {
 
 it('rejects creating a conversation with invalid user ids', function () {
     $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [99999],
         ])
         ->assertUnprocessable();
 });
 
 it('requires authentication to create a conversation', function () {
-    $this->postJson(chatUrl($this->customer, '/conversations'), [
+    $this->postJson(chatUrl('/conversations'), [
         'user_ids' => [$this->bob->id],
     ])->assertUnauthorized();
 });
@@ -119,13 +119,13 @@ it('sends a message in a conversation', function () {
 
     // Create conversation first
     $convResponse = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id],
         ]);
     $convId = $convResponse->json('conversation.id');
 
     $response = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, "/conversations/{$convId}/messages"), [
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
             'body' => 'Hello Bob!',
         ]);
 
@@ -145,13 +145,13 @@ it('updates last_message_at when sending a message', function () {
     Event::fake([MessageSent::class]);
 
     $convResponse = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id],
         ]);
     $convId = $convResponse->json('conversation.id');
 
     $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, "/conversations/{$convId}/messages"), [
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
             'body' => 'Hi!',
         ]);
 
@@ -162,14 +162,14 @@ it('updates last_message_at when sending a message', function () {
 it('prevents non-participants from sending messages', function () {
     // Alice creates a conversation with Bob
     $convResponse = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id],
         ]);
     $convId = $convResponse->json('conversation.id');
 
     // Charlie is NOT a participant — should get 403
     $this->actingAs($this->charlie)
-        ->postJson(chatUrl($this->customer, "/conversations/{$convId}/messages"), [
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
             'body' => 'Snooping!',
         ])
         ->assertForbidden();
@@ -179,13 +179,13 @@ it('rejects empty messages', function () {
     Event::fake([MessageSent::class]);
 
     $convResponse = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id],
         ]);
     $convId = $convResponse->json('conversation.id');
 
     $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, "/conversations/{$convId}/messages"), [
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
             'body' => '',
         ])
         ->assertUnprocessable();
@@ -197,7 +197,7 @@ it('returns paginated messages for a conversation', function () {
     Event::fake([MessageSent::class]);
 
     $convResponse = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id],
         ]);
     $convId = $convResponse->json('conversation.id');
@@ -205,13 +205,13 @@ it('returns paginated messages for a conversation', function () {
     // Send a few messages
     foreach (['Hello', 'How are you?', 'Fine thanks'] as $body) {
         $this->actingAs($this->alice)
-            ->postJson(chatUrl($this->customer, "/conversations/{$convId}/messages"), [
+            ->postJson(chatUrl("/conversations/{$convId}/messages"), [
                 'body' => $body,
             ]);
     }
 
     $response = $this->actingAs($this->alice)
-        ->getJson(chatUrl($this->customer, "/conversations/{$convId}"));
+        ->getJson(chatUrl("/conversations/{$convId}"));
 
     $response->assertOk()
         ->assertJsonCount(3, 'messages')
@@ -220,13 +220,13 @@ it('returns paginated messages for a conversation', function () {
 
 it('prevents non-participants from reading messages', function () {
     $convResponse = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id],
         ]);
     $convId = $convResponse->json('conversation.id');
 
     $this->actingAs($this->charlie)
-        ->getJson(chatUrl($this->customer, "/conversations/{$convId}"))
+        ->getJson(chatUrl("/conversations/{$convId}"))
         ->assertForbidden();
 });
 
@@ -236,14 +236,14 @@ it('marks a conversation as read', function () {
     Event::fake([MessageSent::class]);
 
     $convResponse = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id],
         ]);
     $convId = $convResponse->json('conversation.id');
 
     // Bob sends a message
     $this->actingAs($this->bob)
-        ->postJson(chatUrl($this->customer, "/conversations/{$convId}/messages"), [
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
             'body' => 'Hey Alice!',
         ]);
 
@@ -253,7 +253,7 @@ it('marks a conversation as read', function () {
 
     // Alice marks as read
     $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, "/conversations/{$convId}/read"))
+        ->postJson(chatUrl("/conversations/{$convId}/read"))
         ->assertOk();
 
     expect($conversation->unreadCountFor($this->alice))->toBe(0);
@@ -263,7 +263,7 @@ it('marks a conversation as read', function () {
 
 it('searches users by name', function () {
     $response = $this->actingAs($this->alice)
-        ->getJson(chatUrl($this->customer, '/users/search?q=Bob'));
+        ->getJson(chatUrl('/users/search?q=Bob'));
 
     $response->assertOk()
         ->assertJsonCount(1, 'users')
@@ -272,7 +272,7 @@ it('searches users by name', function () {
 
 it('excludes the current user from search results', function () {
     $response = $this->actingAs($this->alice)
-        ->getJson(chatUrl($this->customer, '/users/search?q=Alice'));
+        ->getJson(chatUrl('/users/search?q=Alice'));
 
     $response->assertOk()
         ->assertJsonCount(0, 'users');
@@ -280,7 +280,7 @@ it('excludes the current user from search results', function () {
 
 it('requires a search query', function () {
     $this->actingAs($this->alice)
-        ->getJson(chatUrl($this->customer, '/users/search'))
+        ->getJson(chatUrl('/users/search'))
         ->assertUnprocessable();
 });
 
@@ -291,16 +291,16 @@ it('lists conversations for the authenticated user', function () {
 
     // Alice creates 2 conversations
     $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id],
         ]);
     $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->charlie->id],
         ]);
 
     $response = $this->actingAs($this->alice)
-        ->get(chatUrl($this->customer));
+        ->get(chatUrl());
 
     $response->assertOk()
         ->assertInertia(fn ($page) => $page
@@ -312,13 +312,13 @@ it('lists conversations for the authenticated user', function () {
 it('does not show conversations the user is not part of', function () {
     // Alice creates a conversation with Bob
     $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id],
         ]);
 
     // Charlie should see 0 conversations
     $this->actingAs($this->charlie)
-        ->get(chatUrl($this->customer))
+        ->get(chatUrl())
         ->assertInertia(fn ($page) => $page
             ->component('Chat')
             ->has('conversations', 0)
@@ -332,19 +332,19 @@ it('shares unread_messages_count via Inertia', function () {
 
     // Create conversation and send a message from Bob to Alice
     $convResponse = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id],
         ]);
     $convId = $convResponse->json('conversation.id');
 
     $this->actingAs($this->bob)
-        ->postJson(chatUrl($this->customer, "/conversations/{$convId}/messages"), [
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
             'body' => 'Unread message!',
         ]);
 
     // Alice sees 1 unread in shared props
     $this->actingAs($this->alice)
-        ->get(customerUrl($this->customer, '/dashboard'))
+        ->get(customerUrl($this->customer, '/dashboard'))  // dashboard is still customer-scoped
         ->assertInertia(fn ($page) => $page->where('auth.user.unread_messages_count', 1));
 });
 
@@ -355,39 +355,39 @@ it('allows two users to exchange messages', function () {
 
     // Create conversation
     $convResponse = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id],
         ]);
     $convId = $convResponse->json('conversation.id');
 
     // Alice sends
     $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, "/conversations/{$convId}/messages"), [
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
             'body' => 'Hi Bob!',
         ])
         ->assertCreated();
 
     // Bob sends
     $this->actingAs($this->bob)
-        ->postJson(chatUrl($this->customer, "/conversations/{$convId}/messages"), [
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
             'body' => 'Hi Alice!',
         ])
         ->assertCreated();
 
     // Alice sends again
     $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, "/conversations/{$convId}/messages"), [
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
             'body' => 'How are you?',
         ])
         ->assertCreated();
 
     // Both see all 3 messages
     $aliceMessages = $this->actingAs($this->alice)
-        ->getJson(chatUrl($this->customer, "/conversations/{$convId}"));
+        ->getJson(chatUrl("/conversations/{$convId}"));
     $aliceMessages->assertJsonCount(3, 'messages');
 
     $bobMessages = $this->actingAs($this->bob)
-        ->getJson(chatUrl($this->customer, "/conversations/{$convId}"));
+        ->getJson(chatUrl("/conversations/{$convId}"));
     $bobMessages->assertJsonCount(3, 'messages');
 });
 
@@ -395,7 +395,7 @@ it('tracks unread counts per user correctly', function () {
     Event::fake([MessageSent::class]);
 
     $convResponse = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id],
         ]);
     $convId = $convResponse->json('conversation.id');
@@ -406,7 +406,7 @@ it('tracks unread counts per user correctly', function () {
             $this->travel(1)->seconds();
         }
         $this->actingAs($this->alice)
-            ->postJson(chatUrl($this->customer, "/conversations/{$convId}/messages"), [
+            ->postJson(chatUrl("/conversations/{$convId}/messages"), [
                 'body' => $body,
             ]);
     }
@@ -421,7 +421,7 @@ it('tracks unread counts per user correctly', function () {
     // Bob marks as read
     $this->travel(1)->seconds();
     $this->actingAs($this->bob)
-        ->postJson(chatUrl($this->customer, "/conversations/{$convId}/read"));
+        ->postJson(chatUrl("/conversations/{$convId}/read"));
 
     $conversation = Conversation::find($convId);
     expect($conversation->unreadCountFor($this->bob))->toBe(0);
@@ -429,7 +429,7 @@ it('tracks unread counts per user correctly', function () {
     // Alice sends one more after Bob marked as read
     $this->travel(1)->seconds();
     $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, "/conversations/{$convId}/messages"), [
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
             'body' => 'Msg 4',
         ]);
 
@@ -442,35 +442,35 @@ it('handles group messaging correctly', function () {
 
     // Create group with all three
     $convResponse = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id, $this->charlie->id],
         ]);
     $convId = $convResponse->json('conversation.id');
 
     // Each person sends a message with time gaps so timestamps differ
     $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, "/conversations/{$convId}/messages"), [
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
             'body' => 'Hello group!',
         ]);
 
     $this->travel(1)->seconds();
 
     $this->actingAs($this->bob)
-        ->postJson(chatUrl($this->customer, "/conversations/{$convId}/messages"), [
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
             'body' => 'Hey everyone!',
         ]);
 
     $this->travel(1)->seconds();
 
     $this->actingAs($this->charlie)
-        ->postJson(chatUrl($this->customer, "/conversations/{$convId}/messages"), [
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
             'body' => 'Hi all!',
         ]);
 
     // All three see 3 messages
     foreach ([$this->alice, $this->bob, $this->charlie] as $user) {
         $this->actingAs($user)
-            ->getJson(chatUrl($this->customer, "/conversations/{$convId}"))
+            ->getJson(chatUrl("/conversations/{$convId}"))
             ->assertJsonCount(3, 'messages');
     }
 
@@ -488,13 +488,13 @@ it('encrypts messages at rest when enabled', function () {
     config()->set('chat.encryption_enabled', true);
 
     $convResponse = $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, '/conversations'), [
+        ->postJson(chatUrl('/conversations'), [
             'user_ids' => [$this->bob->id],
         ]);
     $convId = $convResponse->json('conversation.id');
 
     $this->actingAs($this->alice)
-        ->postJson(chatUrl($this->customer, "/conversations/{$convId}/messages"), [
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
             'body' => 'Secret message',
         ]);
 

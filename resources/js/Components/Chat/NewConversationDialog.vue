@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
 import { ref, watch } from 'vue';
-import { useCustomer } from '@/composables/useCustomer';
 import type { ChatUser } from '@/composables/useChat';
 
 const props = defineProps<{
@@ -14,7 +13,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const { customerUrl } = useCustomer();
 
 const query = ref('');
 const results = ref<(ChatUser & { full_name: string })[]>([]);
@@ -31,7 +29,7 @@ watch(query, (val) => {
     }
     searching.value = true;
     searchTimeout = setTimeout(() => {
-        fetch(customerUrl(`/chat/users/search?q=${encodeURIComponent(val.trim())}`), {
+        fetch(`/chat/users/search?q=${encodeURIComponent(val.trim())}`, {
             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         })
             .then(r => r.json())

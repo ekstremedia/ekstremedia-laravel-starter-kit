@@ -17,8 +17,8 @@ const appName = import.meta.env.VITE_APP_NAME || t('app.name');
 const { customer, tenancyEnabled, customerUrl } = useCustomer();
 const dashboardUrl = computed(() => customerUrl('/dashboard'));
 const profileUrl = computed(() => customerUrl('/profile'));
-const chatUrl = computed(() => customerUrl('/chat'));
-const notificationSettingsUrl = computed(() => customerUrl('/settings/notifications'));
+const chatUrl = '/chat';
+const notificationSettingsUrl = '/settings/notifications';
 const notificationsReadAllUrl = computed(() => customerUrl('/notifications/read-all'));
 const chatEnabled = computed(() => page.props.chat?.enabled ?? false);
 const unreadMessagesCount = computed(() => user.value?.unread_messages_count ?? 0);
@@ -259,7 +259,7 @@ function initials(u: { first_name: string; last_name: string }) {
                         </template>
 
                         <!-- Chat messages -->
-                        <template v-if="user && chatEnabled && showCustomerNav">
+                        <template v-if="user && chatEnabled">
                             <Link
                                 :href="chatUrl"
                                 class="relative p-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-dark-800"
@@ -328,7 +328,6 @@ function initials(u: { first_name: string; last_name: string }) {
                                             {{ t('nav.profile') }}
                                         </Link>
                                         <Link
-                                            v-if="showCustomerNav"
                                             :href="notificationSettingsUrl"
                                             class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800"
                                         >

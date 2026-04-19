@@ -13,8 +13,10 @@ use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SystemInfoController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\DevLoginController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CustomerLandingController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\NotificationPreferenceController;
 use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -44,6 +46,20 @@ Route::middleware('auth')->group(function () {
         Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.central.readAll');
         Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.central.destroy');
         Route::delete('/notifications', [NotificationController::class, 'destroyAll'])->name('notifications.central.destroyAll');
+
+        // Notification preferences
+        Route::get('/settings/notifications', [NotificationPreferenceController::class, 'index'])->name('settings.notifications');
+        Route::put('/settings/notifications', [NotificationPreferenceController::class, 'update'])->name('settings.notifications.update');
+
+        // Chat (only when CHAT_ENABLED=true)
+        Route::middleware('chat.enabled')->group(function () {
+            Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
+            Route::post('/chat/conversations', [ChatController::class, 'store'])->name('chat.conversations.store');
+            Route::get('/chat/conversations/{conversation}', [ChatController::class, 'show'])->name('chat.conversations.show');
+            Route::post('/chat/conversations/{conversation}/messages', [ChatController::class, 'sendMessage'])->name('chat.conversations.sendMessage');
+            Route::post('/chat/conversations/{conversation}/read', [ChatController::class, 'markRead'])->name('chat.conversations.markRead');
+            Route::get('/chat/users/search', [ChatController::class, 'searchUsers'])->name('chat.users.search');
+        });
     });
 });
 

@@ -8,7 +8,6 @@ import MessageThread from '@/Components/Chat/MessageThread.vue';
 import MessageInput from '@/Components/Chat/MessageInput.vue';
 import NewConversationDialog from '@/Components/Chat/NewConversationDialog.vue';
 import { useChat } from '@/composables/useChat';
-import { useCustomer } from '@/composables/useCustomer';
 import type { ChatConversation, ChatMessage } from '@/composables/useChat';
 import type { PageProps } from '@/types';
 
@@ -19,7 +18,6 @@ const props = defineProps<{
 const { t } = useI18n();
 const page = usePage<PageProps>();
 const user = computed(() => page.props.auth.user!);
-const { customerUrl } = useCustomer();
 const { messages: realtimeMessages, typingUser, joinConversation, whisperTyping } = useChat();
 
 const conversationList = ref<ChatConversation[]>([...props.conversations]);
@@ -51,7 +49,7 @@ function selectConversation(conversation: ChatConversation) {
 
 function fetchMessages(conversationId: number, cursor?: string) {
     loadingMessages.value = true;
-    const url = customerUrl(`/chat/conversations/${conversationId}`) + (cursor ? `?cursor=${cursor}` : '');
+    const url = `/chat/conversations/${conversationId}` + (cursor ? `?cursor=${cursor}` : '');
 
     fetch(url, {
         headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
@@ -116,7 +114,7 @@ function sendMessage(body: string) {
         headers['X-Socket-ID'] = socketId;
     }
 
-    fetch(customerUrl(`/chat/conversations/${activeConversation.value.id}/messages`), {
+    fetch(`/chat/conversations/${activeConversation.value.id}/messages`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ body }),
@@ -147,7 +145,7 @@ function sendMessage(body: string) {
 }
 
 function markRead(conversationId: number) {
-    fetch(customerUrl(`/chat/conversations/${conversationId}/read`), {
+    fetch(`/chat/conversations/${conversationId}/read`, {
         method: 'POST',
         headers: {
             'Accept': 'application/json',
@@ -164,7 +162,7 @@ function handleTyping() {
 }
 
 function createConversation(userIds: number[]) {
-    fetch(customerUrl('/chat/conversations'), {
+    fetch('/chat/conversations', {
         method: 'POST',
         headers: {
             'Accept': 'application/json',
@@ -185,7 +183,7 @@ function createConversation(userIds: number[]) {
 }
 
 function reloadConversations(selectId?: number) {
-    router.visit(customerUrl('/chat'), {
+    router.visit('/chat', {
         preserveState: false,
         onSuccess: (page) => {
             const newConversations = (page.props as any).conversations ?? [];

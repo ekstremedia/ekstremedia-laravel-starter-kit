@@ -6,7 +6,6 @@ import { gsap } from 'gsap';
 import { useToast } from 'primevue/usetoast';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
-import { useCustomer } from '@/composables/useCustomer';
 
 const props = defineProps<{
     preferences: {
@@ -20,7 +19,6 @@ const props = defineProps<{
 
 const { t } = useI18n();
 const toast = useToast();
-const { customerUrl } = useCustomer();
 
 const form = useForm({
     notification_email_immediate: props.preferences.notification_email_immediate,
@@ -46,7 +44,7 @@ onMounted(() => {
 });
 
 function submit() {
-    form.put(customerUrl('/settings/notifications'), {
+    form.put('/settings/notifications', {
         preserveScroll: true,
         onSuccess: () => {
             toast.add({ severity: 'success', summary: t('notification_settings.saved'), life: 3000 });
