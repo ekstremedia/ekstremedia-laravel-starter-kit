@@ -9,3 +9,7 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
 Broadcast::channel('admin.health', function ($user) {
     return $user !== null && $user->hasRole('Admin');
 });
+
+Broadcast::channel('chat.conversation.{conversationId}', function ($user, $conversationId) {
+    return $user->conversations()->whereKey((int) $conversationId)->exists();
+});

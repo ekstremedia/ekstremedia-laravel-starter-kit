@@ -58,6 +58,9 @@ class HandleInertiaRequests extends Middleware
                     'roles' => $request->user()->getRoleNames()->toArray(),
                     'permissions' => $request->user()->getAllPermissions()->pluck('name')->toArray(),
                     'unread_notifications_count' => $request->user()->unreadNotifications()->count(),
+                    'unread_messages_count' => config('chat.enabled')
+                        ? $request->user()->unreadMessagesCount()
+                        : 0,
                     'is_impersonating' => session()->has('impersonated_by'),
                 ] : null,
             ],
@@ -79,6 +82,9 @@ class HandleInertiaRequests extends Middleware
             'app_settings' => fn () => $this->appSettings(),
             'tenancy' => [
                 'enabled' => (bool) config('tenancy.enabled'),
+            ],
+            'chat' => [
+                'enabled' => (bool) config('chat.enabled'),
             ],
             'customer' => fn () => $this->currentCustomer(),
             // `customers` is only consumed by the picker page (which already

@@ -15,6 +15,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Lab404\Impersonate\Models\Impersonate;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Scout\Searchable;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 use Spatie\Image\Enums\Fit;
@@ -30,7 +31,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     public const ROLE_ADMIN = 'Admin';
 
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasRoles, Impersonate, InteractsWithMedia, LogsActivity, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, HasRoles, Impersonate, InteractsWithMedia, LogsActivity, Notifiable, Searchable, TwoFactorAuthenticatable;
 
     public function canImpersonate(): bool
     {
@@ -115,9 +116,62 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
             ->useLogName('user');
     }
 
+    /**
+     * @return array{
+     *     id: int|string|null,
+     *     first_name: string|null,
+     *     last_name: string|null,
+     * }
+     */
+    public function toSearchableArray(): array
+    {
+        // `email` is intentionally omitted — indexing it in external Scout
+        // backends (Meilisearch, Algolia, etc.) leaks PII beyond what the
+        // chat/user UI exposes, and every user-facing search UX in the app
+        // filters by name only.
+        return [
+            'id' => $this->id,
+            'first_name' => $this->first_name,
+            'last_name' => $this->last_name,
+        ];
+    }
+
     public function setting(): HasOne
     {
         return $this->hasOne(UserSetting::class);
+    }
+
+    /**
+     * Conversations this user is a participant in.
+     *
+     * @return BelongsToMany<Conversation, $this>
+     */
+    public function conversations(): BelongsToMany
+    {
+        return $this->belongsToMany(Conversation::class)
+            ->withPivot('last_read_at')
+            ->withTimestamps();
+    }
+
+    /**
+     * Count total unread messages across all conversations for this user.
+     * Single aggregate query joining the conversation_user pivot.
+     */
+    public function unreadMessagesCount(): int
+    {
+        return Message::query()
+            ->join('conversation_user', 'conversation_user.conversation_id', '=', 'messages.conversation_id')
+            ->where('conversation_user.user_id', $this->id)
+            // Deleted-sender rows (user_id IS NULL) still count as "not mine".
+            ->where(function ($q): void {
+                $q->where('messages.user_id', '!=', $this->id)
+                    ->orWhereNull('messages.user_id');
+            })
+            ->where(function ($q): void {
+                $q->whereNull('conversation_user.last_read_at')
+                    ->orWhereColumn('messages.created_at', '>', 'conversation_user.last_read_at');
+            })
+            ->count();
     }
 
     /**
@@ -170,6 +224,12 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
 
     /**
      * Send the password reset notification using the MJML template.
+     *
+     * @param  string  $token
+     *
+     * Note: we can't add a `string` type hint here — the parent
+     * `Illuminate\Foundation\Auth\User::sendPasswordResetNotification` has an
+     * untyped parameter, and tightening the signature breaks LSP at runtime.
      */
     public function sendPasswordResetNotification($token): void
     {

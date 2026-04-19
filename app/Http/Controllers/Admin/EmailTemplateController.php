@@ -125,12 +125,19 @@ class EmailTemplateController extends Controller
                         return;
                     }
 
-                    $hasPlaceholder = str_contains($value, '{{');
-                    $isHttpUrl = filter_var($value, FILTER_VALIDATE_URL)
-                        && in_array(parse_url($value, PHP_URL_SCHEME), ['http', 'https'], true);
+                    $value = trim($value);
+                    $scheme = parse_url($value, PHP_URL_SCHEME);
+                    $scheme = is_string($scheme) ? strtolower($scheme) : null;
+                    $isHttpUrl = filter_var($value, FILTER_VALIDATE_URL) !== false
+                        && in_array($scheme, ['http', 'https'], true);
 
-                    if (! $isHttpUrl && ! $hasPlaceholder) {
-                        $fail('The action URL must be an http(s) URL or contain a template placeholder.');
+                    // Placeholders are OK only at the start of the value — a
+                    // prefixed unsafe scheme like "javascript:{{ app_url }}"
+                    // must be rejected even though it contains `{{`.
+                    $startsWithPlaceholder = preg_match('/^\s*\{\{\s*[^}]+\s*\}\}/', $value) === 1;
+
+                    if (! $isHttpUrl && ! $startsWithPlaceholder) {
+                        $fail('The action URL must be an http(s) URL or start with a template placeholder.');
                     }
                 },
             ],

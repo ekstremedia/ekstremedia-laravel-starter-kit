@@ -89,7 +89,7 @@ class EmailTemplate extends Model
      */
     public function interpolateSubject(array $data): string
     {
-        $subject = $this->subject;
+        $subject = $this->subject ?? '';
 
         foreach ($data as $key => $value) {
             $subject = str_replace('{{ '.$key.' }}', $value, $subject);

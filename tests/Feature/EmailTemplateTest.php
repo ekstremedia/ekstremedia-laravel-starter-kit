@@ -10,7 +10,9 @@ use Database\Seeders\EmailTemplateSeeder;
 use Illuminate\Support\Facades\Notification;
 
 it('compiles valid MJML to HTML', function () {
-    $compiler = app(MjmlCompiler::class);
+    // Instantiate the real compiler directly — the global test binding swaps
+    // in a fake compiler to keep the rest of the suite fast.
+    $compiler = new MjmlCompiler;
 
     $html = $compiler->compile('<mjml><mj-body><mj-section><mj-column><mj-text>Hello</mj-text></mj-column></mj-section></mj-body></mjml>');
 
@@ -18,11 +20,11 @@ it('compiles valid MJML to HTML', function () {
     expect($html)->toContain('<!doctype html>');
 });
 
-it('seeds all 14 templates', function () {
+it('seeds all 18 templates', function () {
     $this->seed(EmailTemplateSeeder::class);
 
-    expect(EmailTemplate::count())->toBe(14);
-    expect(EmailTemplate::whereNotNull('compiled_html')->count())->toBe(14);
+    expect(EmailTemplate::count())->toBe(18);
+    expect(EmailTemplate::whereNotNull('compiled_html')->count())->toBe(18);
 });
 
 it('finds template by slug and locale', function () {
