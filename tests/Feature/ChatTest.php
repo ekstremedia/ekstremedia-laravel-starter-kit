@@ -511,3 +511,85 @@ it('encrypts messages at rest when enabled', function () {
         // But the model accessor decrypts it
         ->and($message->body)->toBe('Secret message');
 });
+
+// ── Conversations list JSON endpoint (dropdown) ─────────────────
+
+it('returns conversations as JSON for the dropdown', function () {
+    Event::fake([MessageSent::class]);
+
+    $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->bob->id]]);
+
+    $response = $this->actingAs($this->alice)
+        ->getJson('/chat/conversations-list');
+
+    $response->assertOk()
+        ->assertJsonCount(1, 'conversations')
+        ->assertJsonPath('conversations.0.participants.0.first_name', fn ($v) => in_array($v, ['Alice', 'Bob']));
+});
+
+it('filters conversations by unread', function () {
+    Event::fake([MessageSent::class]);
+
+    // Create a conversation and send a message from Bob
+    $convResponse = $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->bob->id]]);
+    $convId = $convResponse->json('conversation.id');
+
+    $this->travel(1)->seconds();
+
+    $this->actingAs($this->bob)
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), ['body' => 'Hey!']);
+
+    // Create another conversation with no messages
+    $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->charlie->id]]);
+
+    // filter=all → 2 conversations
+    $this->actingAs($this->alice)
+        ->getJson('/chat/conversations-list?filter=all')
+        ->assertJsonCount(2, 'conversations');
+
+    // filter=unread → only the one with Bob's message
+    $this->actingAs($this->alice)
+        ->getJson('/chat/conversations-list?filter=unread')
+        ->assertJsonCount(1, 'conversations');
+});
+
+it('filters conversations by groups', function () {
+    Event::fake([MessageSent::class]);
+
+    // 1:1 conversation
+    $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->bob->id]]);
+
+    // Group conversation
+    $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->bob->id, $this->charlie->id]]);
+
+    // filter=groups → only the group
+    $this->actingAs($this->alice)
+        ->getJson('/chat/conversations-list?filter=groups')
+        ->assertJsonCount(1, 'conversations')
+        ->assertJsonPath('conversations.0.is_group', true);
+});
+
+it('searches conversations by participant name', function () {
+    Event::fake([MessageSent::class]);
+
+    $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->bob->id]]);
+    $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->charlie->id]]);
+
+    // Search for Bob → only the conversation with Bob
+    $response = $this->actingAs($this->alice)
+        ->getJson('/chat/conversations-list?q=Bob');
+
+    $response->assertOk()
+        ->assertJsonCount(1, 'conversations');
+});
+
+it('requires auth for conversations-list', function () {
+    $this->getJson('/chat/conversations-list')->assertUnauthorized();
+});

@@ -15,6 +15,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Lab404\Impersonate\Models\Impersonate;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Scout\Searchable;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 use Spatie\Image\Enums\Fit;
@@ -30,7 +31,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     public const ROLE_ADMIN = 'Admin';
 
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasRoles, Impersonate, InteractsWithMedia, LogsActivity, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, HasRoles, Impersonate, InteractsWithMedia, LogsActivity, Notifiable, Searchable, TwoFactorAuthenticatable;
 
     public function canImpersonate(): bool
     {
@@ -113,6 +114,19 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
             ->logOnly(['first_name', 'last_name', 'email', 'email_verified_at'])
             ->logOnlyDirty()
             ->useLogName('user');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'first_name' => $this->first_name,
+            'last_name' => $this->last_name,
+            'email' => $this->email,
+        ];
     }
 
     public function setting(): HasOne

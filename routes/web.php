@@ -54,6 +54,7 @@ Route::middleware('auth')->group(function () {
         // Chat (only when CHAT_ENABLED=true)
         Route::middleware('chat.enabled')->group(function () {
             Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
+            Route::get('/chat/conversations-list', [ChatController::class, 'conversationsJson'])->name('chat.conversations.list');
             Route::post('/chat/conversations', [ChatController::class, 'store'])->name('chat.conversations.store');
             Route::get('/chat/conversations/{conversation}', [ChatController::class, 'show'])->name('chat.conversations.show');
             Route::post('/chat/conversations/{conversation}/messages', [ChatController::class, 'sendMessage'])->name('chat.conversations.sendMessage');

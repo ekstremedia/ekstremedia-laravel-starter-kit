@@ -462,5 +462,10 @@ export default {
         unknown_user: 'Ukjent bruker',
         start_chat: 'Start chat',
         decrypt_failed: 'Kryptert melding — kan ikke dekryptere',
+        filter_all: 'Alle',
+        filter_unread: 'Uleste',
+        filter_groups: 'Grupper',
+        search_conversations: 'Søk i samtaler…',
+        open_messages: 'Åpne meldinger',
     },
 };

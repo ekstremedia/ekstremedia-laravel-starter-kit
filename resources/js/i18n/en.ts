@@ -462,5 +462,10 @@ export default {
         unknown_user: 'Unknown user',
         start_chat: 'Start chat',
         decrypt_failed: 'Encrypted message — unable to decrypt',
+        filter_all: 'All',
+        filter_unread: 'Unread',
+        filter_groups: 'Groups',
+        search_conversations: 'Search conversations…',
+        open_messages: 'Open Messages',
     },
 };

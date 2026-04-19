@@ -59,6 +59,74 @@ class ChatController extends Controller
         ]);
     }
 
+    /**
+     * Lightweight JSON endpoint for the chat dropdown.
+     */
+    public function conversationsJson(Request $request): JsonResponse
+    {
+        $request->validate([
+            'filter' => 'sometimes|in:all,unread,groups',
+            'q' => 'sometimes|string|max:100',
+        ]);
+
+        $user = $request->user();
+        $filter = $request->input('filter', 'all');
+
+        $query = Conversation::forUser($user->id)
+            ->with(['users:id,first_name,last_name', 'latestMessage.user:id,first_name,last_name'])
+            ->orderByDesc('last_message_at')
+            ->orderByDesc('created_at');
+
+        if ($filter === 'groups') {
+            $query->where('is_group', true);
+        }
+
+        if ($q = $request->input('q')) {
+            $matchingUserIds = User::search($q)->keys();
+            $query->whereHas('users', fn ($sub) => $sub->whereIn('user_id', $matchingUserIds));
+        }
+
+        $models = $query->limit(15)->get();
+
+        $conversations = [];
+
+        foreach ($models as $c) {
+            $latest = $c->latestMessage;
+            $unreadCount = $c->unreadCountFor($user);
+
+            // Skip non-unread when filtering
+            if ($filter === 'unread' && $unreadCount === 0) {
+                continue;
+            }
+
+            $conversations[] = [
+                'id' => $c->id,
+                'title' => $c->title,
+                'is_group' => $c->is_group,
+                'participants' => $c->users->map(fn (User $u) => [
+                    'id' => $u->id,
+                    'first_name' => $u->first_name,
+                    'last_name' => $u->last_name,
+                    'avatar_thumb_url' => $u->avatarUrl('thumb'),
+                ])->values()->all(),
+                'latest_message' => $latest ? [
+                    'id' => $latest->id,
+                    'body' => $latest->body,
+                    'user_id' => $latest->user_id,
+                    'user' => [
+                        'id' => $latest->user->id,
+                        'first_name' => $latest->user->first_name,
+                    ],
+                    'created_at' => $latest->created_at->toISOString(),
+                ] : null,
+                'unread_count' => $unreadCount,
+                'last_message_at' => $c->last_message_at?->toISOString(),
+            ];
+        }
+
+        return response()->json(['conversations' => $conversations]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([

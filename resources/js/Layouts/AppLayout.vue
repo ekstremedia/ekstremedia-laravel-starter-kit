@@ -5,6 +5,7 @@ import { computed, ref, watch } from 'vue';
 import Toast from 'primevue/toast';
 import LanguageSwitcher from '@/Components/LanguageSwitcher.vue';
 import DarkModeToggle from '@/Components/DarkModeToggle.vue';
+import ChatDropdown from '@/Components/Chat/ChatDropdown.vue';
 import { useFlashToast } from '@/composables/useFlashToast';
 import { useCustomer } from '@/composables/useCustomer';
 import type { PageProps } from '@/types';
@@ -17,7 +18,6 @@ const appName = import.meta.env.VITE_APP_NAME || t('app.name');
 const { customer, tenancyEnabled, customerUrl } = useCustomer();
 const dashboardUrl = computed(() => customerUrl('/dashboard'));
 const profileUrl = computed(() => customerUrl('/profile'));
-const chatUrl = '/chat';
 const notificationSettingsUrl = '/settings/notifications';
 const notificationsReadAllUrl = computed(() => customerUrl('/notifications/read-all'));
 const chatEnabled = computed(() => page.props.chat?.enabled ?? false);
@@ -260,17 +260,7 @@ function initials(u: { first_name: string; last_name: string }) {
 
                         <!-- Chat messages -->
                         <template v-if="user && chatEnabled">
-                            <Link
-                                :href="chatUrl"
-                                class="relative p-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-dark-800"
-                                :aria-label="t('chat.title')"
-                            >
-                                <i class="pi pi-comments text-lg text-gray-600 dark:text-gray-300"></i>
-                                <span
-                                    v-if="unreadMessagesCount > 0"
-                                    class="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 rounded-full bg-indigo-500 text-white text-[10px] font-semibold flex items-center justify-center"
-                                >{{ unreadMessagesCount > 99 ? '99+' : unreadMessagesCount }}</span>
-                            </Link>
+                            <ChatDropdown :unread-count="unreadMessagesCount" :current-user-id="user.id" />
                         </template>
 
                         <!-- User dropdown -->
