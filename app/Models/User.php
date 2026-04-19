@@ -121,6 +121,44 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     }
 
     /**
+     * Conversations this user is a participant in.
+     *
+     * @return BelongsToMany<Conversation, $this>
+     */
+    public function conversations(): BelongsToMany
+    {
+        return $this->belongsToMany(Conversation::class)
+            ->withPivot('last_read_at')
+            ->withTimestamps();
+    }
+
+    /**
+     * Count total unread messages across all conversations for this user.
+     */
+    public function unreadMessagesCount(): int
+    {
+        $count = 0;
+
+        $this->conversations()
+            ->with('latestMessage')
+            ->get()
+            ->each(function (Conversation $conversation) use (&$count) {
+                $lastRead = $conversation->pivot?->getAttribute('last_read_at');
+
+                $query = $conversation->messages()
+                    ->where('user_id', '!=', $this->id);
+
+                if ($lastRead) {
+                    $query->where('created_at', '>', $lastRead);
+                }
+
+                $count += $query->count();
+            });
+
+        return $count;
+    }
+
+    /**
      * Customers (a.k.a. tenants in package-speak) this user is a member of.
      * The underlying model is `App\Models\Tenant` because stancl/tenancy's base
      * contract names it that way; at the application layer we call them customers.

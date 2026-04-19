@@ -17,7 +17,11 @@ const appName = import.meta.env.VITE_APP_NAME || t('app.name');
 const { customer, tenancyEnabled, customerUrl } = useCustomer();
 const dashboardUrl = computed(() => customerUrl('/dashboard'));
 const profileUrl = computed(() => customerUrl('/profile'));
+const chatUrl = computed(() => customerUrl('/chat'));
+const notificationSettingsUrl = computed(() => customerUrl('/settings/notifications'));
 const notificationsReadAllUrl = computed(() => customerUrl('/notifications/read-all'));
+const chatEnabled = computed(() => page.props.chat?.enabled ?? false);
+const unreadMessagesCount = computed(() => user.value?.unread_messages_count ?? 0);
 // Customer-scoped nav entries show in the layout when either tenancy is off
 // (single-tenant mode, routes at root) or a customer is actively in scope.
 const showCustomerNav = computed(() => !tenancyEnabled.value || Boolean(customer.value));
@@ -254,6 +258,21 @@ function initials(u: { first_name: string; last_name: string }) {
                             </div>
                         </template>
 
+                        <!-- Chat messages -->
+                        <template v-if="user && chatEnabled && showCustomerNav">
+                            <Link
+                                :href="chatUrl"
+                                class="relative p-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-dark-800"
+                                :aria-label="t('chat.title')"
+                            >
+                                <i class="pi pi-comments text-lg text-gray-600 dark:text-gray-300"></i>
+                                <span
+                                    v-if="unreadMessagesCount > 0"
+                                    class="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 rounded-full bg-indigo-500 text-white text-[10px] font-semibold flex items-center justify-center"
+                                >{{ unreadMessagesCount > 99 ? '99+' : unreadMessagesCount }}</span>
+                            </Link>
+                        </template>
+
                         <!-- User dropdown -->
                         <template v-if="user">
                             <div class="relative">
@@ -307,6 +326,13 @@ function initials(u: { first_name: string; last_name: string }) {
                                             class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800"
                                         >
                                             {{ t('nav.profile') }}
+                                        </Link>
+                                        <Link
+                                            v-if="showCustomerNav"
+                                            :href="notificationSettingsUrl"
+                                            class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800"
+                                        >
+                                            <i class="pi pi-cog mr-2 text-xs"></i>{{ t('notification_settings.title') }}
                                         </Link>
                                         <Link
                                             v-if="isAdmin"

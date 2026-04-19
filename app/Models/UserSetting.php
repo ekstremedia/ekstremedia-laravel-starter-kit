@@ -20,6 +20,11 @@ class UserSetting extends Model
     public static array $defaults = [
         'locale' => 'en',
         'dark_mode' => true,
+        'notification_email_immediate' => false,
+        'notification_digest' => 'none', // 'none', 'daily', 'weekly'
+        'notification_chat_messages' => true,
+        'notification_account_updates' => true,
+        'notification_system_alerts' => true,
     ];
 
     public function user(): BelongsTo

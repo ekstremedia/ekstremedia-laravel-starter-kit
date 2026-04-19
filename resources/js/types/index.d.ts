@@ -16,6 +16,7 @@ export interface User {
     roles?: string[];
     permissions?: string[];
     unread_notifications_count?: number;
+    unread_messages_count?: number;
     is_impersonating?: boolean;
 }
 
@@ -46,6 +47,9 @@ export interface PageProps extends InertiaPageProps {
         status?: string;
     };
     tenancy: {
+        enabled: boolean;
+    };
+    chat: {
         enabled: boolean;
     };
     customer: Customer | null;

@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\AvatarController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\NotificationPreferenceController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -35,3 +37,17 @@ Route::post('/notifications/{id}/read', [NotificationController::class, 'markRea
 Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.readAll');
 Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
 Route::delete('/notifications', [NotificationController::class, 'destroyAll'])->name('notifications.destroyAll');
+
+// Notification preferences (standalone — not gated by chat)
+Route::get('/settings/notifications', [NotificationPreferenceController::class, 'index'])->name('settings.notifications');
+Route::put('/settings/notifications', [NotificationPreferenceController::class, 'update'])->name('settings.notifications.update');
+
+// Chat (only when CHAT_ENABLED=true)
+Route::middleware('chat.enabled')->group(function () {
+    Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
+    Route::post('/chat/conversations', [ChatController::class, 'store'])->name('chat.conversations.store');
+    Route::get('/chat/conversations/{conversation}', [ChatController::class, 'show'])->name('chat.conversations.show');
+    Route::post('/chat/conversations/{conversation}/messages', [ChatController::class, 'sendMessage'])->name('chat.conversations.sendMessage');
+    Route::post('/chat/conversations/{conversation}/read', [ChatController::class, 'markRead'])->name('chat.conversations.markRead');
+    Route::get('/chat/users/search', [ChatController::class, 'searchUsers'])->name('chat.users.search');
+});
