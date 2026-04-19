@@ -200,6 +200,113 @@ it('accepts file attachments on a message', function () {
     expect($message->getMedia('attachments'))->toHaveCount(2);
 });
 
+it('counts messages from a deleted sender as unread', function () {
+    Event::fake([MessageSent::class]);
+    Notification::fake();
+
+    // Bob sends a message, then is deleted (simulating the ON DELETE SET NULL).
+    $convId = $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->bob->id]])
+        ->json('conversation.id');
+
+    $this->actingAs($this->bob)
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), ['body' => 'ghost']);
+
+    // Zero out the sender column to mimic a deleted user.
+    Message::query()->update(['user_id' => null]);
+
+    // Alice hasn't read yet — unread count should still include the orphan row.
+    expect($this->alice->fresh()->unreadMessagesCount())->toBe(1);
+});
+
+it('excludes the requester from conversation search matches', function () {
+    Event::fake([MessageSent::class]);
+    Notification::fake();
+
+    // Alice + Bob in a direct chat.
+    $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->bob->id]]);
+
+    // Alice searches for her own first name — the search predicate must not
+    // match her own user row, so no conversations should come back.
+    $response = $this->actingAs($this->alice)
+        ->get(chatUrl('/conversations-list?q='.$this->alice->first_name))
+        ->assertOk();
+
+    $ids = collect($response->json('conversations'))->pluck('id');
+    expect($ids)->toBeEmpty();
+});
+
+it('returns the existing direct conversation on a duplicate create', function () {
+    Event::fake([MessageSent::class]);
+    Notification::fake();
+
+    $first = $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->bob->id]])
+        ->assertCreated()
+        ->json('conversation.id');
+
+    $second = $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->bob->id]])
+        ->assertOk()
+        ->assertJsonPath('existing', true)
+        ->json('conversation.id');
+
+    expect($second)->toBe($first);
+});
+
+it('rejects attachments with blocked executable extensions', function () {
+    Event::fake([MessageSent::class]);
+    Notification::fake();
+    Storage::fake('public');
+
+    $convId = $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->bob->id]])
+        ->json('conversation.id');
+
+    $evil = UploadedFile::fake()->create('backdoor.php', 4, 'application/x-php');
+
+    $this->actingAs($this->alice)
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
+            'body' => 'try this',
+            'attachments' => [$evil],
+        ])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('attachments.0');
+});
+
+it('lets a conversation participant download an attachment', function () {
+    Event::fake([MessageSent::class]);
+    Notification::fake();
+    Storage::fake('public');
+
+    $convId = $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->bob->id]])
+        ->json('conversation.id');
+
+    $doc = UploadedFile::fake()->create('notes.pdf', 12, 'application/pdf');
+    $response = $this->actingAs($this->alice)
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
+            'body' => 'pdf here',
+            'attachments' => [$doc],
+        ])
+        ->assertCreated();
+
+    $mediaId = $response->json('message.attachments.0.id');
+    expect($mediaId)->not->toBeNull();
+
+    // Recipient can download.
+    $this->actingAs($this->bob)
+        ->get(chatUrl("/conversations/{$convId}/attachments/{$mediaId}"))
+        ->assertOk()
+        ->assertDownload('notes.pdf');
+
+    // Non-participant is forbidden.
+    $this->actingAs($this->charlie)
+        ->get(chatUrl("/conversations/{$convId}/attachments/{$mediaId}"))
+        ->assertForbidden();
+});
+
 it('requires either a body or attachments', function () {
     Event::fake([MessageSent::class]);
     Notification::fake();

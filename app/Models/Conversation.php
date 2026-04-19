@@ -82,7 +82,11 @@ class Conversation extends Model
         /** @phpstan-ignore method.nonObject */
         $lastRead = $this->users()->where('user_id', $user->id)->first()?->pivot?->getAttribute('last_read_at');
 
-        $query = $this->messages()->where('user_id', '!=', $user->id);
+        // "Not sent by me" must also match deleted-sender rows (user_id IS NULL),
+        // otherwise orphaned messages silently drop out of unread counts.
+        $query = $this->messages()->where(function (Builder $q) use ($user): void {
+            $q->where('user_id', '!=', $user->id)->orWhereNull('user_id');
+        });
 
         if ($lastRead) {
             $query->where('created_at', '>', $lastRead);

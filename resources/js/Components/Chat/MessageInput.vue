@@ -127,6 +127,7 @@ function formatSize(bytes: number): string {
             <li
                 v-for="(f, i) in pendingFiles"
                 :key="i"
+                :title="f.name"
                 class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 dark:bg-dark-800 text-xs text-gray-700 dark:text-gray-200"
             >
                 <i class="pi pi-paperclip text-[10px]"></i>
@@ -173,6 +174,7 @@ function formatSize(bytes: number): string {
                 style="min-height: 2.5rem;"
             ></textarea>
             <button
+                type="button"
                 @click="send"
                 :disabled="!body.trim() && pendingFiles.length === 0"
                 class="h-10 w-10 shrink-0 flex items-center justify-center rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"

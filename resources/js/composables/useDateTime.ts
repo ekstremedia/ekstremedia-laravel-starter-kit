@@ -28,7 +28,12 @@ export function formatDateTime(iso: string | null | undefined): string {
         normalised = iso + 'Z';
     }
 
-    return new Date(normalised).toLocaleString(undefined, {
+    const date = new Date(normalised);
+    if (Number.isNaN(date.getTime())) {
+        return '\u2014';
+    }
+
+    return date.toLocaleString(undefined, {
         timeZone: browserTz,
     });
 }
@@ -47,7 +52,12 @@ export function formatDate(iso: string | null | undefined): string {
         normalised = iso + 'Z';
     }
 
-    return new Date(normalised).toLocaleDateString(undefined, {
+    const date = new Date(normalised);
+    if (Number.isNaN(date.getTime())) {
+        return '\u2014';
+    }
+
+    return date.toLocaleDateString(undefined, {
         timeZone: browserTz,
     });
 }

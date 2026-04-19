@@ -208,6 +208,7 @@ function closeEditor() {
 </script>
 
 <template>
+    <div>
     <Head title="Mail · Admin" />
 
     <!-- Preview dialog -->
@@ -362,4 +363,5 @@ function closeEditor() {
             </TabPanel>
         </TabPanels>
     </Tabs>
+    </div>
 </template>

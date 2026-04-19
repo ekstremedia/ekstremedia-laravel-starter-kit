@@ -121,16 +121,18 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
      *     id: int|string|null,
      *     first_name: string|null,
      *     last_name: string|null,
-     *     email: string|null,
      * }
      */
     public function toSearchableArray(): array
     {
+        // `email` is intentionally omitted — indexing it in external Scout
+        // backends (Meilisearch, Algolia, etc.) leaks PII beyond what the
+        // chat/user UI exposes, and every user-facing search UX in the app
+        // filters by name only.
         return [
             'id' => $this->id,
             'first_name' => $this->first_name,
             'last_name' => $this->last_name,
-            'email' => $this->email,
         ];
     }
 
@@ -160,7 +162,11 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         return Message::query()
             ->join('conversation_user', 'conversation_user.conversation_id', '=', 'messages.conversation_id')
             ->where('conversation_user.user_id', $this->id)
-            ->where('messages.user_id', '!=', $this->id)
+            // Deleted-sender rows (user_id IS NULL) still count as "not mine".
+            ->where(function ($q): void {
+                $q->where('messages.user_id', '!=', $this->id)
+                    ->orWhereNull('messages.user_id');
+            })
             ->where(function ($q): void {
                 $q->whereNull('conversation_user.last_read_at')
                     ->orWhereColumn('messages.created_at', '>', 'conversation_user.last_read_at');

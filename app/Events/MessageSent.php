@@ -37,7 +37,9 @@ class MessageSent implements ShouldBroadcast
      */
     public function broadcastWith(): array
     {
-        $attachments = $this->message->getMedia('attachments')->map(function ($m) {
+        $conversationId = $this->message->conversation_id;
+
+        $attachments = $this->message->getMedia('attachments')->map(function ($m) use ($conversationId) {
             $isImage = str_starts_with((string) $m->mime_type, 'image/');
 
             return [
@@ -48,6 +50,10 @@ class MessageSent implements ShouldBroadcast
                 'is_image' => $isImage,
                 'url' => $m->getUrl(),
                 'thumb_url' => $isImage && $m->hasGeneratedConversion('thumb') ? $m->getUrl('thumb') : null,
+                'download_url' => route('chat.conversations.attachments.download', [
+                    'conversation' => $conversationId,
+                    'media' => $m->id,
+                ]),
             ];
         })->values()->all();
 

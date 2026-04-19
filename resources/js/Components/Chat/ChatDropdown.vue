@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import { useToast } from 'primevue/usetoast';
 import Dialog from 'primevue/dialog';
@@ -32,6 +32,30 @@ const quickReplyVisible = computed({
         if (!v) quickReplyTarget.value = null;
     },
 });
+
+watch(quickReplyTarget, (target) => {
+    if (target) focusQuickReplyInput();
+});
+
+// Autofocus the textarea once the dialog's show animation has settled.
+// PrimeVue's Dialog teleports its body into document.body and re-asserts
+// focus onto the close button during its show sequence, so a single focus
+// call loses the race. Retry through the first few frames; bail once the
+// textarea has focus or the dialog is gone.
+function focusQuickReplyInput() {
+    let tries = 0;
+    const tryFocus = () => {
+        if (!quickReplyTarget.value || tries > 10) return;
+        const el = document.querySelector<HTMLTextAreaElement>('textarea[data-quick-reply-input]');
+        if (el && document.activeElement !== el) {
+            el.focus();
+        }
+        if (document.activeElement === el) return;
+        tries++;
+        setTimeout(tryFocus, 30);
+    };
+    tryFocus();
+}
 
 function fetchConversations() {
     const requestId = ++conversationsRequestId;
@@ -148,9 +172,12 @@ function sendQuickReply() {
             return r.json();
         })
         .then(() => {
-            const prevUnread = target.unread_count ?? 0;
-            if (prevUnread > 0) decrementMessages(prevUnread);
+            // Read unread_count from the live row rather than the captured
+            // target — "mark all viewed" could have zeroed it between dialog
+            // open and reply completion.
             const idx = conversations.value.findIndex((c) => c.id === target.id);
+            const prevUnread = idx !== -1 ? (conversations.value[idx].unread_count ?? 0) : 0;
+            if (prevUnread > 0) decrementMessages(prevUnread);
             if (idx !== -1) conversations.value[idx].unread_count = 0;
             quickReplyTarget.value = null;
         })
@@ -369,25 +396,39 @@ const filters = ['all', 'unread', 'groups'] as const;
         <!-- Click-outside backdrop -->
         <div v-if="open" @click="open = false" class="fixed inset-0 z-40"></div>
 
-        <!-- Quick reply dialog -->
+        <!-- Quick reply dialog. pt overrides PrimeVue's default surface
+             palette so the dialog matches the app's dark-blue theme
+             (otherwise the Aura preset renders a neutral grey that clashes
+             with our custom dark-* palette in app.css). p-2 padding on
+             content prevents the textarea's focus ring from being clipped
+             against the dialog's rounded edge. -->
         <Dialog
             v-model:visible="quickReplyVisible"
             :modal="true"
             :draggable="false"
             :dismissable-mask="true"
             :close-on-escape="true"
+            @show="focusQuickReplyInput"
             :style="{ width: 'min(420px, calc(100vw - 2rem))' }"
             :header="quickReplyTarget ? t('chat.quick_reply_to', { name: displayName(quickReplyTarget) }) : t('chat.quick_reply')"
+            :pt="{
+                root: 'bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded-2xl shadow-xl',
+                header: 'bg-white dark:bg-dark-900 px-5 py-4 border-b border-gray-200 dark:border-dark-700 rounded-t-2xl',
+                title: 'text-base font-semibold text-gray-900 dark:text-gray-100',
+                content: 'bg-white dark:bg-dark-900 px-5 py-4',
+                footer: 'bg-white dark:bg-dark-900 px-5 py-3 border-t border-gray-200 dark:border-dark-700 rounded-b-2xl',
+                mask: 'bg-black/50',
+            }"
         >
-            <div class="space-y-3">
-                <textarea
-                    v-model="quickReplyBody"
-                    rows="3"
-                    class="w-full rounded-xl border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                    :placeholder="t('chat.reply_placeholder')"
-                    @keydown.enter.exact.prevent="sendQuickReply"
-                ></textarea>
-            </div>
+            <textarea
+                data-quick-reply-input
+                v-model="quickReplyBody"
+                rows="3"
+                autofocus
+                class="w-full rounded-xl border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                :placeholder="t('chat.reply_placeholder')"
+                @keydown.enter.exact.prevent="sendQuickReply"
+            ></textarea>
             <template #footer>
                 <div class="flex justify-end gap-2">
                     <button

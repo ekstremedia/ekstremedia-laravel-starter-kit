@@ -31,17 +31,26 @@
         </mj-text>
 
         {{-- Only render the CTA when we have both a label and a safe URL.
-             Safe = http(s) URL OR contains a template placeholder (which is
-             substituted at render time and has its own validation upstream).
-             Anything else (javascript:, data:, file:, etc.) is dropped. --}}
+             Safe = http(s) URL, OR a placeholder at the START of the string
+             (so "javascript:{{ x }}" is rejected even though it contains a
+             placeholder). Any other scheme (javascript:, data:, file:, …) is
+             dropped. --}}
         @php
             $isSafeActionUrl = false;
             if (is_string($actionUrl) && $actionUrl !== '') {
+                $actionUrl = trim($actionUrl);
+                $scheme = parse_url($actionUrl, PHP_URL_SCHEME);
+                $scheme = is_string($scheme) ? strtolower($scheme) : null;
+
                 if (str_contains($actionUrl, '{{')) {
-                    $isSafeActionUrl = true;
+                    // Placeholder is OK only when it appears at the start of
+                    // the URL (will resolve to the placeholder's value) —
+                    // prefixes like "javascript:" must reject.
+                    $isSafeActionUrl = preg_match('/^\s*\{\{\s*[^}]+\s*\}\}/', $actionUrl) === 1
+                        || in_array($scheme, ['http', 'https'], true);
                 } else {
-                    $scheme = parse_url($actionUrl, PHP_URL_SCHEME);
-                    $isSafeActionUrl = in_array($scheme, ['http', 'https'], true);
+                    $isSafeActionUrl = filter_var($actionUrl, FILTER_VALIDATE_URL) !== false
+                        && in_array($scheme, ['http', 'https'], true);
                 }
             }
         @endphp

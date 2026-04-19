@@ -56,7 +56,10 @@ class NewChatMessageNotification extends Notification implements ShouldBroadcast
         return $this->renderTemplate('new-chat-message', $notifiable, [
             'sender_name' => $this->sender->fullName(),
             'message_preview' => $this->messagePreview(),
-            'app_name' => config('app.name'),
+            'app_name' => (string) config('app.name'),
+            // The new-chat-message template CTA uses {{ app_url }}/chat, so
+            // we must pass app_url or the button link ends up unresolved.
+            'app_url' => (string) config('app.url'),
         ]);
     }
 

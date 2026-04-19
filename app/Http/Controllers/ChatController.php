@@ -7,14 +7,18 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
 use App\Notifications\NewChatMessageNotification;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
 use Inertia\Response;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ChatController extends Controller
 {
@@ -33,7 +37,7 @@ class ChatController extends Controller
         $conversations = [];
 
         foreach ($models as $c) {
-            $conversations[] = $this->formatConversation($c, $user, $unreadMap[$c->id] ?? 0);
+            $conversations[] = $this->formatConversation($c, $unreadMap[$c->id] ?? 0);
         }
 
         return Inertia::render('Chat', [
@@ -66,13 +70,17 @@ class ChatController extends Controller
         if ($filter === 'unread') {
             // Push the unread condition into SQL so the LIMIT returns 15
             // *unread* conversations, not 15 total of which some may be read.
+            // Deleted-sender messages (user_id IS NULL) still count as unread.
             $query->whereHas('users', function ($sub) use ($user) {
                 $sub->where('user_id', $user->id)
                     ->whereExists(function ($m) use ($user) {
                         $m->select(DB::raw(1))
                             ->from('messages')
                             ->whereColumn('messages.conversation_id', 'conversations.id')
-                            ->where('messages.user_id', '!=', $user->id)
+                            ->where(function ($inner) use ($user) {
+                                $inner->where('messages.user_id', '!=', $user->id)
+                                    ->orWhereNull('messages.user_id');
+                            })
                             ->where(function ($q) {
                                 $q->whereNull('conversation_user.last_read_at')
                                     ->orWhereColumn('messages.created_at', '>', 'conversation_user.last_read_at');
@@ -82,8 +90,16 @@ class ChatController extends Controller
         }
 
         if ($q = $request->input('q')) {
-            $matchingUserIds = User::search($q)->keys();
-            $query->whereHas('users', fn ($sub) => $sub->whereIn('user_id', $matchingUserIds));
+            // Exclude the requester from the match set — otherwise searching for
+            // your own name would match every conversation you're in.
+            $matchingUserIds = User::search($q)
+                ->keys()
+                ->reject(fn ($id) => (int) $id === $user->id)
+                ->values();
+            $query->whereHas('users', fn ($sub) => $sub
+                ->where('user_id', '!=', $user->id)
+                ->whereIn('user_id', $matchingUserIds)
+            );
         }
 
         $models = $query->limit(15)->get();
@@ -94,7 +110,7 @@ class ChatController extends Controller
 
         foreach ($models as $c) {
             $unreadCount = $unreadMap[$c->id] ?? 0;
-            $conversations[] = $this->formatConversation($c, $user, $unreadCount);
+            $conversations[] = $this->formatConversation($c, $unreadCount);
         }
 
         return response()->json(['conversations' => $conversations]);
@@ -118,7 +134,11 @@ class ChatController extends Controller
             ->selectRaw('messages.conversation_id, COUNT(*) AS unread')
             ->join('conversation_user', 'conversation_user.conversation_id', '=', 'messages.conversation_id')
             ->where('conversation_user.user_id', $user->id)
-            ->where('messages.user_id', '!=', $user->id)
+            // Deleted-sender rows (user_id IS NULL) still count as "not mine".
+            ->where(function ($inner) use ($user): void {
+                $inner->where('messages.user_id', '!=', $user->id)
+                    ->orWhereNull('messages.user_id');
+            })
             ->whereIn('messages.conversation_id', $ids)
             ->where(function ($q): void {
                 $q->whereNull('conversation_user.last_read_at')
@@ -133,7 +153,7 @@ class ChatController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function formatConversation(Conversation $c, User $user, int $unreadCount): array
+    private function formatConversation(Conversation $c, int $unreadCount): array
     {
         $latest = $c->latestMessage;
 
@@ -207,38 +227,44 @@ class ChatController extends Controller
             return response()->json(['message' => 'At least one other participant is required.'], 422);
         }
 
-        // For any two-party chat, always dedupe against an existing direct conversation.
-        if ($participantIds->count() === 1) {
-            $existing = Conversation::findDirectBetween($user->id, $participantIds->first());
-            if ($existing) {
-                return response()->json([
-                    'conversation' => ['id' => $existing->id],
-                    'existing' => true,
-                ]);
-            }
-        }
-
         $isGroup = $participantIds->count() > 1;
         $title = $validated['title'] ?? null;
         $attachIds = $participantIds->push($user->id)->unique()->all();
+        $otherUserId = $isGroup ? null : $participantIds->first();
 
-        // Wrap create + attach in a single transaction so a failed attach
-        // doesn't leave an orphaned Conversation row behind.
-        $conversation = DB::connection($connection)->transaction(function () use ($title, $isGroup, $user, $attachIds) {
-            $conversation = Conversation::create([
+        // Dedupe + create runs inside a single transaction so two concurrent
+        // requests for the same direct-chat pair can't both miss and create
+        // duplicate conversations. The lockForUpdate on the dedupe read
+        // serializes the two requests against the pivot table.
+        [$conversation, $existed] = DB::connection($connection)->transaction(function () use ($title, $isGroup, $user, $attachIds, $otherUserId) {
+            if ($otherUserId !== null) {
+                $existing = Conversation::where('is_group', false)
+                    ->whereHas('users', fn (Builder $q) => $q->where('user_id', $user->id))
+                    ->whereHas('users', fn (Builder $q) => $q->where('user_id', $otherUserId))
+                    ->withCount('users')
+                    ->lockForUpdate()
+                    ->get()
+                    ->first(fn (Conversation $c) => $c->users_count === 2);
+
+                if ($existing) {
+                    return [$existing, true];
+                }
+            }
+
+            $created = Conversation::create([
                 'title' => $title,
                 'is_group' => $isGroup,
                 'created_by' => $user->id,
             ]);
-            $conversation->users()->attach($attachIds);
+            $created->users()->attach($attachIds);
 
-            return $conversation;
+            return [$created, false];
         });
 
         return response()->json([
             'conversation' => ['id' => $conversation->id],
-            'existing' => false,
-        ], 201);
+            'existing' => $existed,
+        ], $existed ? 200 : 201);
     }
 
     public function show(Request $request, Conversation $conversation): JsonResponse
@@ -289,9 +315,29 @@ class ChatController extends Controller
         $validated = $request->validate([
             'body' => 'nullable|string|max:5000',
             'attachments' => 'sometimes|array|max:10',
-            // Whitelist safe extensions. Anything else (HTML, JS, PHP, etc.)
-            // is rejected outright to avoid serving active content inline.
-            'attachments.*' => 'file|max:10240|mimes:png,jpg,jpeg,gif,webp,pdf,txt,zip,csv,doc,docx,xls,xlsx,ppt,pptx',
+            'attachments.*' => [
+                'file',
+                'max:10240', // 10 MB per file
+                // Denylist server-interpreted / executable extensions. Files
+                // still pass through the download route which forces
+                // Content-Disposition: attachment, so even HTML/SVG/JS can't
+                // execute in the browser — but active server extensions must
+                // be blocked outright in case of a misconfigured web root.
+                function (string $attribute, $value, \Closure $fail): void {
+                    $blocked = [
+                        'php', 'phtml', 'phar', 'php3', 'php4', 'php5', 'php7', 'php8',
+                        'exe', 'bat', 'cmd', 'sh', 'ps1', 'msi', 'dll',
+                        'jsp', 'asp', 'aspx', 'cgi',
+                    ];
+                    if (! $value instanceof UploadedFile) {
+                        return;
+                    }
+                    $ext = strtolower($value->getClientOriginalExtension());
+                    if (in_array($ext, $blocked, true)) {
+                        $fail(__('chat.attachment_blocked_type', ['ext' => $ext]));
+                    }
+                },
+            ],
         ]);
 
         $hasFiles = $request->hasFile('attachments');
@@ -302,24 +348,15 @@ class ChatController extends Controller
         }
 
         /** @var Message $message */
-        $message = DB::connection($conversation->getConnectionName())->transaction(function () use ($conversation, $validated, $request) {
-            $message = $conversation->messages()->create([
-                'user_id' => $request->user()->id,
-                'body' => $validated['body'] ?? '',
-            ]);
+        $message = $conversation->messages()->create([
+            'user_id' => $request->user()->id,
+            'body' => $validated['body'] ?? '',
+        ]);
 
-            $conversation->update(['last_message_at' => now()]);
-
-            // Mark as read for the sender
-            $conversation->users()->updateExistingPivot($request->user()->id, [
-                'last_read_at' => now(),
-            ]);
-
-            $message->load('user:id,first_name,last_name');
-
-            return $message;
-        });
-
+        // Save attachments before touching conversation metadata so a failed
+        // upload doesn't leave a stale last_message_at / last_read_at bump
+        // visible to participants. If attachment storage throws, delete the
+        // message row we just created and re-throw.
         if ($hasFiles) {
             try {
                 /** @var UploadedFile $file */
@@ -328,26 +365,45 @@ class ChatController extends Controller
                 }
                 $message->load('media');
             } catch (\Throwable $e) {
-                // Roll back: delete the already-committed message row and any
-                // media rows spatie created before the failure — otherwise we
-                // leave an empty-body message visible to participants. The
-                // delete() call cascades to the `media` table.
                 $message->delete();
 
                 throw $e;
             }
         }
 
+        // Now that the message (and its attachments, if any) are durably
+        // persisted, wrap the metadata bumps in a transaction on the chat
+        // connection so they commit atomically.
+        DB::connection($conversation->getConnectionName())->transaction(function () use ($conversation, $request) {
+            $conversation->update(['last_message_at' => now()]);
+            $conversation->users()->updateExistingPivot($request->user()->id, [
+                'last_read_at' => now(),
+            ]);
+        });
+
+        $message->load('user:id,first_name,last_name');
+
         broadcast(new MessageSent($message, $request->user()))->toOthers();
 
-        // Notify every other participant (database + broadcast, mail if enabled).
+        // Notification delivery must not fail the already-sent message — the
+        // client would retry and duplicate. Log and swallow instead.
         $sender = $request->user();
         $recipients = $conversation->users()
             ->where('user_id', '!=', $sender->id)
             ->get();
 
         if ($recipients->isNotEmpty()) {
-            Notification::send($recipients, new NewChatMessageNotification($message, $sender));
+            try {
+                Notification::send($recipients, new NewChatMessageNotification($message, $sender));
+            } catch (\Throwable $e) {
+                Log::warning('Chat message notification delivery failed.', [
+                    'message_id' => $message->id,
+                    'conversation_id' => $conversation->id,
+                    'recipient_count' => $recipients->count(),
+                    'exception' => $e::class,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return response()->json([
@@ -429,11 +485,45 @@ class ChatController extends Controller
     }
 
     /**
+     * Stream a chat attachment to the requesting user, forcing
+     * Content-Disposition: attachment so the browser always downloads the
+     * original file (even HTML/SVG/JS) instead of rendering it inline.
+     * Access is gated on conversation participation.
+     */
+    public function downloadAttachment(Request $request, Conversation $conversation, Media $media): BinaryFileResponse
+    {
+        if (! $conversation->isParticipant($request->user())) {
+            abort(403);
+        }
+
+        // Guard against media rows attached to other models or other
+        // conversations — a participant of conversation A must not be
+        // able to download attachments from conversation B by guessing IDs.
+        if (
+            $media->collection_name !== 'attachments'
+            || $media->model_type !== Message::class
+        ) {
+            abort(404);
+        }
+
+        /** @var Message|null $message */
+        $message = Message::query()->find($media->model_id);
+        if (! $message || $message->conversation_id !== $conversation->id) {
+            abort(404);
+        }
+
+        return response()->download(
+            $media->getPath(),
+            $media->file_name,
+        );
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function formatMessage(Message $message): array
     {
-        $attachments = $message->getMedia('attachments')->map(function ($m) {
+        $attachments = $message->getMedia('attachments')->map(function (Media $m) use ($message) {
             $isImage = str_starts_with((string) $m->mime_type, 'image/');
 
             return [
@@ -442,8 +532,15 @@ class ChatController extends Controller
                 'size' => $m->size,
                 'mime_type' => $m->mime_type,
                 'is_image' => $isImage,
+                // `url` is for inline preview (image thumbs open-in-tab).
+                // `download_url` always forces a save-as through the
+                // authenticated download route, regardless of file type.
                 'url' => $m->getUrl(),
                 'thumb_url' => $isImage && $m->hasGeneratedConversion('thumb') ? $m->getUrl('thumb') : null,
+                'download_url' => route('chat.conversations.attachments.download', [
+                    'conversation' => $message->conversation_id,
+                    'media' => $m->id,
+                ]),
             ];
         })->values()->all();
 

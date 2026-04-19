@@ -13,8 +13,12 @@ export interface ChatAttachment {
     size: number;
     mime_type: string;
     is_image: boolean;
+    /** Inline URL for preview (images open in a new tab). */
     url: string;
+    /** Thumbnail URL for images only. */
     thumb_url: string | null;
+    /** Always forces a browser download via the authenticated chat route. */
+    download_url: string;
 }
 
 export interface ChatMessage {

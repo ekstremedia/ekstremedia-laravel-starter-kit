@@ -115,15 +115,18 @@ function loadMore() {
 }
 
 function handleRealtimeMessage(msg: ChatMessage) {
+    // Ignore stale events from a channel the user just left — the Echo
+    // listener from a previous conversation can still fire briefly after
+    // selecting a new one.
+    if (activeConversation.value?.id !== msg.conversation_id) return;
+
     // Deduplicate — the sender already added the message from the POST response
     if (threadMessages.value.some(m => m.id === msg.id)) return;
 
     threadMessages.value.push(msg);
-    // If this message targets the currently active conversation, mark read
-    // immediately (user is looking at it) and don't bump the global badge.
-    if (activeConversation.value?.id === msg.conversation_id) {
-        markRead(msg.conversation_id);
-    }
+    // User is looking at this conversation, so mark it read immediately and
+    // don't bump the global badge.
+    markRead(msg.conversation_id);
 
     // Update conversation list
     const idx = conversationList.value.findIndex(c => c.id === msg.conversation_id);
@@ -260,7 +263,7 @@ function createConversation(userIds: number[]) {
             }
         })
         .catch(() => {
-            toast.add({ severity: 'error', summary: t('chat.send_failed'), life: 4000 });
+            toast.add({ severity: 'error', summary: t('chat.create_conversation_failed'), life: 4000 });
         });
 }
 

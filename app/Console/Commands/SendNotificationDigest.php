@@ -52,11 +52,10 @@ class SendNotificationDigest extends Command
                 $failed++;
                 Log::error('Notification digest failed to queue', [
                     'user_id' => $user->id,
-                    'email' => $user->email,
                     'frequency' => $frequency,
                     'error' => $e->getMessage(),
                 ]);
-                $this->error("Failed to queue digest for {$user->email}: {$e->getMessage()}");
+                $this->error("Failed to queue digest for user {$user->id}: {$e->getMessage()}");
             }
         }
 

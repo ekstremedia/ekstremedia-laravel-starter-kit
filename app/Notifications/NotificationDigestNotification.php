@@ -24,6 +24,10 @@ class NotificationDigestNotification extends Notification implements ShouldQueue
     ) {}
 
     /**
+     * Intentionally mail-only (contract exception): the digest is a rollup
+     * of DB notifications that already exist in the notifiable's inbox.
+     * Adding a second `database` row would be noise, not a new signal.
+     *
      * @return array<int, string>
      */
     public function via(object $notifiable): array

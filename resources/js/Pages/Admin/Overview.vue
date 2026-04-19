@@ -9,7 +9,7 @@ defineOptions({ layout: AdminLayout });
 const { t } = useI18n();
 
 // `computed` so labels re-evaluate when the user switches locale; a plain
-// `const cards = [...]` captures translations at module-eval time.
+// `const cards = [...]` captures translations once during setup.
 const cards = computed(() => [
     { title: t('admin.overview.users'), href: '/admin/users', icon: 'pi-users', desc: t('admin.overview.users_desc') },
     { title: t('admin.overview.roles'), href: '/admin/roles', icon: 'pi-shield', desc: t('admin.overview.roles_desc') },

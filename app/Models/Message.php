@@ -48,6 +48,13 @@ class Message extends Model implements HasMedia
 
     public function registerMediaConversions(?Media $media = null): void
     {
+        // Only attempt the image thumb conversion for image uploads. Spatie
+        // gracefully skips non-imageable files today, but making it explicit
+        // prevents surprises if the whitelist broadens later.
+        if ($media !== null && ! str_starts_with((string) $media->mime_type, 'image/')) {
+            return;
+        }
+
         $this->addMediaConversion('thumb')
             ->fit(Fit::Contain, 320, 320)
             ->format('webp')
@@ -78,7 +85,11 @@ class Message extends Model implements HasMedia
     protected function body(): Attribute
     {
         return Attribute::make(
-            get: function (string $value): string {
+            get: function (?string $value): string {
+                if ($value === null || $value === '') {
+                    return '';
+                }
+
                 if ($this->is_encrypted) {
                     try {
                         return Crypt::decryptString($value);

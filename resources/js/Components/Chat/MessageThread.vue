@@ -140,33 +140,44 @@ defineExpose({ scrollToBottom });
                 >
                     <p v-if="msg.body" class="whitespace-pre-wrap break-words">{{ msg.body }}</p>
 
-                    <!-- Attachments -->
+                    <!-- Attachments. Images render inline (click → open);
+                         non-images render as a download card. A small
+                         download icon on images offers the same forced-
+                         download path via the authenticated route. -->
                     <div v-if="msg.attachments && msg.attachments.length > 0" class="mt-2 space-y-2">
                         <template v-for="att in msg.attachments" :key="att.id">
-                            <a
-                                v-if="att.is_image"
-                                :href="att.url"
-                                target="_blank"
-                                rel="noopener"
-                                class="block"
-                            >
-                                <img
-                                    :src="att.thumb_url ?? att.url"
-                                    :alt="att.name"
-                                    class="max-w-full rounded-lg max-h-60 object-contain bg-white/10"
-                                />
-                            </a>
+                            <div v-if="att.is_image" class="relative group/attachment">
+                                <a
+                                    :href="att.url"
+                                    target="_blank"
+                                    rel="noopener"
+                                    class="block"
+                                >
+                                    <img
+                                        :src="att.thumb_url ?? att.url"
+                                        :alt="att.name"
+                                        class="max-w-full rounded-lg max-h-60 object-contain bg-white/10"
+                                    />
+                                </a>
+                                <a
+                                    :href="att.download_url"
+                                    class="absolute top-1 right-1 p-1.5 rounded-md bg-black/60 text-white opacity-0 group-hover/attachment:opacity-100 focus:opacity-100 transition-opacity"
+                                    :title="t('chat.download_attachment')"
+                                    :aria-label="t('chat.download_attachment')"
+                                >
+                                    <i class="pi pi-download text-xs"></i>
+                                </a>
+                            </div>
                             <a
                                 v-else
-                                :href="att.url"
-                                target="_blank"
-                                rel="noopener"
-                                download
+                                :href="att.download_url"
+                                :title="att.name"
                                 class="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs"
                                 :class="msg.user_id === currentUserId ? 'bg-indigo-700/50 hover:bg-indigo-700/70' : 'bg-gray-200 dark:bg-dark-700 hover:bg-gray-300 dark:hover:bg-dark-600'"
                             >
                                 <i class="pi pi-file text-sm"></i>
                                 <span class="truncate max-w-[12rem]">{{ att.name }}</span>
+                                <i class="pi pi-download text-[10px] ml-auto opacity-70"></i>
                             </a>
                         </template>
                     </div>

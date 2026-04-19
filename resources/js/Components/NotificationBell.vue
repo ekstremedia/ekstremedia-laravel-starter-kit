@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
+import { useToast } from 'primevue/usetoast';
 import { useCustomer } from '@/composables/useCustomer';
 import { useUnreadCounts } from '@/composables/useUnreadCounts';
 
@@ -14,6 +15,7 @@ interface NotificationItem {
 }
 
 const { t } = useI18n();
+const toast = useToast();
 const { customerUrl } = useCustomer();
 const { notificationsCount: unreadCount, decrementNotifications, setNotifications } = useUnreadCounts();
 
@@ -32,8 +34,30 @@ function fetchNotifications() {
     })
         .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
         .then(json => { notifications.value = json.recent ?? []; })
-        .catch(() => { /* silent */ })
+        .catch(() => {
+            // Surface failures instead of silently leaving the panel blank
+            // (indistinguishable from "you're all caught up").
+            toast.add({ severity: 'error', summary: t('notifications.load_failed'), life: 4000 });
+        })
         .finally(() => { loading.value = false; });
+}
+
+// Reactive now-tick so "2m ago" labels tick forward while the panel is open.
+const nowTick = ref(Date.now());
+let tickHandle: number | undefined;
+onMounted(() => {
+    tickHandle = window.setInterval(() => { nowTick.value = Date.now(); }, 30_000);
+    document.addEventListener('keydown', onKeydown);
+});
+onBeforeUnmount(() => {
+    if (tickHandle !== undefined) window.clearInterval(tickHandle);
+    document.removeEventListener('keydown', onKeydown);
+});
+
+function onKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape' && open.value) {
+        open.value = false;
+    }
 }
 
 watch(open, (v) => {
@@ -87,7 +111,8 @@ function markAllRead() {
 }
 
 function timeAgo(iso: string): string {
-    const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    // Read nowTick.value so Vue re-runs this when the interval fires.
+    const seconds = Math.floor((nowTick.value - new Date(iso).getTime()) / 1000);
     if (seconds < 60) return t('notifications.just_now');
     const minutes = Math.floor(seconds / 60);
     if (minutes < 60) return t('notifications.minutes_ago', { n: minutes });
@@ -95,6 +120,13 @@ function timeAgo(iso: string): string {
     if (hours < 24) return t('notifications.hours_ago', { n: hours });
     const days = Math.floor(hours / 24);
     return t('notifications.days_ago', { n: days });
+}
+
+function notificationTitle(n: NotificationItem): string {
+    if (n.data.title) return n.data.title;
+    // Localize the fallback so screen readers / non-English users never see
+    // a raw PHP class basename like "NewCommentNotification".
+    return t('notifications.untitled');
 }
 </script>
 
@@ -105,6 +137,8 @@ function timeAgo(iso: string): string {
             @click="open = !open"
             class="relative p-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-dark-800 cursor-pointer"
             :aria-label="t('notifications.title')"
+            :aria-expanded="open"
+            aria-haspopup="true"
         >
             <i class="pi pi-bell text-lg text-gray-600 dark:text-gray-300"></i>
             <span
@@ -144,7 +178,7 @@ function timeAgo(iso: string): string {
                         <i :class="n.data.icon ? `pi ${n.data.icon}` : 'pi pi-bell'"
                            class="mt-0.5 text-sm text-indigo-500"></i>
                         <div class="flex-1 min-w-0 cursor-pointer" @click="markOneRead(n)">
-                            <p class="text-sm font-medium truncate">{{ n.data.title ?? n.type }}</p>
+                            <p class="text-sm font-medium truncate">{{ notificationTitle(n) }}</p>
                             <p v-if="n.data.message" class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{{ n.data.message }}</p>
                             <p class="text-[10px] text-gray-400 mt-1">{{ timeAgo(n.created_at) }}</p>
                         </div>
