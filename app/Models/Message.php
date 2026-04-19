@@ -22,7 +22,10 @@ use Illuminate\Support\Facades\Crypt;
  */
 class Message extends Model
 {
-    protected $connection = 'pgsql';
+    public function getConnectionName(): ?string
+    {
+        return config('chat.connection', 'pgsql');
+    }
 
     protected $fillable = ['conversation_id', 'user_id', 'body', 'is_encrypted', 'type'];
 

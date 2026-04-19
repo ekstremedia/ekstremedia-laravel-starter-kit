@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Mail;
 
 class SendNotificationDigest extends Command
@@ -57,7 +58,7 @@ class SendNotificationDigest extends Command
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, DatabaseNotification>  $notifications
+     * @param  Collection<int, DatabaseNotification>  $notifications
      */
     private function buildDigestBody(User $user, $notifications): string
     {
@@ -67,7 +68,7 @@ class SendNotificationDigest extends Command
         foreach ($notifications as $n) {
             $title = $n->data['title'] ?? class_basename($n->type);
             $message = $n->data['message'] ?? '';
-            $lines[] = "• {$title}" . ($message ? " — {$message}" : '');
+            $lines[] = "• {$title}".($message ? " — {$message}" : '');
         }
 
         $lines[] = "\n— ".config('app.name');

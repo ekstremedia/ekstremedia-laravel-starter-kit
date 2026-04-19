@@ -78,6 +78,9 @@ function loadMore() {
 }
 
 function handleRealtimeMessage(msg: ChatMessage) {
+    // Deduplicate — the sender already added the message from the POST response
+    if (threadMessages.value.some(m => m.id === msg.id)) return;
+
     threadMessages.value.push(msg);
     markRead(msg.conversation_id);
 
@@ -95,17 +98,27 @@ function handleRealtimeMessage(msg: ChatMessage) {
     }
 }
 
+function getSocketId(): string {
+    return window.Echo?.socketId?.() ?? '';
+}
+
 function sendMessage(body: string) {
     if (!activeConversation.value) return;
 
+    const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-XSRF-TOKEN': getCsrfToken(),
+    };
+    const socketId = getSocketId();
+    if (socketId) {
+        headers['X-Socket-ID'] = socketId;
+    }
+
     fetch(customerUrl(`/chat/conversations/${activeConversation.value.id}/messages`), {
         method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-XSRF-TOKEN': getCsrfToken(),
-        },
+        headers,
         body: JSON.stringify({ body }),
     })
         .then(r => r.json())

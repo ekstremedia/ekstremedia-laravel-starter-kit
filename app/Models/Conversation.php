@@ -3,12 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @property int $id
@@ -19,14 +22,17 @@ use Illuminate\Support\Carbon;
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read User $creator
- * @property-read \Illuminate\Database\Eloquent\Collection<int, User> $users
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Message> $messages
+ * @property-read Collection<int, User> $users
+ * @property-read Collection<int, Message> $messages
  * @property-read Message|null $latestMessage
- * @property-read \Illuminate\Database\Eloquent\Relations\Pivot|null $pivot
+ * @property-read Pivot|null $pivot
  */
 class Conversation extends Model
 {
-    protected $connection = 'pgsql';
+    public function getConnectionName(): ?string
+    {
+        return config('chat.connection', 'pgsql');
+    }
 
     protected $fillable = ['title', 'is_group', 'created_by', 'last_message_at'];
 
@@ -73,7 +79,7 @@ class Conversation extends Model
      */
     public function unreadCountFor(User $user): int
     {
-        $pivotRow = \Illuminate\Support\Facades\DB::connection('pgsql')
+        $pivotRow = DB::connection(config('chat.connection', 'pgsql'))
             ->table('conversation_user')
             ->where('conversation_id', $this->id)
             ->where('user_id', $user->id)

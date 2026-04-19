@@ -24,4 +24,17 @@ return [
     |
     */
     'encryption_enabled' => (bool) env('CHAT_ENCRYPTION_ENABLED', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Database Connection
+    |--------------------------------------------------------------------------
+    |
+    | Chat tables live in the central (public) schema, not in per-tenant
+    | schemas. This connection is used by the Conversation and Message models.
+    | Defaults to 'pgsql' (the central connection); tests may override this
+    | to use the default in-memory SQLite connection.
+    |
+    */
+    'connection' => env('CHAT_DB_CONNECTION', env('DB_CONNECTION', 'pgsql')),
 ];

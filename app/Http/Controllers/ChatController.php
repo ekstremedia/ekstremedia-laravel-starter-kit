@@ -62,7 +62,7 @@ class ChatController extends Controller
     {
         $validated = $request->validate([
             'user_ids' => 'required|array|min:1',
-            'user_ids.*' => 'required|integer|exists:pgsql.users,id',
+            'user_ids.*' => 'required|integer|exists:'.config('chat.connection', 'pgsql').'.users,id',
             'title' => 'nullable|string|max:255',
         ]);
 
@@ -189,13 +189,17 @@ class ChatController extends Controller
         $query = $request->input('q');
         $user = $request->user();
 
-        $users = User::on('pgsql')
+        $connection = config('chat.connection', 'pgsql');
+        $driver = \Illuminate\Support\Facades\DB::connection($connection)->getDriverName();
+        $op = $driver === 'pgsql' ? 'ilike' : 'like';
+
+        $users = User::on($connection)
             ->where('id', '!=', $user->id)
             ->notBanned()
-            ->where(function ($q) use ($query) {
-                $q->where('first_name', 'ilike', "%{$query}%")
-                    ->orWhere('last_name', 'ilike', "%{$query}%")
-                    ->orWhere('email', 'ilike', "%{$query}%");
+            ->where(function ($q) use ($query, $op) {
+                $q->where('first_name', $op, "%{$query}%")
+                    ->orWhere('last_name', $op, "%{$query}%")
+                    ->orWhere('email', $op, "%{$query}%");
             })
             ->limit(10)
             ->get()
