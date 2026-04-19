@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('title')->nullable();
             $table->boolean('is_group')->default(false);
-            $table->foreignId('created_by')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('last_message_at')->nullable();
             $table->timestamps();
         });

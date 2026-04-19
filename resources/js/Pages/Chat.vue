@@ -18,7 +18,7 @@ const props = defineProps<{
 const { t } = useI18n();
 const page = usePage<PageProps>();
 const user = computed(() => page.props.auth.user!);
-const { messages: realtimeMessages, typingUser, joinConversation, whisperTyping } = useChat();
+const { typingUser, joinConversation, whisperTyping } = useChat();
 
 const conversationList = ref<ChatConversation[]>([...props.conversations]);
 const activeConversation = ref<ChatConversation | null>(null);
@@ -183,8 +183,8 @@ function createConversation(userIds: number[]) {
 }
 
 function reloadConversations(selectId?: number) {
-    router.visit('/chat', {
-        preserveState: false,
+    router.reload({
+        only: ['conversations'],
         onSuccess: (page) => {
             const newConversations = (page.props as any).conversations ?? [];
             conversationList.value = newConversations;

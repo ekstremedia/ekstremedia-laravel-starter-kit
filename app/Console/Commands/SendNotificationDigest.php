@@ -26,7 +26,7 @@ class SendNotificationDigest extends Command
 
         $users = User::notBanned()
             ->whereHas('setting', function ($q) use ($frequency) {
-                $q->whereJsonContains('settings->notification_digest', $frequency);
+                $q->where('settings->notification_digest', $frequency);
             })
             ->get();
 
@@ -60,7 +60,7 @@ class SendNotificationDigest extends Command
     /**
      * @param  Collection<int, DatabaseNotification>  $notifications
      */
-    private function buildDigestBody(User $user, $notifications): string
+    private function buildDigestBody(User $user, \Illuminate\Support\Collection $notifications): string
     {
         $lines = ["Hi {$user->first_name},\n"];
         $lines[] = "Here's a summary of your {$notifications->count()} unread notification(s):\n";

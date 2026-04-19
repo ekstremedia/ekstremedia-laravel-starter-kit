@@ -57,7 +57,7 @@ class Message extends Model
                     try {
                         return Crypt::decryptString($value);
                     } catch (\Throwable) {
-                        return '[encrypted message — unable to decrypt]';
+                        return __('chat.decrypt_failed');
                     }
                 }
 

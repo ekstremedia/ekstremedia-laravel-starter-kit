@@ -331,7 +331,7 @@ function initials(u: { first_name: string; last_name: string }) {
                                             :href="notificationSettingsUrl"
                                             class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800"
                                         >
-                                            <i class="pi pi-cog mr-2 text-xs"></i>{{ t('notification_settings.title') }}
+                                            <i class="pi pi-cog mr-2 text-xs"></i>{{ t('notifications.settings.title') }}
                                         </Link>
                                         <Link
                                             v-if="isAdmin"

@@ -8,6 +8,7 @@ use App\Models\Message;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -68,6 +69,10 @@ class ChatController extends Controller
 
         $user = $request->user();
         $participantIds = collect($validated['user_ids'])->reject(fn ($id) => (int) $id === $user->id);
+
+        if ($participantIds->isEmpty()) {
+            return response()->json(['message' => 'At least one other participant is required.'], 422);
+        }
 
         // For 1:1 chats, check if a conversation already exists
         if ($participantIds->count() === 1 && ! isset($validated['title'])) {
@@ -148,19 +153,23 @@ class ChatController extends Controller
         ]);
 
         /** @var Message $message */
-        $message = $conversation->messages()->create([
-            'user_id' => $request->user()->id,
-            'body' => $validated['body'],
-        ]);
+        $message = DB::connection($conversation->getConnectionName())->transaction(function () use ($conversation, $validated, $request) {
+            $message = $conversation->messages()->create([
+                'user_id' => $request->user()->id,
+                'body' => $validated['body'],
+            ]);
 
-        $conversation->update(['last_message_at' => now()]);
+            $conversation->update(['last_message_at' => now()]);
 
-        // Mark as read for the sender
-        $conversation->users()->updateExistingPivot($request->user()->id, [
-            'last_read_at' => now(),
-        ]);
+            // Mark as read for the sender
+            $conversation->users()->updateExistingPivot($request->user()->id, [
+                'last_read_at' => now(),
+            ]);
 
-        $message->load('user:id,first_name,last_name');
+            $message->load('user:id,first_name,last_name');
+
+            return $message;
+        });
 
         broadcast(new MessageSent($message, $request->user()))->toOthers();
 
@@ -188,18 +197,19 @@ class ChatController extends Controller
 
         $query = $request->input('q');
         $user = $request->user();
+        $escapedQuery = str_replace(['%', '_'], ['\%', '\_'], $query);
 
         $connection = config('chat.connection', 'pgsql');
-        $driver = \Illuminate\Support\Facades\DB::connection($connection)->getDriverName();
+        $driver = DB::connection($connection)->getDriverName();
         $op = $driver === 'pgsql' ? 'ilike' : 'like';
 
         $users = User::on($connection)
             ->where('id', '!=', $user->id)
             ->notBanned()
-            ->where(function ($q) use ($query, $op) {
-                $q->where('first_name', $op, "%{$query}%")
-                    ->orWhere('last_name', $op, "%{$query}%")
-                    ->orWhere('email', $op, "%{$query}%");
+            ->where(function ($q) use ($escapedQuery, $op) {
+                $q->where('first_name', $op, "%{$escapedQuery}%")
+                    ->orWhere('last_name', $op, "%{$escapedQuery}%")
+                    ->orWhere('email', $op, "%{$escapedQuery}%");
             })
             ->limit(10)
             ->get()

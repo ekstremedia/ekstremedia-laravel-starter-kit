@@ -11,16 +11,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
-
 /**
  * @property int $id
  * @property string|null $title
  * @property bool $is_group
- * @property int $created_by
+ * @property int|null $created_by
  * @property Carbon|null $last_message_at
  * @property Carbon $created_at
  * @property Carbon $updated_at
+ * @property-read int|null $users_count
  * @property-read User $creator
  * @property-read Collection<int, User> $users
  * @property-read Collection<int, Message> $messages
@@ -79,12 +78,8 @@ class Conversation extends Model
      */
     public function unreadCountFor(User $user): int
     {
-        $pivotRow = DB::connection(config('chat.connection', 'pgsql'))
-            ->table('conversation_user')
-            ->where('conversation_id', $this->id)
-            ->where('user_id', $user->id)
-            ->first();
-        $lastRead = $pivotRow?->last_read_at;
+        /** @phpstan-ignore method.nonObject */
+        $lastRead = $this->users()->where('user_id', $user->id)->first()?->pivot?->getAttribute('last_read_at');
 
         $query = $this->messages()->where('user_id', '!=', $user->id);
 
@@ -111,7 +106,8 @@ class Conversation extends Model
         return static::where('is_group', false)
             ->whereHas('users', fn (Builder $q) => $q->where('user_id', $userIdA))
             ->whereHas('users', fn (Builder $q) => $q->where('user_id', $userIdB))
+            ->withCount('users')
             ->get()
-            ->first(fn (self $c) => $c->users()->count() === 2);
+            ->first(fn (self $c) => $c->users_count === 2);
     }
 }

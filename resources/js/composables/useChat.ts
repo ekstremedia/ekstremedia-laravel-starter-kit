@@ -80,8 +80,8 @@ export function useChat() {
     }
 
     function whisperTyping(conversationId: number, name: string) {
-        const channelName = `chat.conversation.${conversationId}`;
-        window.Echo?.private(channelName).whisper('typing', { name });
+        if (currentChannelName !== `chat.conversation.${conversationId}`) return;
+        window.Echo?.private(currentChannelName).whisper('typing', { name });
     }
 
     onUnmounted(() => {
