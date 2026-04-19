@@ -5,6 +5,7 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
 use Database\Seeders\RoleAndPermissionSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 
 beforeEach(function () {
@@ -501,7 +502,7 @@ it('encrypts messages at rest when enabled', function () {
     $message = Message::first();
 
     // The raw DB value should NOT be the plaintext
-    $rawBody = \Illuminate\Support\Facades\DB::table('messages')
+    $rawBody = DB::table('messages')
         ->where('id', $message->id)
         ->value('body');
 

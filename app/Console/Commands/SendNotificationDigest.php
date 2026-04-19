@@ -60,7 +60,7 @@ class SendNotificationDigest extends Command
     /**
      * @param  Collection<int, DatabaseNotification>  $notifications
      */
-    private function buildDigestBody(User $user, \Illuminate\Support\Collection $notifications): string
+    private function buildDigestBody(User $user, Collection $notifications): string
     {
         $lines = ["Hi {$user->first_name},\n"];
         $lines[] = "Here's a summary of your {$notifications->count()} unread notification(s):\n";

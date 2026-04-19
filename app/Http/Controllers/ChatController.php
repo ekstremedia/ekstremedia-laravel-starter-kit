@@ -203,14 +203,25 @@ class ChatController extends Controller
         $driver = DB::connection($connection)->getDriverName();
         $op = $driver === 'pgsql' ? 'ilike' : 'like';
 
-        $users = User::on($connection)
+        $usersQuery = User::on($connection)
             ->where('id', '!=', $user->id)
             ->notBanned()
             ->where(function ($q) use ($escapedQuery, $op) {
                 $q->where('first_name', $op, "%{$escapedQuery}%")
                     ->orWhere('last_name', $op, "%{$escapedQuery}%")
                     ->orWhere('email', $op, "%{$escapedQuery}%");
-            })
+            });
+
+        // When tenancy is enabled and user is not admin, limit to users
+        // who share at least one customer (company) with the searcher.
+        if (config('tenancy.enabled') && ! $user->hasRole('Admin')) {
+            $customerIds = $user->customers()->pluck('tenants.id');
+            $usersQuery->whereHas('customers', function ($q) use ($customerIds) {
+                $q->whereIn('tenants.id', $customerIds);
+            });
+        }
+
+        $users = $usersQuery
             ->limit(10)
             ->get()
             ->map(fn (User $u) => [
