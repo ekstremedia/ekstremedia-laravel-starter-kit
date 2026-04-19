@@ -167,21 +167,39 @@ function initials(user: ChatUser): string {
                         <div v-if="searching" class="text-center py-3">
                             <i class="pi pi-spin pi-spinner text-gray-400"></i>
                         </div>
-                        <ul v-else-if="results.length > 0" class="max-h-48 overflow-y-auto divide-y divide-gray-100 dark:divide-dark-800 rounded-xl border border-gray-200 dark:border-dark-700">
+                        <ul
+                            v-else-if="results.length > 0"
+                            role="listbox"
+                            :aria-label="t('chat.search_users')"
+                            class="max-h-48 overflow-y-auto divide-y divide-gray-100 dark:divide-dark-800 rounded-xl border border-gray-200 dark:border-dark-700"
+                        >
                             <li
                                 v-for="u in results"
                                 :key="u.id"
+                                role="option"
+                                tabindex="0"
                                 @click="selectUser(u)"
-                                class="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-800"
+                                @keydown.enter.prevent="selectUser(u)"
+                                @keydown.space.prevent="selectUser(u)"
+                                class="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
                             >
-                                <img v-if="u.avatar_thumb_url" :src="u.avatar_thumb_url" class="w-8 h-8 rounded-full object-cover" />
-                                <div v-else class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-semibold">
+                                <img
+                                    v-if="u.avatar_thumb_url"
+                                    :src="u.avatar_thumb_url"
+                                    :alt="t('chat.avatar_alt', { name: u.full_name })"
+                                    class="w-8 h-8 rounded-full object-cover"
+                                />
+                                <div
+                                    v-else
+                                    class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-semibold"
+                                    :aria-label="t('chat.avatar_alt', { name: u.full_name })"
+                                >
                                     {{ initials(u) }}
                                 </div>
                                 <span class="text-sm">{{ u.full_name }}</span>
                             </li>
                         </ul>
-                        <p v-else-if="query.trim().length > 0 && !searching" class="text-sm text-gray-400 text-center py-3">
+                        <p v-else-if="query.trim().length >= 2 && !searching" class="text-sm text-gray-400 text-center py-3">
                             {{ t('chat.no_users_found') }}
                         </p>
                     </div>

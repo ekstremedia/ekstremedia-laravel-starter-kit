@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 
@@ -7,7 +8,9 @@ defineOptions({ layout: AdminLayout });
 
 const { t } = useI18n();
 
-const cards = [
+// `computed` so labels re-evaluate when the user switches locale; a plain
+// `const cards = [...]` captures translations at module-eval time.
+const cards = computed(() => [
     { title: t('admin.overview.users'), href: '/admin/users', icon: 'pi-users', desc: t('admin.overview.users_desc') },
     { title: t('admin.overview.roles'), href: '/admin/roles', icon: 'pi-shield', desc: t('admin.overview.roles_desc') },
     { title: t('admin.overview.permissions'), href: '/admin/permissions', icon: 'pi-key', desc: t('admin.overview.permissions_desc') },
@@ -19,7 +22,7 @@ const cards = [
     { title: t('admin.overview.horizon'), href: '/horizon', icon: 'pi-compass', desc: t('admin.overview.horizon_desc'), external: true },
     { title: t('admin.overview.pulse'), href: '/pulse', icon: 'pi-chart-line', desc: t('admin.overview.pulse_desc'), external: true },
     { title: t('admin.overview.logs'), href: '/log-viewer', icon: 'pi-file', desc: t('admin.overview.logs_desc'), external: true },
-];
+]);
 </script>
 
 <template>

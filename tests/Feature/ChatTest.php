@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
+    config()->set('chat.enabled', true);
     config()->set('chat.connection', config('database.default'));
 
     $this->customer = createCustomer();

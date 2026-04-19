@@ -30,7 +30,22 @@
           {!! nl2br(e($body)) !!}
         </mj-text>
 
-        @if($actionText && $actionUrl)
+        {{-- Only render the CTA when we have both a label and a safe URL.
+             Safe = http(s) URL OR contains a template placeholder (which is
+             substituted at render time and has its own validation upstream).
+             Anything else (javascript:, data:, file:, etc.) is dropped. --}}
+        @php
+            $isSafeActionUrl = false;
+            if (is_string($actionUrl) && $actionUrl !== '') {
+                if (str_contains($actionUrl, '{{')) {
+                    $isSafeActionUrl = true;
+                } else {
+                    $scheme = parse_url($actionUrl, PHP_URL_SCHEME);
+                    $isSafeActionUrl = in_array($scheme, ['http', 'https'], true);
+                }
+            }
+        @endphp
+        @if($actionText && $isSafeActionUrl)
         <mj-button href="{{ $actionUrl }}" align="left" padding-top="20px">
           {{ $actionText }}
         </mj-button>

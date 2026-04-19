@@ -19,6 +19,7 @@ const { t } = useI18n();
 const scrollContainer = ref<HTMLElement | null>(null);
 const autoScroll = ref(true);
 let prevScrollHeight = 0;
+let prevScrollTop = 0;
 
 function scrollToBottom() {
     nextTick(() => {
@@ -33,9 +34,12 @@ function handleScroll() {
     const { scrollTop, scrollHeight, clientHeight } = scrollContainer.value;
     autoScroll.value = scrollHeight - scrollTop - clientHeight < 50;
 
-    // Load more when scrolled near top — remember height so we can keep the viewport steady.
+    // Load more when scrolled near top — remember both height and scrollTop
+    // so the viewport stays anchored to the same content after new messages
+    // are prepended above.
     if (scrollTop < 100 && props.hasMore && !props.loading) {
         prevScrollHeight = scrollHeight;
+        prevScrollTop = scrollTop;
         emit('loadMore');
     }
 }
@@ -47,11 +51,13 @@ watch(() => props.messages.length, () => {
     }
     if (prevScrollHeight && scrollContainer.value) {
         const capturedHeight = prevScrollHeight;
+        const capturedTop = prevScrollTop;
         prevScrollHeight = 0;
+        prevScrollTop = 0;
         nextTick(() => {
             const el = scrollContainer.value;
             if (!el) return;
-            el.scrollTop = el.scrollHeight - capturedHeight;
+            el.scrollTop = capturedTop + (el.scrollHeight - capturedHeight);
         });
     }
 });
@@ -116,11 +122,13 @@ defineExpose({ scrollToBottom });
                     <img
                         v-if="msg.user.avatar_thumb_url"
                         :src="msg.user.avatar_thumb_url"
+                        :alt="`${msg.user.first_name} ${msg.user.last_name}`.trim()"
                         class="w-7 h-7 rounded-full object-cover"
                     />
                     <div
                         v-else
                         class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-semibold"
+                        :aria-label="`${msg.user.first_name} ${msg.user.last_name}`.trim()"
                     >{{ initials(msg.user) }}</div>
                 </div>
 

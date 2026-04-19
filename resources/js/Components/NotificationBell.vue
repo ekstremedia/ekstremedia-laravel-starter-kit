@@ -81,9 +81,9 @@ function markAllRead() {
         onSuccess: () => {
             notifications.value.forEach(n => { n.read_at = n.read_at ?? new Date().toISOString(); });
             setNotifications(0);
+            open.value = false;
         },
     });
-    open.value = false;
 }
 
 function timeAgo(iso: string): string {
@@ -150,7 +150,7 @@ function timeAgo(iso: string): string {
                         </div>
                         <div class="flex items-center gap-1 shrink-0 mt-0.5">
                             <span v-if="!n.read_at" class="w-2 h-2 rounded-full bg-indigo-500"></span>
-                            <button @click.stop="deleteOne(n)" class="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-opacity cursor-pointer" aria-label="Delete notification">
+                            <button @click.stop="deleteOne(n)" class="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-opacity cursor-pointer" :aria-label="t('notifications.delete')">
                                 <i class="pi pi-times text-xs"></i>
                             </button>
                         </div>

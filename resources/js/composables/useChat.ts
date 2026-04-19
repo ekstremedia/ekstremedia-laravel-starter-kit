@@ -57,9 +57,16 @@ export function useChat() {
     function joinConversation(conversationId: number, onMessage?: (msg: ChatMessage) => void) {
         leaveConversation();
 
+        // Without Echo we'd still set currentChannelName, leaving the
+        // composable in a "subscribed" state with no actual subscription.
+        // Bail before mutating any state so callers can safely call this
+        // even when Reverb/Pusher env vars aren't configured.
+        const echo = window.Echo;
+        if (!echo) return;
+
         currentChannelName = `chat.conversation.${conversationId}`;
 
-        window.Echo?.private(currentChannelName)
+        echo.private(currentChannelName)
             .listen('.message.sent', (e: { message: ChatMessage; sender: ChatUser }) => {
                 const msg: ChatMessage = {
                     ...e.message,

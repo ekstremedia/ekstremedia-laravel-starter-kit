@@ -32,6 +32,7 @@ docker compose exec app php artisan test --compact
 - Explicit return types and parameter type hints
 - PHPDoc with array shape types
 - Run `vendor/bin/pint --dirty --format agent` after modifying PHP files
+- **CI runs `pint --test` on all files**, which can flag issues outside changed hunks. If CI fails after a green pre-commit, run `pint --test` locally to reproduce
 - Use `php artisan make:*` with `--no-interaction` to scaffold files
 
 ### Vue / Frontend
@@ -46,6 +47,8 @@ docker compose exec app php artisan test --compact
 - Use factories for models, `fake()` for test data
 - `php artisan make:test --pest {name}` for feature tests, `--unit` for unit tests
 - Do NOT delete tests without approval
+- **`MjmlCompiler` is faked in `tests/Pest.php` `beforeEach`** — real `npx mjml` is ~600 ms per template × 18 seeded templates × `RefreshDatabase`, so the suite would take 2+ minutes otherwise. The one test that exercises real compilation instantiates `new MjmlCompiler` directly to bypass the binding. Don't remove the fake
+- **`Notification::fake()` does not persist to the DB** — tests that exercise code reading `unreadNotifications()` must seed real notifications via `$user->notify(...)` *before* calling `Notification::fake()`, otherwise the query finds nothing
 
 ## Architecture
 
@@ -66,6 +69,12 @@ Views rendered as Inertia pages via `FortifyServiceProvider`. Custom behavior in
 ### Roles & Permissions (Spatie)
 
 Seeded: `Admin` (all), `Editor` (dashboard, resources, settings, profile), `User` (dashboard, settings, profile — assigned on registration). Shared on every Inertia request as `auth.user.roles` / `auth.user.permissions`.
+
+### Chat (optional, off by default)
+
+Real-time 1:1 + group messaging at `/chat`, gated by `CHAT_ENABLED` env + `chat.enabled` middleware. Routes in `routes/web.php` under the chat group; controller in `App\Http\Controllers\ChatController`. Models: `Conversation`, `Message` (body optionally encrypted at rest when `CHAT_ENCRYPTION_ENABLED=true`), pivot `conversation_user` with `last_read_at`. Messages broadcast to `private:chat.conversation.{id}` via the `MessageSent` event; `NewChatMessageNotification` fans out to each other participant on the user private channel so navbar badges update live. Attachments are stored via `spatie/laravel-medialibrary` on the `attachments` collection (whitelisted mime types) with an image `thumb` conversion.
+
+Frontend: `resources/js/Pages/Chat.vue`, dropdown in `Components/Chat/ChatDropdown.vue`, thread in `Components/Chat/MessageThread.vue`. Shared state composables: `useUnreadCounts` (global singleton with a detached `effectScope` watcher) and `useUserChannel` (Echo subscription to `App.Models.User.{id}`). See "Exception: chat messages" under Notifications for why chat doesn't persist to the notification inbox.
 
 ## Localization
 
@@ -94,6 +103,9 @@ DB-backed notification system with MJML email templates. Bell icon in `AppLayout
 4. `toArray()` → `['title' => '...', 'message' => '...', 'icon' => 'pi-...']`
 5. Add template rows in `EmailTemplateSeeder` for both `en` and `no` locales
 6. Optional admin actions: add "Notify user" checkbox (see `Admin/Users/Edit.vue`)
+
+### Exception: chat messages
+`NewChatMessageNotification` deliberately skips the `database` channel and returns `['broadcast']` (+ `'mail'` if the user opted in to immediate emails). Chat pushes to the message badge icon in the navbar, not to the notification bell/inbox — keeping the two streams visually separate was a product decision. The frontend listener in `AppLayout`/`AdminLayout` dispatches on `n.type` to route chat pings to the message counter and everything else to the bell. Don't "fix" this back to `['database', 'mail']`.
 
 ## Email Templates (MJML)
 
@@ -134,7 +146,7 @@ User preferences in `user_settings.settings` (JSONB): `locale`, `dark_mode`. Flo
 - **Sentry** — `SENTRY_LARAVEL_DSN` in `.env`
 - **Backups** — `spatie/laravel-backup`, schedule in `routes/console.php`, UI at `/admin/backups`
 - **Log Viewer** — `/log-viewer` (Admin gate)
-- **Impersonation** — `lab404/laravel-impersonate`, amber banner, activity logged
+- **Impersonation** — `lab404/laravel-impersonate`, amber banner, activity logged. Echo's `App.Models.User.{id}` private channel authorizes against `auth()->user()->id`, which during impersonation is the impersonated user — so broadcasts reach the right tab without any special channel plumbing
 - **Static analysis** — Larastan level 5: `make stan`
 - **Pre-commit hooks** — Husky + lint-staged (pint + vue-tsc)
 

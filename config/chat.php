@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * Chat feature configuration.
+ *
+ * @return array{
+ *     enabled: bool,
+ *     encryption_enabled: bool,
+ *     connection: string,
+ * }
+ */
 return [
     /*
     |--------------------------------------------------------------------------

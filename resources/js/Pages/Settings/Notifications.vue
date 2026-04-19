@@ -3,7 +3,6 @@ import { Head, useForm } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import { ref, onMounted } from 'vue';
 import { gsap } from 'gsap';
-import { useToast } from 'primevue/usetoast';
 import ToggleSwitch from 'primevue/toggleswitch';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
@@ -19,7 +18,6 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
-const toast = useToast();
 
 const form = useForm({
     notification_email_immediate: props.preferences.notification_email_immediate,
@@ -45,11 +43,10 @@ onMounted(() => {
 });
 
 function submit() {
+    // Flash success from the server is surfaced by useFlashToast globally —
+    // no local toast.add here, to avoid duplicates.
     form.put('/settings/notifications', {
         preserveScroll: true,
-        onSuccess: () => {
-            toast.add({ severity: 'success', summary: t('notifications.settings.saved'), life: 3000 });
-        },
     });
 }
 </script>

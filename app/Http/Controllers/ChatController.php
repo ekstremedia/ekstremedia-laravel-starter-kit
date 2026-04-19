@@ -63,6 +63,24 @@ class ChatController extends Controller
             $query->where('is_group', true);
         }
 
+        if ($filter === 'unread') {
+            // Push the unread condition into SQL so the LIMIT returns 15
+            // *unread* conversations, not 15 total of which some may be read.
+            $query->whereHas('users', function ($sub) use ($user) {
+                $sub->where('user_id', $user->id)
+                    ->whereExists(function ($m) use ($user) {
+                        $m->select(DB::raw(1))
+                            ->from('messages')
+                            ->whereColumn('messages.conversation_id', 'conversations.id')
+                            ->where('messages.user_id', '!=', $user->id)
+                            ->where(function ($q) {
+                                $q->whereNull('conversation_user.last_read_at')
+                                    ->orWhereColumn('messages.created_at', '>', 'conversation_user.last_read_at');
+                            });
+                    });
+            });
+        }
+
         if ($q = $request->input('q')) {
             $matchingUserIds = User::search($q)->keys();
             $query->whereHas('users', fn ($sub) => $sub->whereIn('user_id', $matchingUserIds));
@@ -76,12 +94,6 @@ class ChatController extends Controller
 
         foreach ($models as $c) {
             $unreadCount = $unreadMap[$c->id] ?? 0;
-
-            // Skip non-unread when filtering
-            if ($filter === 'unread' && $unreadCount === 0) {
-                continue;
-            }
-
             $conversations[] = $this->formatConversation($c, $user, $unreadCount);
         }
 
@@ -139,9 +151,12 @@ class ChatController extends Controller
                 'id' => $latest->id,
                 'body' => $latest->body,
                 'user_id' => $latest->user_id,
-                'user' => [
+                'user' => $latest->user ? [
                     'id' => $latest->user->id,
                     'first_name' => $latest->user->first_name,
+                ] : [
+                    'id' => null,
+                    'first_name' => __('chat.unknown_user'),
                 ],
                 'created_at' => $latest->created_at->toISOString(),
             ] : null,
@@ -171,12 +186,21 @@ class ChatController extends Controller
             return response()->json(['message' => 'At least one other participant is required.'], 422);
         }
 
-        // Drop banned/invalid users so we match the filter applied in searchUsers.
-        $allowedIds = User::on($connection)
+        // Drop banned/invalid users *and* enforce the same tenancy scope the
+        // search endpoint uses — a non-admin must only be able to start
+        // conversations with users from their shared customers.
+        $allowedQuery = User::on($connection)
             ->notBanned()
-            ->whereIn('id', $participantIds)
-            ->pluck('id');
+            ->whereIn('id', $participantIds);
 
+        if (config('tenancy.enabled') && ! $user->hasRole('Admin')) {
+            $customerIds = $user->customers()->pluck('tenants.id');
+            $allowedQuery->whereHas('customers', function ($q) use ($customerIds) {
+                $q->whereIn('tenants.id', $customerIds);
+            });
+        }
+
+        $allowedIds = $allowedQuery->pluck('id');
         $participantIds = $participantIds->intersect($allowedIds)->values();
 
         if ($participantIds->isEmpty()) {
@@ -195,17 +219,21 @@ class ChatController extends Controller
         }
 
         $isGroup = $participantIds->count() > 1;
+        $title = $validated['title'] ?? null;
+        $attachIds = $participantIds->push($user->id)->unique()->all();
 
-        $conversation = Conversation::create([
-            'title' => $validated['title'] ?? null,
-            'is_group' => $isGroup,
-            'created_by' => $user->id,
-        ]);
+        // Wrap create + attach in a single transaction so a failed attach
+        // doesn't leave an orphaned Conversation row behind.
+        $conversation = DB::connection($connection)->transaction(function () use ($title, $isGroup, $user, $attachIds) {
+            $conversation = Conversation::create([
+                'title' => $title,
+                'is_group' => $isGroup,
+                'created_by' => $user->id,
+            ]);
+            $conversation->users()->attach($attachIds);
 
-        // Attach all participants including the creator
-        $conversation->users()->attach(
-            $participantIds->push($user->id)->unique()->all()
-        );
+            return $conversation;
+        });
 
         return response()->json([
             'conversation' => ['id' => $conversation->id],
@@ -261,7 +289,9 @@ class ChatController extends Controller
         $validated = $request->validate([
             'body' => 'nullable|string|max:5000',
             'attachments' => 'sometimes|array|max:10',
-            'attachments.*' => 'file|max:10240', // 10 MB per file
+            // Whitelist safe extensions. Anything else (HTML, JS, PHP, etc.)
+            // is rejected outright to avoid serving active content inline.
+            'attachments.*' => 'file|max:10240|mimes:png,jpg,jpeg,gif,webp,pdf,txt,zip,csv,doc,docx,xls,xlsx,ppt,pptx',
         ]);
 
         $hasFiles = $request->hasFile('attachments');
@@ -291,11 +321,21 @@ class ChatController extends Controller
         });
 
         if ($hasFiles) {
-            /** @var UploadedFile $file */
-            foreach ($request->file('attachments', []) as $file) {
-                $message->addMedia($file)->toMediaCollection('attachments');
+            try {
+                /** @var UploadedFile $file */
+                foreach ($request->file('attachments', []) as $file) {
+                    $message->addMedia($file)->toMediaCollection('attachments');
+                }
+                $message->load('media');
+            } catch (\Throwable $e) {
+                // Roll back: delete the already-committed message row and any
+                // media rows spatie created before the failure — otherwise we
+                // leave an empty-body message visible to participants. The
+                // delete() call cascades to the `media` table.
+                $message->delete();
+
+                throw $e;
             }
-            $message->load('media');
         }
 
         broadcast(new MessageSent($message, $request->user()))->toOthers();
@@ -407,15 +447,22 @@ class ChatController extends Controller
             ];
         })->values()->all();
 
+        $sender = $message->user;
+
         return [
             'id' => $message->id,
             'conversation_id' => $message->conversation_id,
             'user_id' => $message->user_id,
-            'user' => [
-                'id' => $message->user->id,
-                'first_name' => $message->user->first_name,
-                'last_name' => $message->user->last_name,
-                'avatar_thumb_url' => $message->user->avatarUrl('thumb'),
+            'user' => $sender ? [
+                'id' => $sender->id,
+                'first_name' => $sender->first_name,
+                'last_name' => $sender->last_name,
+                'avatar_thumb_url' => $sender->avatarUrl('thumb'),
+            ] : [
+                'id' => null,
+                'first_name' => __('chat.unknown_user'),
+                'last_name' => '',
+                'avatar_thumb_url' => null,
             ],
             'body' => $message->body,
             'type' => $message->type,

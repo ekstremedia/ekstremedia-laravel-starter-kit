@@ -57,9 +57,9 @@ Route::middleware('auth')->group(function () {
             Route::get('/chat/conversations-list', [ChatController::class, 'conversationsJson'])->name('chat.conversations.list');
             Route::post('/chat/conversations', [ChatController::class, 'store'])->name('chat.conversations.store');
             Route::get('/chat/conversations/{conversation}', [ChatController::class, 'show'])->name('chat.conversations.show');
-            Route::post('/chat/conversations/{conversation}/messages', [ChatController::class, 'sendMessage'])->name('chat.conversations.sendMessage');
-            Route::post('/chat/conversations/{conversation}/read', [ChatController::class, 'markRead'])->name('chat.conversations.markRead');
-            Route::post('/chat/read-all', [ChatController::class, 'markAllRead'])->name('chat.markAllRead');
+            Route::post('/chat/conversations/{conversation}/messages', [ChatController::class, 'sendMessage'])->name('chat.conversations.messages.store');
+            Route::post('/chat/conversations/{conversation}/read', [ChatController::class, 'markRead'])->name('chat.conversations.read');
+            Route::post('/chat/read-all', [ChatController::class, 'markAllRead'])->name('chat.read-all');
             Route::get('/chat/users/search', [ChatController::class, 'searchUsers'])->name('chat.users.search');
         });
     });

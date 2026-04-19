@@ -15,6 +15,11 @@ return new class extends Migration
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('last_message_at')->nullable();
             $table->timestamps();
+
+            // Conversation lists are sorted by last_message_at desc (with
+            // is_group filters in the dropdown), so index both.
+            $table->index(['is_group', 'last_message_at']);
+            $table->index('last_message_at');
         });
     }
 

@@ -15,14 +15,14 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 /**
  * @property int $id
  * @property int $conversation_id
- * @property int $user_id
+ * @property int|null $user_id
  * @property string $body
  * @property bool $is_encrypted
  * @property string $type
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Conversation $conversation
- * @property-read User $user
+ * @property-read User|null $user
  */
 class Message extends Model implements HasMedia
 {
@@ -33,7 +33,10 @@ class Message extends Model implements HasMedia
         return config('chat.connection', 'pgsql');
     }
 
-    protected $fillable = ['conversation_id', 'user_id', 'body', 'is_encrypted', 'type'];
+    // `is_encrypted` intentionally omitted — the body mutator is the single
+    // source of truth for encryption state. Allowing mass-assignment here
+    // would let callers override the flag and desync the stored cipher.
+    protected $fillable = ['conversation_id', 'user_id', 'body', 'type'];
 
     public function registerMediaCollections(): void
     {

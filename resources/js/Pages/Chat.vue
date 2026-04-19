@@ -67,7 +67,7 @@ function fetchMessages(conversationId: number, cursor?: string) {
     activeFetchAbort = new AbortController();
     const fetchId = ++activeFetchId;
     const controller = activeFetchAbort;
-    const url = `/chat/conversations/${conversationId}` + (cursor ? `?cursor=${cursor}` : '');
+    const url = `/chat/conversations/${conversationId}` + (cursor ? `?cursor=${encodeURIComponent(cursor)}` : '');
 
     fetch(url, {
         headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
@@ -146,6 +146,11 @@ function getSocketId(): string {
 function sendMessage(payload: { body: string; files: File[] }) {
     if (!activeConversation.value) return;
 
+    // Capture the target at dispatch time so a user switching conversations
+    // while the POST is in flight can't cause the response to leak into the
+    // newly active conversation.
+    const sentConversationId = activeConversation.value.id;
+
     const headers: Record<string, string> = {
         'Accept': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
@@ -162,7 +167,7 @@ function sendMessage(payload: { body: string; files: File[] }) {
         form.append('attachments[]', file);
     }
 
-    fetch(`/chat/conversations/${activeConversation.value.id}/messages`, {
+    fetch(`/chat/conversations/${sentConversationId}/messages`, {
         method: 'POST',
         headers,
         body: form,
@@ -177,12 +182,13 @@ function sendMessage(payload: { body: string; files: File[] }) {
         .then(json => {
             if (!json.message) return;
 
-            threadMessages.value.push(json.message);
+            // Only append to thread if the user is still on the same conversation.
+            if (activeConversation.value?.id === sentConversationId) {
+                threadMessages.value.push(json.message);
+            }
 
-            // Update conversation list
-            const cId = activeConversation.value?.id;
-            if (cId === undefined) return;
-            const idx = conversationList.value.findIndex(c => c.id === cId);
+            // Always update the conversation list entry — it stays accurate regardless of focus.
+            const idx = conversationList.value.findIndex(c => c.id === sentConversationId);
             if (idx !== -1) {
                 conversationList.value[idx].latest_message = {
                     id: json.message.id,
@@ -328,6 +334,7 @@ function getCsrfToken(): string {
                         <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-dark-700">
                             <button
                                 @click="goBackToList"
+                                :aria-label="t('chat.back_to_conversations')"
                                 class="sm:hidden p-1 rounded hover:bg-gray-100 dark:hover:bg-dark-800 cursor-pointer"
                             >
                                 <i class="pi pi-arrow-left text-gray-500"></i>

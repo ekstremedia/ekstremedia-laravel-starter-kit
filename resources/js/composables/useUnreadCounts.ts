@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue';
+import { effectScope, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import type { PageProps } from '@/types';
 
@@ -18,16 +18,25 @@ export function useUnreadCounts() {
         messagesCount.value = clamp(page.props.auth?.user?.unread_messages_count ?? 0);
         notificationsCount.value = clamp(page.props.auth?.user?.unread_notifications_count ?? 0);
 
-        watch(
-            () => [
-                page.props.auth?.user?.unread_messages_count,
-                page.props.auth?.user?.unread_notifications_count,
-            ] as const,
-            ([m, n]) => {
-                if (typeof m === 'number') messagesCount.value = clamp(m);
-                if (typeof n === 'number') notificationsCount.value = clamp(n);
-            },
-        );
+        // Create the watcher in a detached effect scope so it outlives the
+        // component that happened to trigger the first `useUnreadCounts()`
+        // call. Without this, the shared state stops syncing after that
+        // component unmounts.
+        const scope = effectScope(true);
+        scope.run(() => {
+            watch(
+                () => [
+                    page.props.auth?.user?.unread_messages_count,
+                    page.props.auth?.user?.unread_notifications_count,
+                ] as const,
+                ([m, n]) => {
+                    // Non-numbers (undefined on logout, null) should reset to 0
+                    // rather than silently keeping stale counts around.
+                    messagesCount.value = clamp(typeof m === 'number' ? m : 0);
+                    notificationsCount.value = clamp(typeof n === 'number' ? n : 0);
+                },
+            );
+        });
     }
 
     return {

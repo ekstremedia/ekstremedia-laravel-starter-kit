@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
 import { ref } from 'vue';
+import { useToast } from 'primevue/usetoast';
 
 const emit = defineEmits<{
     send: [payload: { body: string; files: File[] }];
     typing: [];
 }>();
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
+const toast = useToast();
 const body = ref('');
 const pendingFiles = ref<File[]>([]);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
@@ -27,6 +29,9 @@ function handleInput() {
 }
 
 function handleKeydown(e: KeyboardEvent) {
+    // Don't intercept Enter while an IME composition is active — the user is
+    // picking a candidate, not submitting.
+    if (e.isComposing) return;
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         send();
@@ -56,12 +61,41 @@ function autoResize() {
 function onFilesSelected(e: Event) {
     const target = e.target as HTMLInputElement;
     const selected = Array.from(target.files ?? []);
+    const oversized: string[] = [];
     const valid: File[] = [];
+
     for (const f of selected) {
-        if (f.size > MAX_SIZE_BYTES) continue;
+        if (f.size > MAX_SIZE_BYTES) {
+            oversized.push(f.name);
+            continue;
+        }
         valid.push(f);
     }
-    pendingFiles.value = [...pendingFiles.value, ...valid].slice(0, MAX_FILES);
+
+    const roomLeft = Math.max(0, MAX_FILES - pendingFiles.value.length);
+    const accepted = valid.slice(0, roomLeft);
+    const droppedForCap = valid.length - accepted.length;
+
+    pendingFiles.value = [...pendingFiles.value, ...accepted];
+
+    if (oversized.length > 0) {
+        toast.add({
+            severity: 'warn',
+            summary: t('chat.attachment_rejected_size', {
+                names: oversized.join(', '),
+                max: formatSize(MAX_SIZE_BYTES),
+            }),
+            life: 5000,
+        });
+    }
+    if (droppedForCap > 0) {
+        toast.add({
+            severity: 'warn',
+            summary: t('chat.attachment_rejected_count', { max: MAX_FILES }),
+            life: 5000,
+        });
+    }
+
     // Allow re-selecting the same file after removing.
     target.value = '';
 }
@@ -75,9 +109,14 @@ function openFilePicker() {
 }
 
 function formatSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    // Intl.NumberFormat with style:'unit' handles localization for B/KB/MB.
+    if (bytes < 1024) {
+        return new Intl.NumberFormat(locale.value, { style: 'unit', unit: 'byte', maximumFractionDigits: 0 }).format(bytes);
+    }
+    if (bytes < 1024 * 1024) {
+        return new Intl.NumberFormat(locale.value, { style: 'unit', unit: 'kilobyte', maximumFractionDigits: 0 }).format(bytes / 1024);
+    }
+    return new Intl.NumberFormat(locale.value, { style: 'unit', unit: 'megabyte', maximumFractionDigits: 1 }).format(bytes / (1024 * 1024));
 }
 </script>
 
@@ -138,6 +177,7 @@ function formatSize(bytes: number): string {
                 :disabled="!body.trim() && pendingFiles.length === 0"
                 class="h-10 w-10 shrink-0 flex items-center justify-center rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
                 :title="t('chat.send')"
+                :aria-label="t('chat.send')"
             >
                 <i class="pi pi-send text-sm"></i>
             </button>

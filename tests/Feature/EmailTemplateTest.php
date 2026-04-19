@@ -20,11 +20,11 @@ it('compiles valid MJML to HTML', function () {
     expect($html)->toContain('<!doctype html>');
 });
 
-it('seeds all 16 templates', function () {
+it('seeds all 18 templates', function () {
     $this->seed(EmailTemplateSeeder::class);
 
-    expect(EmailTemplate::count())->toBe(16);
-    expect(EmailTemplate::whereNotNull('compiled_html')->count())->toBe(16);
+    expect(EmailTemplate::count())->toBe(18);
+    expect(EmailTemplate::whereNotNull('compiled_html')->count())->toBe(18);
 });
 
 it('finds template by slug and locale', function () {

@@ -21,7 +21,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read int|null $users_count
- * @property-read User $creator
+ * @property-read User|null $creator
  * @property-read Collection<int, User> $users
  * @property-read Collection<int, Message> $messages
  * @property-read Message|null $latestMessage

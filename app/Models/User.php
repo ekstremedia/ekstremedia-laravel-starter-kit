@@ -117,7 +117,12 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     id: int|string|null,
+     *     first_name: string|null,
+     *     last_name: string|null,
+     *     email: string|null,
+     * }
      */
     public function toSearchableArray(): array
     {
@@ -213,6 +218,12 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
 
     /**
      * Send the password reset notification using the MJML template.
+     *
+     * @param  string  $token
+     *
+     * Note: we can't add a `string` type hint here — the parent
+     * `Illuminate\Foundation\Auth\User::sendPasswordResetNotification` has an
+     * untyped parameter, and tightening the signature breaks LSP at runtime.
      */
     public function sendPasswordResetNotification($token): void
     {

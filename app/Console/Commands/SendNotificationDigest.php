@@ -3,10 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
+use App\Notifications\NotificationDigestNotification;
 use Illuminate\Console\Command;
-use Illuminate\Notifications\DatabaseNotification;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class SendNotificationDigest extends Command
 {
@@ -31,48 +31,41 @@ class SendNotificationDigest extends Command
             ->get();
 
         $sent = 0;
+        $failed = 0;
+        $since = $frequency === 'daily' ? now()->subDay() : now()->subWeek();
 
         foreach ($users as $user) {
             $unread = $user->unreadNotifications()
-                ->where('created_at', '>=', $frequency === 'daily' ? now()->subDay() : now()->subWeek())
+                ->where('created_at', '>=', $since)
                 ->get();
 
             if ($unread->isEmpty()) {
                 continue;
             }
 
-            Mail::raw(
-                $this->buildDigestBody($user, $unread),
-                function ($mail) use ($user) {
-                    $mail->to($user->email)
-                        ->subject(__('Your notification digest'));
-                }
-            );
-
-            $sent++;
+            try {
+                // Queued: each send is independent, retryable, and doesn't block the
+                // command loop on one slow SMTP connection.
+                $user->notify(new NotificationDigestNotification($unread, $frequency));
+                $sent++;
+            } catch (Throwable $e) {
+                $failed++;
+                Log::error('Notification digest failed to queue', [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'frequency' => $frequency,
+                    'error' => $e->getMessage(),
+                ]);
+                $this->error("Failed to queue digest for {$user->email}: {$e->getMessage()}");
+            }
         }
 
-        $this->info("Sent {$sent} digest email(s) for frequency '{$frequency}'.");
+        $summary = "Queued {$sent} digest email(s) for frequency '{$frequency}'.";
+        if ($failed > 0) {
+            $summary .= " {$failed} failed.";
+        }
+        $this->info($summary);
 
         return self::SUCCESS;
-    }
-
-    /**
-     * @param  Collection<int, DatabaseNotification>  $notifications
-     */
-    private function buildDigestBody(User $user, Collection $notifications): string
-    {
-        $lines = ["Hi {$user->first_name},\n"];
-        $lines[] = "Here's a summary of your {$notifications->count()} unread notification(s):\n";
-
-        foreach ($notifications as $n) {
-            $title = $n->data['title'] ?? class_basename($n->type);
-            $message = $n->data['message'] ?? '';
-            $lines[] = "• {$title}".($message ? " — {$message}" : '');
-        }
-
-        $lines[] = "\n— ".config('app.name');
-
-        return implode("\n", $lines);
     }
 }

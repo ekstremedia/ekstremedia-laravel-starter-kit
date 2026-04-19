@@ -106,22 +106,21 @@ watch(currentPath, () => {
         </Transition>
 
         <aside
-            class="fixed inset-y-0 left-0 bg-white dark:bg-dark-900 border-r border-gray-200 dark:border-dark-800 transform transition-all duration-200 z-40"
+            class="fixed inset-y-0 left-0 bg-white dark:bg-dark-900 border-r border-gray-200 dark:border-dark-800 transform transition-all duration-200 z-40 w-64 max-w-[80%]"
             :class="[
                 mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
-                sidebarCollapsed ? 'w-16' : 'w-64 max-w-[80%]',
+                // Collapse only applies from md up — mobile drawer keeps full width + labels.
+                sidebarCollapsed ? 'md:w-16' : 'md:w-64',
             ]"
         >
-            <div class="h-16 flex items-center border-b border-gray-200 dark:border-dark-800"
-                 :class="sidebarCollapsed ? 'justify-center' : 'justify-between px-4 sm:px-6'">
-                <Link v-if="!sidebarCollapsed" href="/app" class="text-lg font-semibold text-indigo-600 dark:text-indigo-400">
-                    {{ t('nav.admin') }}
+            <div class="h-16 flex items-center border-b border-gray-200 dark:border-dark-800 justify-between px-4 sm:px-6"
+                 :class="sidebarCollapsed ? 'md:justify-center md:px-0' : ''">
+                <Link href="/app" class="text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
+                    <i class="pi pi-shield md:inline" :class="sidebarCollapsed ? '' : 'md:hidden'"></i>
+                    <span class="text-lg font-semibold" :class="sidebarCollapsed ? 'md:hidden' : ''">{{ t('nav.admin') }}</span>
                 </Link>
-                <Link v-else href="/app" class="text-indigo-600 dark:text-indigo-400" :title="t('nav.admin')">
-                    <i class="pi pi-shield"></i>
-                </Link>
-                <button v-if="!sidebarCollapsed" @click="mobileOpen = false" class="md:hidden text-gray-500 dark:text-gray-400 p-1 cursor-pointer"
-                        aria-label="Close navigation">
+                <button @click="mobileOpen = false" class="md:hidden text-gray-500 dark:text-gray-400 p-1 cursor-pointer"
+                        :aria-label="t('admin.nav.close')">
                     <i class="pi pi-times"></i>
                 </button>
             </div>
@@ -130,10 +129,10 @@ watch(currentPath, () => {
                     <a v-if="item.external" :href="item.href" target="_blank"
                        v-tooltip.right="sidebarCollapsed ? item.label : null"
                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800"
-                       :class="sidebarCollapsed ? 'justify-center' : ''">
+                       :class="sidebarCollapsed ? 'md:justify-center' : ''">
                         <i :class="['pi', item.icon]"></i>
-                        <span v-if="!sidebarCollapsed">{{ item.label }}</span>
-                        <i v-if="!sidebarCollapsed" class="pi pi-external-link text-xs ml-auto opacity-60"></i>
+                        <span :class="sidebarCollapsed ? 'md:hidden' : ''">{{ item.label }}</span>
+                        <i class="pi pi-external-link text-xs ml-auto opacity-60" :class="sidebarCollapsed ? 'md:hidden' : ''"></i>
                     </a>
                     <Link v-else :href="item.href"
                           v-tooltip.right="sidebarCollapsed ? item.label : null"
@@ -142,10 +141,10 @@ watch(currentPath, () => {
                               item.match && item.match(currentPath)
                                   ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
                                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800',
-                              sidebarCollapsed ? 'justify-center' : '',
+                              sidebarCollapsed ? 'md:justify-center' : '',
                           ]">
                         <i :class="['pi', item.icon]"></i>
-                        <span v-if="!sidebarCollapsed">{{ item.label }}</span>
+                        <span :class="sidebarCollapsed ? 'md:hidden' : ''">{{ item.label }}</span>
                     </Link>
                 </template>
             </nav>
@@ -159,7 +158,7 @@ watch(currentPath, () => {
                 v-tooltip.right="sidebarCollapsed ? t('admin.nav.expand_sidebar') : null"
             >
                 <i :class="sidebarCollapsed ? 'pi pi-angle-double-right' : 'pi pi-angle-double-left'"></i>
-                <span v-if="!sidebarCollapsed" class="ml-2">{{ t('admin.nav.collapse_sidebar') }}</span>
+                <span :class="sidebarCollapsed ? 'md:hidden' : 'ml-2'">{{ t('admin.nav.collapse_sidebar') }}</span>
             </button>
         </aside>
 

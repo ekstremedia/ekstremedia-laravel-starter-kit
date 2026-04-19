@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import { useToast } from 'primevue/usetoast';
 import Dialog from 'primevue/dialog';
@@ -21,6 +21,7 @@ const loading = ref(false);
 const activeFilter = ref<'all' | 'unread' | 'groups'>('all');
 const searchQuery = ref('');
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+let conversationsRequestId = 0;
 
 const quickReplyTarget = ref<ChatConversation | null>(null);
 const quickReplyBody = ref('');
@@ -33,6 +34,7 @@ const quickReplyVisible = computed({
 });
 
 function fetchConversations() {
+    const requestId = ++conversationsRequestId;
     loading.value = true;
     const params = new URLSearchParams();
     if (activeFilter.value !== 'all') params.set('filter', activeFilter.value);
@@ -42,10 +44,29 @@ function fetchConversations() {
     fetch(`/chat/conversations-list${qs ? '?' + qs : ''}`, {
         headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
     })
-        .then(r => r.json())
-        .then(json => { conversations.value = json.conversations ?? []; })
-        .finally(() => { loading.value = false; });
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
+        .then(json => {
+            if (requestId !== conversationsRequestId) return;
+            conversations.value = json.conversations ?? [];
+        })
+        .catch(() => {
+            if (requestId !== conversationsRequestId) return;
+            toast.add({ severity: 'error', summary: t('chat.load_failed'), life: 4000 });
+        })
+        .finally(() => {
+            if (requestId === conversationsRequestId) loading.value = false;
+        });
 }
+
+onBeforeUnmount(() => {
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+        searchTimeout = null;
+    }
+});
 
 watch(open, (v) => {
     if (v) {
@@ -104,6 +125,8 @@ function openQuickReply(c: ChatConversation) {
 }
 
 function sendQuickReply() {
+    // Guard against double-submit from Enter key + click.
+    if (quickReplySending.value) return;
     const target = quickReplyTarget.value;
     const body = quickReplyBody.value.trim();
     if (!target || !body) return;
@@ -177,11 +200,11 @@ function timeLabel(iso: string | null): string {
     const seconds = Math.floor((now.getTime() - d.getTime()) / 1000);
     if (seconds < 60) return t('notifications.just_now');
     const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m`;
+    if (minutes < 60) return t('chat.minutes_short', { n: minutes });
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h`;
+    if (hours < 24) return t('chat.hours_short', { n: hours });
     const days = Math.floor(hours / 24);
-    if (days < 7) return `${days}d`;
+    if (days < 7) return t('chat.days_short', { n: days });
     return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
@@ -274,48 +297,55 @@ const filters = ['all', 'unread', 'groups'] as const;
                     <li
                         v-for="c in conversations"
                         :key="c.id"
-                        class="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-dark-800/50"
+                        class="group flex items-center gap-3 px-2 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-dark-800/50"
                         :class="c.unread_count > 0 ? 'bg-indigo-50/30 dark:bg-dark-800/30' : ''"
                     >
-                        <!-- Avatar -->
-                        <div class="shrink-0 cursor-pointer" @click="goToConversation(c)">
-                            <template v-if="displayAvatar(c)">
-                                <img
-                                    v-if="displayAvatar(c)!.avatar_thumb_url"
-                                    :src="displayAvatar(c)!.avatar_thumb_url!"
-                                    class="w-10 h-10 rounded-full object-cover"
-                                />
+                        <!-- Avatar + content (one interactive control so keyboard nav works) -->
+                        <button
+                            type="button"
+                            @click="goToConversation(c)"
+                            class="flex-1 min-w-0 flex items-center gap-3 px-2 py-1 rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 cursor-pointer"
+                        >
+                            <div class="shrink-0">
+                                <template v-if="displayAvatar(c)">
+                                    <img
+                                        v-if="displayAvatar(c)!.avatar_thumb_url"
+                                        :src="displayAvatar(c)!.avatar_thumb_url!"
+                                        :alt="t('chat.avatar_alt', { name: displayName(c) })"
+                                        class="w-10 h-10 rounded-full object-cover"
+                                    />
+                                    <div
+                                        v-else
+                                        class="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-semibold"
+                                        :aria-label="t('chat.avatar_alt', { name: displayName(c) })"
+                                    >{{ initials(displayAvatar(c)!) }}</div>
+                                </template>
                                 <div
                                     v-else
-                                    class="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-semibold"
-                                >{{ initials(displayAvatar(c)!) }}</div>
-                            </template>
-                            <div
-                                v-else
-                                class="w-10 h-10 rounded-full bg-gray-300 dark:bg-dark-600 flex items-center justify-center"
-                            >
-                                <i class="pi pi-users text-sm text-gray-600 dark:text-gray-300"></i>
+                                    class="w-10 h-10 rounded-full bg-gray-300 dark:bg-dark-600 flex items-center justify-center"
+                                    :aria-label="t('chat.group_avatar_alt')"
+                                >
+                                    <i class="pi pi-users text-sm text-gray-600 dark:text-gray-300"></i>
+                                </div>
                             </div>
-                        </div>
-
-                        <!-- Content -->
-                        <div class="flex-1 min-w-0 cursor-pointer" @click="goToConversation(c)">
-                            <div class="flex justify-between items-baseline">
-                                <p class="text-sm truncate" :class="c.unread_count > 0 ? 'font-semibold text-gray-900 dark:text-white' : 'font-medium text-gray-700 dark:text-gray-300'">
-                                    {{ displayName(c) }}
+                            <div class="flex-1 min-w-0">
+                                <div class="flex justify-between items-baseline">
+                                    <p class="text-sm truncate" :class="c.unread_count > 0 ? 'font-semibold text-gray-900 dark:text-white' : 'font-medium text-gray-700 dark:text-gray-300'">
+                                        {{ displayName(c) }}
+                                    </p>
+                                    <span class="text-[10px] text-gray-400 shrink-0 ml-2">{{ timeLabel(c.last_message_at) }}</span>
+                                </div>
+                                <p class="text-xs truncate" :class="c.unread_count > 0 ? 'text-gray-600 dark:text-gray-300' : 'text-gray-400 dark:text-gray-500'">
+                                    {{ previewText(c) }}
                                 </p>
-                                <span class="text-[10px] text-gray-400 shrink-0 ml-2">{{ timeLabel(c.last_message_at) }}</span>
                             </div>
-                            <p class="text-xs truncate" :class="c.unread_count > 0 ? 'text-gray-600 dark:text-gray-300' : 'text-gray-400 dark:text-gray-500'">
-                                {{ previewText(c) }}
-                            </p>
-                        </div>
+                        </button>
 
-                        <!-- Quick reply -->
+                        <!-- Quick reply (always focusable for keyboard users; hover reveals visually) -->
                         <button
                             type="button"
                             @click.stop="openQuickReply(c)"
-                            class="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1.5 rounded-md text-indigo-500 hover:bg-indigo-50 dark:hover:bg-dark-800 cursor-pointer"
+                            class="shrink-0 p-1.5 rounded-md text-indigo-500 hover:bg-indigo-50 dark:hover:bg-dark-800 cursor-pointer opacity-60 group-hover:opacity-100 focus:opacity-100 focus-visible:ring-2 focus-visible:ring-indigo-500 transition-opacity"
                             :title="t('chat.quick_reply')"
                             :aria-label="t('chat.quick_reply')"
                         >
@@ -323,7 +353,7 @@ const filters = ['all', 'unread', 'groups'] as const;
                         </button>
 
                         <!-- Unread dot -->
-                        <span v-if="c.unread_count > 0" class="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0"></span>
+                        <span v-if="c.unread_count > 0" class="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0 mr-2" aria-hidden="true"></span>
                     </li>
                 </ul>
 
