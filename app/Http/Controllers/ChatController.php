@@ -10,6 +10,7 @@ use App\Notifications\NewChatMessageNotification;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
@@ -290,7 +291,7 @@ class ChatController extends Controller
         });
 
         if ($hasFiles) {
-            /** @var \Illuminate\Http\UploadedFile $file */
+            /** @var UploadedFile $file */
             foreach ($request->file('attachments', []) as $file) {
                 $message->addMedia($file)->toMediaCollection('attachments');
             }
