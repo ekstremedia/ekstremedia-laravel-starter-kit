@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import { ref, watch } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ChatUser } from '@/composables/useChat';
 
 const props = defineProps<{
@@ -18,36 +18,70 @@ const query = ref('');
 const results = ref<(ChatUser & { full_name: string })[]>([]);
 const searching = ref(false);
 const selectedUsers = ref<(ChatUser & { full_name: string })[]>([]);
+const searchInput = ref<HTMLInputElement | null>(null);
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+let searchAbort: AbortController | null = null;
+let lastFocused: HTMLElement | null = null;
 
 watch(query, (val) => {
     if (searchTimeout) clearTimeout(searchTimeout);
-    if (val.trim().length < 1) {
+    searchAbort?.abort();
+    if (val.trim().length < 2) {
         results.value = [];
+        searching.value = false;
         return;
     }
     searching.value = true;
     searchTimeout = setTimeout(() => {
+        searchAbort = new AbortController();
+        const controller = searchAbort;
         fetch(`/chat/users/search?q=${encodeURIComponent(val.trim())}`, {
             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            signal: controller.signal,
         })
-            .then(r => r.json())
+            .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
             .then(json => {
+                if (controller.signal.aborted || !props.visible) return;
                 results.value = (json.users ?? []).filter(
-                    (u: ChatUser) => !selectedUsers.value.some(s => s.id === u.id)
+                    (u: ChatUser) => !selectedUsers.value.some(s => s.id === u.id),
                 );
             })
-            .finally(() => { searching.value = false; });
+            .catch(() => { /* aborted or network error */ })
+            .finally(() => {
+                if (!controller.signal.aborted) searching.value = false;
+            });
     }, 300);
 });
 
 watch(() => props.visible, (v) => {
-    if (!v) {
+    if (v) {
+        lastFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        nextTick(() => searchInput.value?.focus());
+    } else {
+        if (searchTimeout) clearTimeout(searchTimeout);
+        searchAbort?.abort();
         query.value = '';
         results.value = [];
         selectedUsers.value = [];
+        searching.value = false;
+        lastFocused?.focus();
+        lastFocused = null;
     }
+});
+
+function onKeydown(e: KeyboardEvent) {
+    if (props.visible && e.key === 'Escape') {
+        e.preventDefault();
+        close();
+    }
+}
+
+onMounted(() => document.addEventListener('keydown', onKeydown));
+onBeforeUnmount(() => {
+    document.removeEventListener('keydown', onKeydown);
+    if (searchTimeout) clearTimeout(searchTimeout);
+    searchAbort?.abort();
 });
 
 function selectUser(user: ChatUser & { full_name: string }) {
@@ -86,14 +120,20 @@ function initials(user: ChatUser): string {
             leave-from-class="opacity-100"
             leave-to-class="opacity-0"
         >
-            <div v-if="visible" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+                v-if="visible"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="new-conversation-title"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4"
+            >
                 <!-- Backdrop -->
                 <div class="fixed inset-0 bg-black/50" @click="close"></div>
 
                 <!-- Dialog -->
                 <div class="relative w-full max-w-md rounded-2xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 shadow-xl">
                     <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-dark-700">
-                        <h3 class="text-lg font-semibold">{{ t('chat.new_conversation') }}</h3>
+                        <h3 id="new-conversation-title" class="text-lg font-semibold">{{ t('chat.new_conversation') }}</h3>
                         <button @click="close" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-dark-800 cursor-pointer">
                             <i class="pi pi-times text-gray-400"></i>
                         </button>
@@ -116,6 +156,7 @@ function initials(user: ChatUser): string {
 
                         <!-- Search input -->
                         <input
+                            ref="searchInput"
                             v-model="query"
                             type="text"
                             :placeholder="t('chat.search_users')"

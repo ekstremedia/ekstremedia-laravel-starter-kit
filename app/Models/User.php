@@ -148,28 +148,19 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
 
     /**
      * Count total unread messages across all conversations for this user.
+     * Single aggregate query joining the conversation_user pivot.
      */
     public function unreadMessagesCount(): int
     {
-        $count = 0;
-
-        $this->conversations()
-            ->with('latestMessage')
-            ->get()
-            ->each(function (Conversation $conversation) use (&$count) {
-                $lastRead = $conversation->pivot?->getAttribute('last_read_at');
-
-                $query = $conversation->messages()
-                    ->where('user_id', '!=', $this->id);
-
-                if ($lastRead) {
-                    $query->where('created_at', '>', $lastRead);
-                }
-
-                $count += $query->count();
-            });
-
-        return $count;
+        return Message::query()
+            ->join('conversation_user', 'conversation_user.conversation_id', '=', 'messages.conversation_id')
+            ->where('conversation_user.user_id', $this->id)
+            ->where('messages.user_id', '!=', $this->id)
+            ->where(function ($q): void {
+                $q->whereNull('conversation_user.last_read_at')
+                    ->orWhereColumn('messages.created_at', '>', 'conversation_user.last_read_at');
+            })
+            ->count();
     }
 
     /**

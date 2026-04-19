@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { Head, usePage, router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
-import { computed, ref, watch, onMounted } from 'vue';
+import { computed, ref, onBeforeUnmount, onMounted } from 'vue';
+import { useToast } from 'primevue/usetoast';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import ConversationList from '@/Components/Chat/ConversationList.vue';
 import MessageThread from '@/Components/Chat/MessageThread.vue';
 import MessageInput from '@/Components/Chat/MessageInput.vue';
 import NewConversationDialog from '@/Components/Chat/NewConversationDialog.vue';
 import { useChat } from '@/composables/useChat';
+import { useUnreadCounts } from '@/composables/useUnreadCounts';
 import type { ChatConversation, ChatMessage } from '@/composables/useChat';
 import type { PageProps } from '@/types';
 
@@ -15,10 +17,17 @@ const props = defineProps<{
     conversations: ChatConversation[];
 }>();
 
+function parseConversationParam(): number | null {
+    const match = window.location.search.match(/[?&]conversation=(\d+)/);
+    return match ? Number(match[1]) : null;
+}
+
 const { t } = useI18n();
 const page = usePage<PageProps>();
+const toast = useToast();
 const user = computed(() => page.props.auth.user!);
 const { typingUser, joinConversation, whisperTyping } = useChat();
+const { decrementMessages, incrementMessages } = useUnreadCounts();
 
 const conversationList = ref<ChatConversation[]>([...props.conversations]);
 const activeConversation = ref<ChatConversation | null>(null);
@@ -40,22 +49,41 @@ function selectConversation(conversation: ChatConversation) {
     joinConversation(conversation.id, handleRealtimeMessage);
     markRead(conversation.id);
 
-    // Reset unread for this conversation in the list
+    // Reset unread for this conversation in the list and decrement the global badge.
     const idx = conversationList.value.findIndex(c => c.id === conversation.id);
     if (idx !== -1) {
+        const wasUnread = conversationList.value[idx].unread_count ?? 0;
         conversationList.value[idx].unread_count = 0;
+        if (wasUnread > 0) decrementMessages(wasUnread);
     }
 }
 
+let activeFetchId = 0;
+let activeFetchAbort: AbortController | null = null;
+
 function fetchMessages(conversationId: number, cursor?: string) {
     loadingMessages.value = true;
+    activeFetchAbort?.abort();
+    activeFetchAbort = new AbortController();
+    const fetchId = ++activeFetchId;
+    const controller = activeFetchAbort;
     const url = `/chat/conversations/${conversationId}` + (cursor ? `?cursor=${cursor}` : '');
 
     fetch(url, {
         headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        signal: controller.signal,
     })
-        .then(r => r.json())
+        .then(async (r) => {
+            if (!r.ok) {
+                if (r.status === 403) throw new Error('forbidden');
+                throw new Error(`HTTP ${r.status}`);
+            }
+            return r.json();
+        })
         .then(json => {
+            // Discard stale responses (user switched to another conversation).
+            if (fetchId !== activeFetchId || activeConversation.value?.id !== conversationId) return;
+
             const fetched: ChatMessage[] = json.messages ?? [];
             // Messages come in desc order from API, reverse for display
             fetched.reverse();
@@ -67,7 +95,18 @@ function fetchMessages(conversationId: number, cursor?: string) {
             nextCursor.value = json.next_cursor ?? null;
             hasMore.value = json.has_more ?? false;
         })
-        .finally(() => { loadingMessages.value = false; });
+        .catch((err: unknown) => {
+            if (err instanceof DOMException && err.name === 'AbortError') return;
+            if (err instanceof Error && err.message === 'forbidden') {
+                toast.add({ severity: 'warn', summary: t('chat.access_denied'), life: 5000 });
+            } else {
+                toast.add({ severity: 'error', summary: t('chat.load_failed'), life: 4000 });
+            }
+        })
+        .finally(() => {
+            if (controller.signal.aborted) return;
+            if (fetchId === activeFetchId) loadingMessages.value = false;
+        });
 }
 
 function loadMore() {
@@ -80,7 +119,11 @@ function handleRealtimeMessage(msg: ChatMessage) {
     if (threadMessages.value.some(m => m.id === msg.id)) return;
 
     threadMessages.value.push(msg);
-    markRead(msg.conversation_id);
+    // If this message targets the currently active conversation, mark read
+    // immediately (user is looking at it) and don't bump the global badge.
+    if (activeConversation.value?.id === msg.conversation_id) {
+        markRead(msg.conversation_id);
+    }
 
     // Update conversation list
     const idx = conversationList.value.findIndex(c => c.id === msg.conversation_id);
@@ -100,12 +143,11 @@ function getSocketId(): string {
     return window.Echo?.socketId?.() ?? '';
 }
 
-function sendMessage(body: string) {
+function sendMessage(payload: { body: string; files: File[] }) {
     if (!activeConversation.value) return;
 
     const headers: Record<string, string> = {
         'Accept': 'application/json',
-        'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
         'X-XSRF-TOKEN': getCsrfToken(),
     };
@@ -114,32 +156,52 @@ function sendMessage(body: string) {
         headers['X-Socket-ID'] = socketId;
     }
 
+    const form = new FormData();
+    if (payload.body) form.append('body', payload.body);
+    for (const file of payload.files) {
+        form.append('attachments[]', file);
+    }
+
     fetch(`/chat/conversations/${activeConversation.value.id}/messages`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ body }),
+        body: form,
     })
-        .then(r => r.json())
+        .then(async (r) => {
+            if (!r.ok) {
+                if (r.status === 403) throw new Error('forbidden');
+                throw new Error(`HTTP ${r.status}`);
+            }
+            return r.json();
+        })
         .then(json => {
-            if (json.message) {
-                threadMessages.value.push(json.message);
+            if (!json.message) return;
 
-                // Update conversation list
-                const cId = activeConversation.value!.id;
-                const idx = conversationList.value.findIndex(c => c.id === cId);
-                if (idx !== -1) {
-                    conversationList.value[idx].latest_message = {
-                        id: json.message.id,
-                        body: json.message.body,
-                        user_id: json.message.user_id,
-                        user: { id: json.message.user.id, first_name: json.message.user.first_name },
-                        created_at: json.message.created_at,
-                    };
-                    conversationList.value[idx].last_message_at = json.message.created_at;
-                    // Move to top
-                    const conv = conversationList.value.splice(idx, 1)[0];
-                    conversationList.value.unshift(conv);
-                }
+            threadMessages.value.push(json.message);
+
+            // Update conversation list
+            const cId = activeConversation.value?.id;
+            if (cId === undefined) return;
+            const idx = conversationList.value.findIndex(c => c.id === cId);
+            if (idx !== -1) {
+                conversationList.value[idx].latest_message = {
+                    id: json.message.id,
+                    body: json.message.body,
+                    user_id: json.message.user_id,
+                    user: { id: json.message.user.id, first_name: json.message.user.first_name },
+                    created_at: json.message.created_at,
+                };
+                conversationList.value[idx].last_message_at = json.message.created_at;
+                // Move to top
+                const conv = conversationList.value.splice(idx, 1)[0];
+                conversationList.value.unshift(conv);
+            }
+        })
+        .catch((err: unknown) => {
+            if (err instanceof Error && err.message === 'forbidden') {
+                toast.add({ severity: 'warn', summary: t('chat.access_denied'), life: 5000 });
+            } else {
+                toast.add({ severity: 'error', summary: t('chat.send_failed'), life: 4000 });
             }
         });
 }
@@ -153,11 +215,19 @@ function markRead(conversationId: number) {
             'X-Requested-With': 'XMLHttpRequest',
             'X-XSRF-TOKEN': getCsrfToken(),
         },
+    }).catch(() => {
+        // Silent — read receipts are non-critical and retried on next open.
     });
 }
 
+const TYPING_THROTTLE_MS = 2000;
+let lastTypingAt = 0;
+
 function handleTyping() {
     if (!activeConversation.value) return;
+    const now = Date.now();
+    if (now - lastTypingAt < TYPING_THROTTLE_MS) return;
+    lastTypingAt = now;
     whisperTyping(activeConversation.value.id, user.value.full_name);
 }
 
@@ -172,15 +242,32 @@ function createConversation(userIds: number[]) {
         },
         body: JSON.stringify({ user_ids: userIds }),
     })
-        .then(r => r.json())
+        .then(async (r) => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
         .then(json => {
             showNewDialog.value = false;
             if (json.conversation?.id) {
                 // Reload conversations and select the new one
                 reloadConversations(json.conversation.id);
             }
+        })
+        .catch(() => {
+            toast.add({ severity: 'error', summary: t('chat.send_failed'), life: 4000 });
         });
 }
+
+onBeforeUnmount(() => {
+    activeFetchAbort?.abort();
+});
+
+onMounted(() => {
+    const id = parseConversationParam();
+    if (id === null) return;
+    const conv = conversationList.value.find((c) => c.id === id);
+    if (conv) selectConversation(conv);
+});
 
 function reloadConversations(selectId?: number) {
     router.reload({

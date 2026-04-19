@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('type', 20)->default('text');
             $table->timestamps();
 
-            $table->index(['conversation_id', 'created_at']);
+            $table->index(['conversation_id', 'created_at', 'id']);
         });
     }
 

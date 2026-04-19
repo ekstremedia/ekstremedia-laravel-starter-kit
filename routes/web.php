@@ -59,6 +59,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/chat/conversations/{conversation}', [ChatController::class, 'show'])->name('chat.conversations.show');
             Route::post('/chat/conversations/{conversation}/messages', [ChatController::class, 'sendMessage'])->name('chat.conversations.sendMessage');
             Route::post('/chat/conversations/{conversation}/read', [ChatController::class, 'markRead'])->name('chat.conversations.markRead');
+            Route::post('/chat/read-all', [ChatController::class, 'markAllRead'])->name('chat.markAllRead');
             Route::get('/chat/users/search', [ChatController::class, 'searchUsers'])->name('chat.users.search');
         });
     });

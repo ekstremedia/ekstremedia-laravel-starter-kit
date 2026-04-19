@@ -5,6 +5,17 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @phpstan-type UserSettingsShape array{
+ *     locale: string,
+ *     dark_mode: bool,
+ *     notification_email_immediate: bool,
+ *     notification_digest: 'none'|'daily'|'weekly',
+ *     notification_chat_messages: bool,
+ *     notification_account_updates: bool,
+ *     notification_system_alerts: bool,
+ * }
+ */
 class UserSetting extends Model
 {
     protected $fillable = ['user_id', 'settings'];
@@ -16,6 +27,8 @@ class UserSetting extends Model
     /**
      * Default values for all settings.
      * Add new settings here — they are automatically merged when reading.
+     *
+     * @var UserSettingsShape
      */
     public static array $defaults = [
         'locale' => 'en',

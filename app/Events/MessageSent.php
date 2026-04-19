@@ -37,6 +37,20 @@ class MessageSent implements ShouldBroadcast
      */
     public function broadcastWith(): array
     {
+        $attachments = $this->message->getMedia('attachments')->map(function ($m) {
+            $isImage = str_starts_with((string) $m->mime_type, 'image/');
+
+            return [
+                'id' => $m->id,
+                'name' => $m->file_name,
+                'size' => $m->size,
+                'mime_type' => $m->mime_type,
+                'is_image' => $isImage,
+                'url' => $m->getUrl(),
+                'thumb_url' => $isImage && $m->hasGeneratedConversion('thumb') ? $m->getUrl('thumb') : null,
+            ];
+        })->values()->all();
+
         return [
             'message' => [
                 'id' => $this->message->id,
@@ -44,6 +58,7 @@ class MessageSent implements ShouldBroadcast
                 'user_id' => $this->message->user_id,
                 'body' => $this->message->body,
                 'type' => $this->message->type,
+                'attachments' => $attachments,
                 'created_at' => $this->message->created_at->toISOString(),
             ],
             'sender' => [

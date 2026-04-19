@@ -4,9 +4,13 @@ use App\Events\MessageSent;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
+use App\Notifications\NewChatMessageNotification;
 use Database\Seeders\RoleAndPermissionSeeder;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
@@ -140,6 +144,134 @@ it('sends a message in a conversation', function () {
         return $event->message->body === 'Hello Bob!'
             && $event->sender->id === $this->alice->id;
     });
+});
+
+it('marks every conversation as read via /chat/read-all', function () {
+    Event::fake([MessageSent::class]);
+    Notification::fake();
+
+    // Alice creates two conversations and Bob sends messages to both.
+    $convA = $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->bob->id]])
+        ->json('conversation.id');
+    $convB = $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->charlie->id]])
+        ->json('conversation.id');
+
+    $this->actingAs($this->bob)
+        ->postJson(chatUrl("/conversations/{$convA}/messages"), ['body' => 'hi from bob']);
+    $this->actingAs($this->charlie)
+        ->postJson(chatUrl("/conversations/{$convB}/messages"), ['body' => 'hi from charlie']);
+
+    expect($this->alice->fresh()->unreadMessagesCount())->toBe(2);
+
+    $this->actingAs($this->alice)
+        ->postJson(chatUrl('/read-all'))
+        ->assertOk()
+        ->assertJson(['ok' => true]);
+
+    expect($this->alice->fresh()->unreadMessagesCount())->toBe(0);
+});
+
+it('accepts file attachments on a message', function () {
+    Event::fake([MessageSent::class]);
+    Notification::fake();
+    Storage::fake('public');
+
+    $convId = $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->bob->id]])
+        ->json('conversation.id');
+
+    $image = UploadedFile::fake()->image('snapshot.png', 120, 80);
+    $doc = UploadedFile::fake()->create('notes.pdf', 12, 'application/pdf');
+
+    $response = $this->actingAs($this->alice)
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
+            'body' => 'See attached',
+            'attachments' => [$image, $doc],
+        ]);
+
+    $response->assertCreated()
+        ->assertJsonPath('message.body', 'See attached')
+        ->assertJsonCount(2, 'message.attachments');
+
+    $message = Message::first();
+    expect($message->getMedia('attachments'))->toHaveCount(2);
+});
+
+it('requires either a body or attachments', function () {
+    Event::fake([MessageSent::class]);
+    Notification::fake();
+
+    $convId = $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->bob->id]])
+        ->json('conversation.id');
+
+    $this->actingAs($this->alice)
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [])
+        ->assertStatus(422);
+});
+
+it('notifies other participants when a message is sent', function () {
+    Event::fake([MessageSent::class]);
+    Notification::fake();
+
+    $convResponse = $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), [
+            'user_ids' => [$this->bob->id],
+        ]);
+    $convId = $convResponse->json('conversation.id');
+
+    $this->actingAs($this->alice)
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
+            'body' => 'Hi Bob!',
+        ])
+        ->assertCreated();
+
+    Notification::assertSentTo($this->bob, NewChatMessageNotification::class);
+    Notification::assertNotSentTo($this->alice, NewChatMessageNotification::class);
+});
+
+it('does not persist chat notifications to the database inbox', function () {
+    Event::fake([MessageSent::class]);
+
+    $convId = $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), ['user_ids' => [$this->bob->id]])
+        ->json('conversation.id');
+
+    $this->actingAs($this->alice)
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
+            'body' => 'Hi Bob!',
+        ])
+        ->assertCreated();
+
+    // Chat messages should only fan out to broadcast (and optionally mail),
+    // never to the database notification inbox.
+    expect($this->bob->fresh()->notifications()->count())->toBe(0);
+    expect($this->bob->fresh()->unreadNotifications()->count())->toBe(0);
+});
+
+it('respects the notification_chat_messages preference for recipients', function () {
+    Event::fake([MessageSent::class]);
+    Notification::fake();
+
+    $this->bob->settings()->merge(['notification_chat_messages' => false]);
+
+    $convResponse = $this->actingAs($this->alice)
+        ->postJson(chatUrl('/conversations'), [
+            'user_ids' => [$this->bob->id],
+        ]);
+    $convId = $convResponse->json('conversation.id');
+
+    $this->actingAs($this->alice)
+        ->postJson(chatUrl("/conversations/{$convId}/messages"), [
+            'body' => 'Hi Bob!',
+        ])
+        ->assertCreated();
+
+    // Laravel's fake still records the Notification::send call; verify via() honours the opt-out.
+    $notification = new NewChatMessageNotification(Message::first(), $this->alice);
+    expect($notification->via($this->bob))->toBe([]);
 });
 
 it('updates last_message_at when sending a message', function () {

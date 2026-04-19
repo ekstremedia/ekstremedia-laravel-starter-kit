@@ -27,6 +27,14 @@ function displayAvatar(conversation: ChatConversation): ChatUser | null {
     return conversation.participants.find(p => p.id !== props.currentUserId) ?? null;
 }
 
+const avatarByConv = computed<Record<number, ChatUser | null>>(() => {
+    const map: Record<number, ChatUser | null> = {};
+    for (const c of props.conversations) {
+        map[c.id] = displayAvatar(c);
+    }
+    return map;
+});
+
 function initials(user: ChatUser): string {
     const first = (user.first_name?.trim() ?? '')[0] ?? '';
     const last = (user.last_name?.trim() ?? '')[0] ?? '';
@@ -84,16 +92,16 @@ function timeLabel(iso: string | null): string {
             >
                 <!-- Avatar -->
                 <div class="relative shrink-0">
-                    <template v-if="displayAvatar(c)">
+                    <template v-if="avatarByConv[c.id]">
                         <img
-                            v-if="displayAvatar(c)!.avatar_thumb_url"
-                            :src="displayAvatar(c)!.avatar_thumb_url!"
+                            v-if="avatarByConv[c.id]!.avatar_thumb_url"
+                            :src="avatarByConv[c.id]!.avatar_thumb_url!"
                             class="w-10 h-10 rounded-full object-cover"
                         />
                         <div
                             v-else
                             class="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-semibold"
-                        >{{ initials(displayAvatar(c)!) }}</div>
+                        >{{ initials(avatarByConv[c.id]!) }}</div>
                     </template>
                     <div
                         v-else

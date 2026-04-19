@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
+use Spatie\Image\Enums\Fit;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 /**
  * @property int $id
@@ -20,14 +24,33 @@ use Illuminate\Support\Facades\Crypt;
  * @property-read Conversation $conversation
  * @property-read User $user
  */
-class Message extends Model
+class Message extends Model implements HasMedia
 {
+    use InteractsWithMedia;
+
     public function getConnectionName(): ?string
     {
         return config('chat.connection', 'pgsql');
     }
 
     protected $fillable = ['conversation_id', 'user_id', 'body', 'is_encrypted', 'type'];
+
+    public function registerMediaCollections(): void
+    {
+        // Accept any user-uploaded file type; size limit is enforced by the
+        // controller's validation rules. Restricting mime types at the model
+        // level is too easy to outgrow — the UI's file picker is the gate.
+        $this->addMediaCollection('attachments');
+    }
+
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('thumb')
+            ->fit(Fit::Contain, 320, 320)
+            ->format('webp')
+            ->nonQueued()
+            ->performOnCollections('attachments');
+    }
 
     protected function casts(): array
     {
@@ -63,7 +86,9 @@ class Message extends Model
 
                 return $value;
             },
-            set: function (string $value): array {
+            set: function (?string $value): array {
+                $value ??= '';
+
                 if (config('chat.encryption_enabled')) {
                     return [
                         'body' => Crypt::encryptString($value),

@@ -6,9 +6,12 @@ use App\Events\MessageSent;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
+use App\Notifications\NewChatMessageNotification;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -24,34 +27,12 @@ class ChatController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
+        $unreadMap = $this->unreadCountsFor($user, $models);
+
         $conversations = [];
 
         foreach ($models as $c) {
-            $latest = $c->latestMessage;
-
-            $conversations[] = [
-                'id' => $c->id,
-                'title' => $c->title,
-                'is_group' => $c->is_group,
-                'participants' => $c->users->map(fn (User $u) => [
-                    'id' => $u->id,
-                    'first_name' => $u->first_name,
-                    'last_name' => $u->last_name,
-                    'avatar_thumb_url' => $u->avatarUrl('thumb'),
-                ])->values()->all(),
-                'latest_message' => $latest ? [
-                    'id' => $latest->id,
-                    'body' => $latest->body,
-                    'user_id' => $latest->user_id,
-                    'user' => [
-                        'id' => $latest->user->id,
-                        'first_name' => $latest->user->first_name,
-                    ],
-                    'created_at' => $latest->created_at->toISOString(),
-                ] : null,
-                'unread_count' => $c->unreadCountFor($user),
-                'last_message_at' => $c->last_message_at?->toISOString(),
-            ];
+            $conversations[] = $this->formatConversation($c, $user, $unreadMap[$c->id] ?? 0);
         }
 
         return Inertia::render('Chat', [
@@ -88,43 +69,84 @@ class ChatController extends Controller
 
         $models = $query->limit(15)->get();
 
+        $unreadMap = $this->unreadCountsFor($user, $models);
+
         $conversations = [];
 
         foreach ($models as $c) {
-            $latest = $c->latestMessage;
-            $unreadCount = $c->unreadCountFor($user);
+            $unreadCount = $unreadMap[$c->id] ?? 0;
 
             // Skip non-unread when filtering
             if ($filter === 'unread' && $unreadCount === 0) {
                 continue;
             }
 
-            $conversations[] = [
-                'id' => $c->id,
-                'title' => $c->title,
-                'is_group' => $c->is_group,
-                'participants' => $c->users->map(fn (User $u) => [
-                    'id' => $u->id,
-                    'first_name' => $u->first_name,
-                    'last_name' => $u->last_name,
-                    'avatar_thumb_url' => $u->avatarUrl('thumb'),
-                ])->values()->all(),
-                'latest_message' => $latest ? [
-                    'id' => $latest->id,
-                    'body' => $latest->body,
-                    'user_id' => $latest->user_id,
-                    'user' => [
-                        'id' => $latest->user->id,
-                        'first_name' => $latest->user->first_name,
-                    ],
-                    'created_at' => $latest->created_at->toISOString(),
-                ] : null,
-                'unread_count' => $unreadCount,
-                'last_message_at' => $c->last_message_at?->toISOString(),
-            ];
+            $conversations[] = $this->formatConversation($c, $user, $unreadCount);
         }
 
         return response()->json(['conversations' => $conversations]);
+    }
+
+    /**
+     * Build a conversation_id => unread_count map in a single query.
+     *
+     * @param  Collection<int, Conversation>  $conversations
+     * @return array<int, int>
+     */
+    private function unreadCountsFor(User $user, Collection $conversations): array
+    {
+        if ($conversations->isEmpty()) {
+            return [];
+        }
+
+        $ids = $conversations->pluck('id')->all();
+
+        $rows = Message::query()
+            ->selectRaw('messages.conversation_id, COUNT(*) AS unread')
+            ->join('conversation_user', 'conversation_user.conversation_id', '=', 'messages.conversation_id')
+            ->where('conversation_user.user_id', $user->id)
+            ->where('messages.user_id', '!=', $user->id)
+            ->whereIn('messages.conversation_id', $ids)
+            ->where(function ($q): void {
+                $q->whereNull('conversation_user.last_read_at')
+                    ->orWhereColumn('messages.created_at', '>', 'conversation_user.last_read_at');
+            })
+            ->groupBy('messages.conversation_id')
+            ->pluck('unread', 'messages.conversation_id');
+
+        return $rows->map(fn ($v) => (int) $v)->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function formatConversation(Conversation $c, User $user, int $unreadCount): array
+    {
+        $latest = $c->latestMessage;
+
+        return [
+            'id' => $c->id,
+            'title' => $c->title,
+            'is_group' => $c->is_group,
+            'participants' => $c->users->map(fn (User $u) => [
+                'id' => $u->id,
+                'first_name' => $u->first_name,
+                'last_name' => $u->last_name,
+                'avatar_thumb_url' => $u->avatarUrl('thumb'),
+            ])->values()->all(),
+            'latest_message' => $latest ? [
+                'id' => $latest->id,
+                'body' => $latest->body,
+                'user_id' => $latest->user_id,
+                'user' => [
+                    'id' => $latest->user->id,
+                    'first_name' => $latest->user->first_name,
+                ],
+                'created_at' => $latest->created_at->toISOString(),
+            ] : null,
+            'unread_count' => $unreadCount,
+            'last_message_at' => $c->last_message_at?->toISOString(),
+        ];
     }
 
     public function store(Request $request): JsonResponse
@@ -136,14 +158,32 @@ class ChatController extends Controller
         ]);
 
         $user = $request->user();
-        $participantIds = collect($validated['user_ids'])->reject(fn ($id) => (int) $id === $user->id);
+        $connection = config('chat.connection', 'pgsql');
+
+        $participantIds = collect($validated['user_ids'])
+            ->map(fn ($id) => (int) $id)
+            ->reject(fn (int $id) => $id === $user->id)
+            ->unique()
+            ->values();
 
         if ($participantIds->isEmpty()) {
             return response()->json(['message' => 'At least one other participant is required.'], 422);
         }
 
-        // For 1:1 chats, check if a conversation already exists
-        if ($participantIds->count() === 1 && ! isset($validated['title'])) {
+        // Drop banned/invalid users so we match the filter applied in searchUsers.
+        $allowedIds = User::on($connection)
+            ->notBanned()
+            ->whereIn('id', $participantIds)
+            ->pluck('id');
+
+        $participantIds = $participantIds->intersect($allowedIds)->values();
+
+        if ($participantIds->isEmpty()) {
+            return response()->json(['message' => 'At least one other participant is required.'], 422);
+        }
+
+        // For any two-party chat, always dedupe against an existing direct conversation.
+        if ($participantIds->count() === 1) {
             $existing = Conversation::findDirectBetween($user->id, $participantIds->first());
             if ($existing) {
                 return response()->json([
@@ -179,8 +219,9 @@ class ChatController extends Controller
         }
 
         $messages = $conversation->messages()
-            ->with('user:id,first_name,last_name')
+            ->with(['user:id,first_name,last_name', 'media'])
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->cursorPaginate(50);
 
         $items = [];
@@ -217,14 +258,23 @@ class ChatController extends Controller
         }
 
         $validated = $request->validate([
-            'body' => 'required|string|max:5000',
+            'body' => 'nullable|string|max:5000',
+            'attachments' => 'sometimes|array|max:10',
+            'attachments.*' => 'file|max:10240', // 10 MB per file
         ]);
+
+        $hasFiles = $request->hasFile('attachments');
+        $hasBody = isset($validated['body']) && trim((string) $validated['body']) !== '';
+
+        if (! $hasBody && ! $hasFiles) {
+            abort(422, 'Message must include text or at least one attachment.');
+        }
 
         /** @var Message $message */
         $message = DB::connection($conversation->getConnectionName())->transaction(function () use ($conversation, $validated, $request) {
             $message = $conversation->messages()->create([
                 'user_id' => $request->user()->id,
-                'body' => $validated['body'],
+                'body' => $validated['body'] ?? '',
             ]);
 
             $conversation->update(['last_message_at' => now()]);
@@ -239,7 +289,25 @@ class ChatController extends Controller
             return $message;
         });
 
+        if ($hasFiles) {
+            /** @var \Illuminate\Http\UploadedFile $file */
+            foreach ($request->file('attachments', []) as $file) {
+                $message->addMedia($file)->toMediaCollection('attachments');
+            }
+            $message->load('media');
+        }
+
         broadcast(new MessageSent($message, $request->user()))->toOthers();
+
+        // Notify every other participant (database + broadcast, mail if enabled).
+        $sender = $request->user();
+        $recipients = $conversation->users()
+            ->where('user_id', '!=', $sender->id)
+            ->get();
+
+        if ($recipients->isNotEmpty()) {
+            Notification::send($recipients, new NewChatMessageNotification($message, $sender));
+        }
 
         return response()->json([
             'message' => $this->formatMessage($message),
@@ -259,13 +327,30 @@ class ChatController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    /**
+     * Mark every conversation the user participates in as read.
+     */
+    public function markAllRead(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $now = now();
+
+        DB::connection(config('chat.connection', 'pgsql'))
+            ->table('conversation_user')
+            ->where('user_id', $user->id)
+            ->update(['last_read_at' => $now, 'updated_at' => $now]);
+
+        return response()->json(['ok' => true]);
+    }
+
     public function searchUsers(Request $request): JsonResponse
     {
-        $request->validate(['q' => 'required|string|min:1|max:100']);
+        $request->validate(['q' => 'required|string|min:2|max:100']);
 
         $query = $request->input('q');
         $user = $request->user();
-        $escapedQuery = str_replace(['%', '_'], ['\%', '\_'], $query);
+        // Escape LIKE/ILIKE wildcards so % and _ don't leak raw user input into the pattern.
+        $escapedQuery = addcslashes($query, '%_\\');
 
         $connection = config('chat.connection', 'pgsql');
         $driver = DB::connection($connection)->getDriverName();
@@ -276,8 +361,7 @@ class ChatController extends Controller
             ->notBanned()
             ->where(function ($q) use ($escapedQuery, $op) {
                 $q->where('first_name', $op, "%{$escapedQuery}%")
-                    ->orWhere('last_name', $op, "%{$escapedQuery}%")
-                    ->orWhere('email', $op, "%{$escapedQuery}%");
+                    ->orWhere('last_name', $op, "%{$escapedQuery}%");
             });
 
         // When tenancy is enabled and user is not admin, limit to users
@@ -308,6 +392,20 @@ class ChatController extends Controller
      */
     private function formatMessage(Message $message): array
     {
+        $attachments = $message->getMedia('attachments')->map(function ($m) {
+            $isImage = str_starts_with((string) $m->mime_type, 'image/');
+
+            return [
+                'id' => $m->id,
+                'name' => $m->file_name,
+                'size' => $m->size,
+                'mime_type' => $m->mime_type,
+                'is_image' => $isImage,
+                'url' => $m->getUrl(),
+                'thumb_url' => $isImage && $m->hasGeneratedConversion('thumb') ? $m->getUrl('thumb') : null,
+            ];
+        })->values()->all();
+
         return [
             'id' => $message->id,
             'conversation_id' => $message->conversation_id,
@@ -320,6 +418,7 @@ class ChatController extends Controller
             ],
             'body' => $message->body,
             'type' => $message->type,
+            'attachments' => $attachments,
             'created_at' => $message->created_at->toISOString(),
         ];
     }

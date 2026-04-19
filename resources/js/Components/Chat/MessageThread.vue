@@ -18,6 +18,7 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const scrollContainer = ref<HTMLElement | null>(null);
 const autoScroll = ref(true);
+let prevScrollHeight = 0;
 
 function scrollToBottom() {
     nextTick(() => {
@@ -32,14 +33,27 @@ function handleScroll() {
     const { scrollTop, scrollHeight, clientHeight } = scrollContainer.value;
     autoScroll.value = scrollHeight - scrollTop - clientHeight < 50;
 
-    // Load more when scrolled near top
+    // Load more when scrolled near top — remember height so we can keep the viewport steady.
     if (scrollTop < 100 && props.hasMore && !props.loading) {
+        prevScrollHeight = scrollHeight;
         emit('loadMore');
     }
 }
 
 watch(() => props.messages.length, () => {
-    scrollToBottom();
+    if (autoScroll.value) {
+        scrollToBottom();
+        return;
+    }
+    if (prevScrollHeight && scrollContainer.value) {
+        const capturedHeight = prevScrollHeight;
+        prevScrollHeight = 0;
+        nextTick(() => {
+            const el = scrollContainer.value;
+            if (!el) return;
+            el.scrollTop = el.scrollHeight - capturedHeight;
+        });
+    }
 });
 
 onMounted(() => {
@@ -116,7 +130,39 @@ defineExpose({ scrollToBottom });
                         ? 'bg-indigo-600 text-white rounded-br-md'
                         : 'bg-gray-100 dark:bg-dark-800 text-gray-900 dark:text-gray-100 rounded-bl-md'"
                 >
-                    <p class="whitespace-pre-wrap break-words">{{ msg.body }}</p>
+                    <p v-if="msg.body" class="whitespace-pre-wrap break-words">{{ msg.body }}</p>
+
+                    <!-- Attachments -->
+                    <div v-if="msg.attachments && msg.attachments.length > 0" class="mt-2 space-y-2">
+                        <template v-for="att in msg.attachments" :key="att.id">
+                            <a
+                                v-if="att.is_image"
+                                :href="att.url"
+                                target="_blank"
+                                rel="noopener"
+                                class="block"
+                            >
+                                <img
+                                    :src="att.thumb_url ?? att.url"
+                                    :alt="att.name"
+                                    class="max-w-full rounded-lg max-h-60 object-contain bg-white/10"
+                                />
+                            </a>
+                            <a
+                                v-else
+                                :href="att.url"
+                                target="_blank"
+                                rel="noopener"
+                                download
+                                class="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs"
+                                :class="msg.user_id === currentUserId ? 'bg-indigo-700/50 hover:bg-indigo-700/70' : 'bg-gray-200 dark:bg-dark-700 hover:bg-gray-300 dark:hover:bg-dark-600'"
+                            >
+                                <i class="pi pi-file text-sm"></i>
+                                <span class="truncate max-w-[12rem]">{{ att.name }}</span>
+                            </a>
+                        </template>
+                    </div>
+
                     <p class="text-[10px] mt-1"
                        :class="msg.user_id === currentUserId ? 'text-indigo-200' : 'text-gray-400'">
                         {{ timeLabel(msg.created_at) }}

@@ -7,6 +7,16 @@ export interface ChatUser {
     avatar_thumb_url?: string | null;
 }
 
+export interface ChatAttachment {
+    id: number;
+    name: string;
+    size: number;
+    mime_type: string;
+    is_image: boolean;
+    url: string;
+    thumb_url: string | null;
+}
+
 export interface ChatMessage {
     id: number;
     conversation_id: number;
@@ -14,6 +24,7 @@ export interface ChatMessage {
     user: ChatUser;
     body: string;
     type: string;
+    attachments?: ChatAttachment[];
     created_at: string;
 }
 

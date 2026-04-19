@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
+import { useToast } from 'primevue/usetoast';
+import Dialog from 'primevue/dialog';
 import type { ChatConversation, ChatUser } from '@/composables/useChat';
+import { useUnreadCounts } from '@/composables/useUnreadCounts';
 
 const props = defineProps<{
     unreadCount: number;
@@ -10,12 +13,24 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
+const toast = useToast();
+const { setMessages, decrementMessages } = useUnreadCounts();
 const open = ref(false);
 const conversations = ref<ChatConversation[]>([]);
 const loading = ref(false);
 const activeFilter = ref<'all' | 'unread' | 'groups'>('all');
 const searchQuery = ref('');
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+const quickReplyTarget = ref<ChatConversation | null>(null);
+const quickReplyBody = ref('');
+const quickReplySending = ref(false);
+const quickReplyVisible = computed({
+    get: () => quickReplyTarget.value !== null,
+    set: (v: boolean) => {
+        if (!v) quickReplyTarget.value = null;
+    },
+});
 
 function fetchConversations() {
     loading.value = true;
@@ -58,6 +73,74 @@ function goToConversation(c: ChatConversation) {
 
 function openFullChat() {
     open.value = false;
+}
+
+function markAllViewed() {
+    fetch('/chat/read-all', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-XSRF-TOKEN': getCsrfToken(),
+        },
+    })
+        .then(async (r) => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        })
+        .then(() => {
+            conversations.value = conversations.value.map((c) => ({ ...c, unread_count: 0 }));
+            setMessages(0);
+            toast.add({ severity: 'success', summary: t('chat.all_marked_viewed'), life: 3000 });
+        })
+        .catch(() => {
+            toast.add({ severity: 'error', summary: t('chat.send_failed'), life: 4000 });
+        });
+}
+
+function openQuickReply(c: ChatConversation) {
+    quickReplyBody.value = '';
+    quickReplyTarget.value = c;
+}
+
+function sendQuickReply() {
+    const target = quickReplyTarget.value;
+    const body = quickReplyBody.value.trim();
+    if (!target || !body) return;
+
+    quickReplySending.value = true;
+
+    fetch(`/chat/conversations/${target.id}/messages`, {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-XSRF-TOKEN': getCsrfToken(),
+        },
+        body: JSON.stringify({ body }),
+    })
+        .then(async (r) => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
+        .then(() => {
+            const prevUnread = target.unread_count ?? 0;
+            if (prevUnread > 0) decrementMessages(prevUnread);
+            const idx = conversations.value.findIndex((c) => c.id === target.id);
+            if (idx !== -1) conversations.value[idx].unread_count = 0;
+            quickReplyTarget.value = null;
+        })
+        .catch(() => {
+            toast.add({ severity: 'error', summary: t('chat.send_failed'), life: 4000 });
+        })
+        .finally(() => {
+            quickReplySending.value = false;
+        });
+}
+
+function getCsrfToken(): string {
+    return decodeURIComponent(document.cookie.split('; ').find(c => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? '');
 }
 
 // ── Display helpers ────────────────────────────────────────────
@@ -136,9 +219,19 @@ const filters = ['all', 'unread', 'groups'] as const;
                 <!-- Header -->
                 <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-dark-700">
                     <span class="text-sm font-semibold">{{ t('chat.title') }}</span>
-                    <Link href="/chat" @click="openFullChat" class="text-xs text-indigo-500 hover:underline">
-                        {{ t('chat.open_messages') }}
-                    </Link>
+                    <div class="flex items-center gap-3">
+                        <button
+                            v-if="unreadCount > 0"
+                            type="button"
+                            @click="markAllViewed"
+                            class="text-xs text-indigo-500 hover:underline cursor-pointer"
+                        >
+                            {{ t('chat.mark_all_viewed') }}
+                        </button>
+                        <Link href="/chat" @click="openFullChat" class="text-xs text-indigo-500 hover:underline">
+                            {{ t('chat.open_messages') }}
+                        </Link>
+                    </div>
                 </div>
 
                 <!-- Filter tabs -->
@@ -181,12 +274,11 @@ const filters = ['all', 'unread', 'groups'] as const;
                     <li
                         v-for="c in conversations"
                         :key="c.id"
-                        @click="goToConversation(c)"
-                        class="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-dark-800/50"
+                        class="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-dark-800/50"
                         :class="c.unread_count > 0 ? 'bg-indigo-50/30 dark:bg-dark-800/30' : ''"
                     >
                         <!-- Avatar -->
-                        <div class="shrink-0">
+                        <div class="shrink-0 cursor-pointer" @click="goToConversation(c)">
                             <template v-if="displayAvatar(c)">
                                 <img
                                     v-if="displayAvatar(c)!.avatar_thumb_url"
@@ -207,7 +299,7 @@ const filters = ['all', 'unread', 'groups'] as const;
                         </div>
 
                         <!-- Content -->
-                        <div class="flex-1 min-w-0">
+                        <div class="flex-1 min-w-0 cursor-pointer" @click="goToConversation(c)">
                             <div class="flex justify-between items-baseline">
                                 <p class="text-sm truncate" :class="c.unread_count > 0 ? 'font-semibold text-gray-900 dark:text-white' : 'font-medium text-gray-700 dark:text-gray-300'">
                                     {{ displayName(c) }}
@@ -218,6 +310,17 @@ const filters = ['all', 'unread', 'groups'] as const;
                                 {{ previewText(c) }}
                             </p>
                         </div>
+
+                        <!-- Quick reply -->
+                        <button
+                            type="button"
+                            @click.stop="openQuickReply(c)"
+                            class="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1.5 rounded-md text-indigo-500 hover:bg-indigo-50 dark:hover:bg-dark-800 cursor-pointer"
+                            :title="t('chat.quick_reply')"
+                            :aria-label="t('chat.quick_reply')"
+                        >
+                            <i class="pi pi-reply text-sm"></i>
+                        </button>
 
                         <!-- Unread dot -->
                         <span v-if="c.unread_count > 0" class="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0"></span>
@@ -235,5 +338,41 @@ const filters = ['all', 'unread', 'groups'] as const;
 
         <!-- Click-outside backdrop -->
         <div v-if="open" @click="open = false" class="fixed inset-0 z-40"></div>
+
+        <!-- Quick reply dialog -->
+        <Dialog
+            v-model:visible="quickReplyVisible"
+            :modal="true"
+            :draggable="false"
+            :dismissable-mask="true"
+            :close-on-escape="true"
+            :style="{ width: 'min(420px, calc(100vw - 2rem))' }"
+            :header="quickReplyTarget ? t('chat.quick_reply_to', { name: displayName(quickReplyTarget) }) : t('chat.quick_reply')"
+        >
+            <div class="space-y-3">
+                <textarea
+                    v-model="quickReplyBody"
+                    rows="3"
+                    class="w-full rounded-xl border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                    :placeholder="t('chat.reply_placeholder')"
+                    @keydown.enter.exact.prevent="sendQuickReply"
+                ></textarea>
+            </div>
+            <template #footer>
+                <div class="flex justify-end gap-2">
+                    <button
+                        type="button"
+                        @click="quickReplyTarget = null"
+                        class="px-3 py-1.5 text-sm rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-800 cursor-pointer"
+                    >{{ t('common.cancel') }}</button>
+                    <button
+                        type="button"
+                        :disabled="!quickReplyBody.trim() || quickReplySending"
+                        @click="sendQuickReply"
+                        class="px-4 py-1.5 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    >{{ t('chat.send') }}</button>
+                </div>
+            </template>
+        </Dialog>
     </div>
 </template>

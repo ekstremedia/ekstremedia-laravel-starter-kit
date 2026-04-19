@@ -104,6 +104,10 @@ class Conversation extends Model
      */
     public static function findDirectBetween(int $userIdA, int $userIdB): ?self
     {
+        // `having` on the aggregate subquery isn't portable to SQLite (CI/test
+        // driver), so we eager-load the count and filter in memory. The two
+        // whereHas clauses already narrow the candidate set to conversations
+        // containing both users, so this is typically a 0–1 row result.
         return static::where('is_group', false)
             ->whereHas('users', fn (Builder $q) => $q->where('user_id', $userIdA))
             ->whereHas('users', fn (Builder $q) => $q->where('user_id', $userIdB))

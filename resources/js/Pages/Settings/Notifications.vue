@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { ref, onMounted } from 'vue';
 import { gsap } from 'gsap';
 import { useToast } from 'primevue/usetoast';
+import ToggleSwitch from 'primevue/toggleswitch';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 
@@ -31,16 +32,16 @@ const form = useForm({
 const sectionsRef = ref<HTMLElement>();
 
 onMounted(() => {
-    if (sectionsRef.value) {
-        gsap.from(sectionsRef.value.children, {
-            y: 20,
-            opacity: 0,
-            duration: 0.4,
-            stagger: 0.1,
-            ease: 'power2.out',
-            delay: 0.1,
-        });
-    }
+    if (!sectionsRef.value) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    gsap.from(sectionsRef.value.children, {
+        y: 20,
+        opacity: 0,
+        duration: 0.4,
+        stagger: 0.1,
+        ease: 'power2.out',
+        delay: 0.1,
+    });
 });
 
 function submit() {
@@ -67,16 +68,12 @@ function submit() {
                     <h2 class="text-lg font-semibold">{{ t('notifications.settings.email_delivery') }}</h2>
 
                     <!-- Immediate emails -->
-                    <label class="flex items-start gap-3 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            v-model="form.notification_email_immediate"
-                            class="mt-0.5 w-5 h-5 rounded border-gray-300 dark:border-dark-600 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                        />
+                    <label class="flex items-start justify-between gap-3 cursor-pointer">
                         <div>
                             <span class="text-sm font-medium">{{ t('notifications.settings.email_on_new') }}</span>
                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ t('notifications.settings.email_on_new_desc') }}</p>
                         </div>
+                        <ToggleSwitch v-model="form.notification_email_immediate" />
                     </label>
 
                     <!-- Digest frequency -->
@@ -99,40 +96,28 @@ function submit() {
                     <h2 class="text-lg font-semibold">{{ t('notifications.settings.per_type_title') }}</h2>
                     <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('notifications.settings.per_type_desc') }}</p>
 
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            v-model="form.notification_chat_messages"
-                            class="w-5 h-5 rounded border-gray-300 dark:border-dark-600 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                        />
+                    <label class="flex items-center justify-between gap-3 cursor-pointer">
                         <div class="flex items-center gap-2">
                             <i class="pi pi-comments text-sm text-indigo-500"></i>
                             <span class="text-sm">{{ t('notifications.settings.chat_messages') }}</span>
                         </div>
+                        <ToggleSwitch v-model="form.notification_chat_messages" />
                     </label>
 
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            v-model="form.notification_account_updates"
-                            class="w-5 h-5 rounded border-gray-300 dark:border-dark-600 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                        />
+                    <label class="flex items-center justify-between gap-3 cursor-pointer">
                         <div class="flex items-center gap-2">
                             <i class="pi pi-user text-sm text-indigo-500"></i>
                             <span class="text-sm">{{ t('notifications.settings.account_updates') }}</span>
                         </div>
+                        <ToggleSwitch v-model="form.notification_account_updates" />
                     </label>
 
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            v-model="form.notification_system_alerts"
-                            class="w-5 h-5 rounded border-gray-300 dark:border-dark-600 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                        />
+                    <label class="flex items-center justify-between gap-3 cursor-pointer">
                         <div class="flex items-center gap-2">
-                            <i class="pi pi-exclamation-triangle text-sm text-indigo-500"></i>
+                            <i class="pi pi-bell text-sm text-indigo-500"></i>
                             <span class="text-sm">{{ t('notifications.settings.system_alerts') }}</span>
                         </div>
+                        <ToggleSwitch v-model="form.notification_system_alerts" />
                     </label>
                 </div>
 
