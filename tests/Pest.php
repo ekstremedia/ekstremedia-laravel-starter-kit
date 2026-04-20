@@ -2,6 +2,7 @@
 
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\MjmlCompiler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Stancl\Tenancy\Events\TenantCreated;
@@ -21,6 +22,18 @@ pest()->extend(TestCase::class)
         config()->set('tenancy.bootstrappers', []);
         Event::forget(TenantCreated::class);
         Event::forget(TenantDeleted::class);
+
+        // MJML compilation shells out to `npx mjml` which takes ~600 ms per
+        // template. 16 templates × every RefreshDatabase seed = painful.
+        // Swap in a fake compiler for tests; real compilation is exercised
+        // by the dedicated unit test that opts out of this binding.
+        app()->bind(MjmlCompiler::class, fn () => new class extends MjmlCompiler
+        {
+            public function compile(string $mjml): string
+            {
+                return '<!doctype html><html><body>'.strip_tags($mjml).'</body></html>';
+            }
+        });
     })
     ->in('Feature');
 

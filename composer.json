@@ -17,6 +17,7 @@
         "laravel/pulse": "^1.7",
         "laravel/reverb": "^1.10",
         "laravel/sanctum": "^4.3",
+        "laravel/scout": "^11.1",
         "laravel/tinker": "^3.0",
         "opcodesio/log-viewer": "^3.24",
         "pusher/pusher-php-server": "^7.2",

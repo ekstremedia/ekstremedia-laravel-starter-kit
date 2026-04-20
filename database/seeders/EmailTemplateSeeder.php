@@ -202,6 +202,54 @@ class EmailTemplateSeeder extends Seeder
                 'action_url' => '{{ reset_url }}',
                 'variables' => ['user_name', 'reset_url', 'expire_minutes'],
             ],
+
+            // ── Notification Digest ──────────────────────────────────
+            [
+                'slug' => 'notification-digest',
+                'locale' => 'en',
+                'name' => 'Notification digest',
+                'subject' => 'Your {{ frequency }} digest from {{ app_name }}',
+                'heading' => 'Hi {{ user_name }},',
+                'body' => "Here is a summary of your {{ count }} unread notification(s):\n\n{{ lines }}",
+                'action_text' => 'Open app',
+                'action_url' => '{{ app_url }}',
+                'variables' => ['user_name', 'count', 'frequency', 'lines', 'app_name', 'app_url'],
+            ],
+            [
+                'slug' => 'notification-digest',
+                'locale' => 'no',
+                'name' => 'Varslingssammendrag',
+                'subject' => 'Ditt {{ frequency }} sammendrag fra {{ app_name }}',
+                'heading' => 'Hei {{ user_name }},',
+                'body' => "Her er et sammendrag av dine {{ count }} uleste varsler:\n\n{{ lines }}",
+                'action_text' => 'Åpne appen',
+                'action_url' => '{{ app_url }}',
+                'variables' => ['user_name', 'count', 'frequency', 'lines', 'app_name', 'app_url'],
+            ],
+
+            // ── New Chat Message ─────────────────────────────────────
+            [
+                'slug' => 'new-chat-message',
+                'locale' => 'en',
+                'name' => 'New Chat Message',
+                'subject' => 'New message from {{ sender_name }}',
+                'heading' => 'Hi {{ user_name }},',
+                'body' => "{{ sender_name }} sent you a new message on {{ app_name }}:\n\n{{ message_preview }}",
+                'action_text' => 'Open chat',
+                'action_url' => '{{ app_url }}/chat',
+                'variables' => ['user_name', 'sender_name', 'message_preview', 'app_name', 'app_url'],
+            ],
+            [
+                'slug' => 'new-chat-message',
+                'locale' => 'no',
+                'name' => 'Ny chatmelding',
+                'subject' => 'Ny melding fra {{ sender_name }}',
+                'heading' => 'Hei {{ user_name }},',
+                'body' => "{{ sender_name }} har sendt deg en ny melding på {{ app_name }}:\n\n{{ message_preview }}",
+                'action_text' => 'Åpne chat',
+                'action_url' => '{{ app_url }}/chat',
+                'variables' => ['user_name', 'sender_name', 'message_preview', 'app_name', 'app_url'],
+            ],
         ];
     }
 }

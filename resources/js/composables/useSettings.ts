@@ -8,6 +8,11 @@ const STORAGE_KEY = import.meta.env.VITE_APP_STORAGE_KEY || 'starter_kit_setting
 const defaults: UserSettings = {
     locale: 'en',
     dark_mode: true,
+    notification_email_immediate: false,
+    notification_digest: 'none',
+    notification_chat_messages: true,
+    notification_account_updates: true,
+    notification_system_alerts: true,
 };
 
 // Module-level reactive state — shared across all composable calls

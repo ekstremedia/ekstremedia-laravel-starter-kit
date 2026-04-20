@@ -30,7 +30,31 @@
           {!! nl2br(e($body)) !!}
         </mj-text>
 
-        @if($actionText && $actionUrl)
+        {{-- Only render the CTA when we have both a label and a safe URL.
+             Safe = http(s) URL, OR a placeholder at the START of the string
+             (so "javascript:{{ x }}" is rejected even though it contains a
+             placeholder). Any other scheme (javascript:, data:, file:, …) is
+             dropped. --}}
+        @php
+            $isSafeActionUrl = false;
+            if (is_string($actionUrl) && $actionUrl !== '') {
+                $actionUrl = trim($actionUrl);
+                $scheme = parse_url($actionUrl, PHP_URL_SCHEME);
+                $scheme = is_string($scheme) ? strtolower($scheme) : null;
+
+                if (str_contains($actionUrl, '{{')) {
+                    // Placeholder is OK only when it appears at the start of
+                    // the URL (will resolve to the placeholder's value) —
+                    // prefixes like "javascript:" must reject.
+                    $isSafeActionUrl = preg_match('/^\s*\{\{\s*[^}]+\s*\}\}/', $actionUrl) === 1
+                        || in_array($scheme, ['http', 'https'], true);
+                } else {
+                    $isSafeActionUrl = filter_var($actionUrl, FILTER_VALIDATE_URL) !== false
+                        && in_array($scheme, ['http', 'https'], true);
+                }
+            }
+        @endphp
+        @if($actionText && $isSafeActionUrl)
         <mj-button href="{{ $actionUrl }}" align="left" padding-top="20px">
           {{ $actionText }}
         </mj-button>

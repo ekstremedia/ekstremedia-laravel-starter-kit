@@ -16,12 +16,20 @@ export interface User {
     roles?: string[];
     permissions?: string[];
     unread_notifications_count?: number;
+    unread_messages_count?: number;
     is_impersonating?: boolean;
 }
+
+export type NotificationDigestFrequency = 'none' | 'daily' | 'weekly';
 
 export interface UserSettings {
     locale: string;
     dark_mode: boolean;
+    notification_email_immediate: boolean;
+    notification_digest: NotificationDigestFrequency;
+    notification_chat_messages: boolean;
+    notification_account_updates: boolean;
+    notification_system_alerts: boolean;
     [key: string]: UserSettingValue;
 }
 
@@ -46,6 +54,9 @@ export interface PageProps extends InertiaPageProps {
         status?: string;
     };
     tenancy: {
+        enabled: boolean;
+    };
+    chat: {
         enabled: boolean;
     };
     customer: Customer | null;

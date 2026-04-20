@@ -16,11 +16,27 @@ class MjmlCompiler
      */
     public function compile(string $mjml): string
     {
-        $tmpIn = tempnam(sys_get_temp_dir(), 'mjml_');
-        $tmpOut = $tmpIn.'.html';
+        $tmpBase = tempnam(sys_get_temp_dir(), 'mjml_');
+        if ($tmpBase === false) {
+            throw new RuntimeException('Failed to create MJML temporary file.');
+        }
+
+        // mjml CLI looks at file extension; ensure we feed it a .mjml input.
+        $tmpIn = $tmpBase.'.mjml';
+        $tmpOut = $tmpBase.'.html';
 
         try {
-            file_put_contents($tmpIn, $mjml);
+            // Rename the 0-byte temp file so the `.mjml` variant is the one we
+            // own + clean up. If rename fails we must bail — continuing would
+            // write to a predictable path we don't own (a pre-existing file at
+            // $tmpIn could be overwritten, or another process could race us).
+            if (! @rename($tmpBase, $tmpIn)) {
+                throw new RuntimeException("Failed to prepare MJML temporary file at {$tmpIn}.");
+            }
+
+            if (file_put_contents($tmpIn, $mjml) === false) {
+                throw new RuntimeException("Failed to write MJML source to {$tmpIn}.");
+            }
 
             $process = new Process([
                 'npx', '--yes', 'mjml', $tmpIn,
@@ -38,8 +54,14 @@ class MjmlCompiler
                 throw new RuntimeException('MJML compilation produced no output file.');
             }
 
-            return file_get_contents($tmpOut);
+            $html = file_get_contents($tmpOut);
+            if ($html === false) {
+                throw new RuntimeException("Failed to read compiled HTML from {$tmpOut}.");
+            }
+
+            return $html;
         } finally {
+            @unlink($tmpBase);
             @unlink($tmpIn);
             @unlink($tmpOut);
         }

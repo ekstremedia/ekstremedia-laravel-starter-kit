@@ -16,3 +16,7 @@ Schedule::command('backup:monitor')->daily()->at('06:00');
 // Pulse trim + activity log cleanup
 Schedule::command('pulse:trim')->hourly();
 Schedule::command('activitylog:clean')->daily();
+
+// Notification digests
+Schedule::command('notifications:digest --frequency=daily')->dailyAt('08:00');
+Schedule::command('notifications:digest --frequency=weekly')->weeklyOn(1, '08:00');

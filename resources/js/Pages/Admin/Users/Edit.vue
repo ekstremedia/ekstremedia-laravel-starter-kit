@@ -100,6 +100,7 @@ function confirmRemove() {
 </script>
 
 <template>
+    <div>
     <Head :title="`Edit ${user.email} · Admin`" />
     <ConfirmDialog />
 
@@ -208,5 +209,6 @@ function confirmRemove() {
             </ul>
             <p v-else class="text-sm text-gray-400 italic">{{ t('admin.users.not_member') }}</p>
         </section>
+    </div>
     </div>
 </template>
