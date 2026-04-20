@@ -41,6 +41,7 @@ it('saves notification preferences', function () {
             'notification_chat_messages' => false,
             'notification_account_updates' => true,
             'notification_system_alerts' => false,
+            'notification_storage_alerts' => true,
         ])
         ->assertRedirect();
 

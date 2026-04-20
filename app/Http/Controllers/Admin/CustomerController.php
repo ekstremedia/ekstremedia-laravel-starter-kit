@@ -96,6 +96,7 @@ class CustomerController extends Controller
                 'slug' => $customer->slug,
                 'name' => $customer->name,
                 'status' => $customer->status,
+                'files_feature_enabled' => (bool) $customer->files_feature_enabled,
                 'users' => $customer->users->map(fn (User $user) => [
                     'id' => $user->id,
                     'email' => $user->email,
@@ -110,6 +111,7 @@ class CustomerController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'status' => ['required', Rule::in(['active', 'suspended'])],
+            'files_feature_enabled' => ['sometimes', 'boolean'],
         ]);
 
         $customer->update($data);

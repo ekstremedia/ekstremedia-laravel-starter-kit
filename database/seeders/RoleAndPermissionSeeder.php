@@ -20,6 +20,7 @@ class RoleAndPermissionSeeder extends Seeder
             'manage resources',
             'manage settings',
             'manage profile',
+            'manage storage',
         ];
 
         foreach ($permissions as $permission) {

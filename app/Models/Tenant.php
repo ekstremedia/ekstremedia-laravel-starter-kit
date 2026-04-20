@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Database\Factories\TenantFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
@@ -14,10 +16,12 @@ use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
  * @property string $slug
  * @property string $name
  * @property string $status
+ * @property bool $files_feature_enabled
  */
 class Tenant extends BaseTenant implements TenantWithDatabase
 {
-    use HasDatabase;
+    /** @use HasFactory<TenantFactory> */
+    use HasDatabase, HasFactory;
 
     public $incrementing = true;
 
@@ -30,7 +34,17 @@ class Tenant extends BaseTenant implements TenantWithDatabase
      */
     public static function getCustomColumns(): array
     {
-        return ['id', 'slug', 'name', 'status'];
+        return ['id', 'slug', 'name', 'status', 'files_feature_enabled'];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'files_feature_enabled' => 'boolean',
+        ];
     }
 
     /**

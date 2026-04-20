@@ -57,6 +57,7 @@ const navItems = computed<NavItem[]>(() => [
     { label: t('admin.nav.activity_log'), href: '/admin/activity', icon: 'pi-list', match: (p: string) => p.startsWith('/admin/activity') },
     { label: t('admin.nav.mail_settings'), href: '/admin/mail', icon: 'pi-envelope', match: (p: string) => p.startsWith('/admin/mail') },
     { label: t('admin.nav.app_settings'), href: '/admin/settings', icon: 'pi-sliders-h', match: (p: string) => p === '/admin/settings' },
+    { label: t('admin.nav.storage'), href: '/admin/storage', icon: 'pi-database', match: (p: string) => p.startsWith('/admin/storage') },
     { label: t('admin.nav.backups'), href: '/admin/backups', icon: 'pi-cloud-upload', match: (p: string) => p.startsWith('/admin/backups') },
     { label: t('admin.nav.system'), href: '/admin/system', icon: 'pi-server', match: (p: string) => p.startsWith('/admin/system') || p.startsWith('/admin/health') },
     { label: t('admin.nav.horizon'), href: '/horizon', icon: 'pi-compass', external: true },

@@ -61,6 +61,14 @@ class InitializeTenancyByPath
 
         $request->attributes->set('customer', $customer);
 
+        // Remember the user's most-recent customer so /app can auto-redirect
+        // them on their next login. Writes only when it actually changes to
+        // avoid hammering the setting row on every request.
+        $resolved = $user->settings()->resolved();
+        if (($resolved['last_customer_slug'] ?? null) !== $customer->slug) {
+            $user->settings()->merge(['last_customer_slug' => $customer->slug]);
+        }
+
         return $next($request);
     }
 }

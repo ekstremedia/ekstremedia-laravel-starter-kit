@@ -6,6 +6,7 @@ import Toast from 'primevue/toast';
 import LanguageSwitcher from '@/Components/LanguageSwitcher.vue';
 import DarkModeToggle from '@/Components/DarkModeToggle.vue';
 import ChatDropdown from '@/Components/Chat/ChatDropdown.vue';
+import CustomerSwitcher from '@/Components/CustomerSwitcher.vue';
 import NotificationBell from '@/Components/NotificationBell.vue';
 import { useFlashToast } from '@/composables/useFlashToast';
 import { useCustomer } from '@/composables/useCustomer';
@@ -21,6 +22,18 @@ const appName = import.meta.env.VITE_APP_NAME || t('app.name');
 const { customer, tenancyEnabled, customerUrl } = useCustomer();
 const dashboardUrl = computed(() => customerUrl('/dashboard'));
 const profileUrl = computed(() => customerUrl('/profile'));
+const filesUrl = computed(() => customerUrl('/files'));
+const filesEnabled = computed(() => {
+    const us = (page.props.user_settings ?? {}) as Record<string, unknown>;
+    const appSettings = (page.props.app_settings ?? {}) as Record<string, unknown>;
+    // Show the link only when every gate is green:
+    //   global app toggle + active customer has it on + per-user setting.
+    return (
+        Boolean(appSettings.files_feature_enabled)
+        && Boolean(page.props.customer?.files_feature_enabled)
+        && Boolean(us.files_enabled)
+    );
+});
 const notificationSettingsUrl = '/settings/notifications';
 const chatEnabled = computed(() => page.props.chat?.enabled ?? false);
 const {
@@ -111,6 +124,16 @@ function initials(u: { first_name: string; last_name: string }) {
                                     {{ t('nav.dashboard') }}
                                 </Link>
                                 <Link
+                                    v-if="filesEnabled"
+                                    :href="filesUrl"
+                                    class="px-3 py-2 text-sm font-medium rounded-lg transition-colors"
+                                    :class="$page.url.startsWith(filesUrl)
+                                        ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10'
+                                        : 'text-gray-600 dark:text-dark-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-dark-800'"
+                                >
+                                    {{ t('files.title') }}
+                                </Link>
+                                <Link
                                     v-if="isAdmin"
                                     href="/admin"
                                     class="px-3 py-2 text-sm font-medium rounded-lg transition-colors"
@@ -126,6 +149,7 @@ function initials(u: { first_name: string; last_name: string }) {
 
                     <!-- Right side -->
                     <div class="flex items-center gap-1 sm:gap-3">
+                        <template v-if="user"><CustomerSwitcher /></template>
                         <div class="hidden sm:block"><LanguageSwitcher /></div>
                         <DarkModeToggle />
 
@@ -186,6 +210,13 @@ function initials(u: { first_name: string; last_name: string }) {
                                             class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800 sm:hidden"
                                         >
                                             {{ t('nav.dashboard') }}
+                                        </Link>
+                                        <Link
+                                            v-if="filesEnabled"
+                                            :href="filesUrl"
+                                            class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800 sm:hidden"
+                                        >
+                                            {{ t('files.title') }}
                                         </Link>
                                         <Link
                                             :href="profileUrl"

@@ -37,6 +37,7 @@ export interface Customer {
     id: number;
     slug: string;
     name: string;
+    files_feature_enabled?: boolean;
 }
 
 export interface PageProps extends InertiaPageProps {

@@ -19,6 +19,7 @@ class AppSettingsController extends Controller
                 'site_up', 'registration_open', 'login_enabled', 'require_email_verification',
                 'default_role', 'require_2fa_for_admins', 'send_welcome_notification',
                 'maintenance_message', 'announcement_banner', 'announcement_severity',
+                'files_feature_enabled', 'max_share_days',
             ]),
             'roles' => Role::orderBy('name')->pluck('name'),
         ]);
@@ -37,6 +38,8 @@ class AppSettingsController extends Controller
             'maintenance_message' => ['nullable', 'string', 'max:500'],
             'announcement_banner' => ['nullable', 'string', 'max:500'],
             'announcement_severity' => ['required', 'in:info,warn,danger,success'],
+            'files_feature_enabled' => ['required', 'boolean'],
+            'max_share_days' => ['required', 'integer', 'min:1', 'max:30'],
         ]);
 
         $settings = AppSetting::current();

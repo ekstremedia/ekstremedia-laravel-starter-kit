@@ -93,3 +93,92 @@
 .dark .p-tabpanels {
     background-color: transparent;
 }
+
+/* PrimeVue Dialog / ConfirmDialog — matches our dark-blue palette, adds
+ * breathing room, a soft indigo ring + elevation, and clips children so
+ * they don't paint past the rounded corners. Applies to every Dialog +
+ * ConfirmDialog via the unstyled theme presets. */
+.dark .p-dialog,
+.dark .p-confirmdialog {
+    background-color: var(--color-dark-900);
+    color: #e2e8f0;
+    border: 1px solid var(--color-dark-700);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow:
+        0 25px 50px -12px rgba(0, 0, 0, 0.65),
+        0 0 0 1px rgba(99, 102, 241, 0.08);
+}
+.dark .p-dialog-header,
+.dark .p-confirmdialog .p-dialog-header {
+    background: linear-gradient(to bottom, var(--color-dark-850), var(--color-dark-900));
+    color: #f1f5f9;
+    border-bottom: 1px solid var(--color-dark-800);
+    padding: 1.1rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+.dark .p-dialog-title,
+.dark .p-confirmdialog .p-dialog-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+.dark .p-dialog-content,
+.dark .p-confirmdialog .p-dialog-content {
+    background-color: var(--color-dark-900);
+    color: #cbd5e1;
+    padding: 1.35rem 1.5rem;
+    line-height: 1.5;
+}
+/* ConfirmDialog message gap between icon and text. */
+.dark .p-confirmdialog .p-confirmdialog-message,
+.dark .p-confirmdialog-message {
+    gap: 0.875rem;
+    align-items: center;
+}
+.dark .p-confirmdialog-icon {
+    font-size: 1.75rem;
+    color: #fbbf24;
+}
+/* Footer — restore PrimeVue's defaults since overriding background drops
+ * the original padding. Buttons sit end-aligned with a consistent gap. */
+.dark .p-dialog-footer,
+.dark .p-confirmdialog .p-dialog-footer {
+    background-color: var(--color-dark-900);
+    border-top: 1px solid var(--color-dark-800);
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+}
+.dark .p-dialog-mask {
+    background-color: rgba(3, 7, 18, 0.7);
+    backdrop-filter: blur(2px);
+}
+.dark .p-dialog .p-dialog-close-button,
+.dark .p-confirmdialog .p-dialog-close-button {
+    color: #94a3b8;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    transition: background-color 150ms ease, color 150ms ease;
+}
+.dark .p-dialog .p-dialog-close-button:hover,
+.dark .p-confirmdialog .p-dialog-close-button:hover {
+    background-color: var(--color-dark-800);
+    color: #e2e8f0;
+}
+
+/* Same polish in light mode — keep the rounded corners + shadow so the
+ * two themes stay consistent visually. Backgrounds are the default light
+ * palette; we only tweak structural bits. */
+.p-dialog,
+.p-confirmdialog {
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+}
+.p-dialog-mask {
+    backdrop-filter: blur(2px);
+}

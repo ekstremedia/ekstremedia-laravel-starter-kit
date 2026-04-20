@@ -20,6 +20,7 @@ class NotificationPreferenceController extends Controller
                 'notification_chat_messages' => $settings['notification_chat_messages'] ?? true,
                 'notification_account_updates' => $settings['notification_account_updates'] ?? true,
                 'notification_system_alerts' => $settings['notification_system_alerts'] ?? true,
+                'notification_storage_alerts' => $settings['notification_storage_alerts'] ?? true,
             ],
         ]);
     }
@@ -32,6 +33,7 @@ class NotificationPreferenceController extends Controller
             'notification_chat_messages' => 'required|boolean',
             'notification_account_updates' => 'required|boolean',
             'notification_system_alerts' => 'required|boolean',
+            'notification_storage_alerts' => 'required|boolean',
         ]);
 
         $request->user()->settings()->merge($validated);

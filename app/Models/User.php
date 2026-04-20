@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -142,6 +143,16 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     }
 
     /**
+     * Laravel reads this when sending notifications to switch app()->getLocale()
+     * for the duration of rendering — makes `__()` and Blade `@lang` calls in
+     * MailMessage / notifications respect the recipient's own language.
+     */
+    public function preferredLocale(): ?string
+    {
+        return $this->settings()->resolved()['locale'] ?? null;
+    }
+
+    /**
      * Conversations this user is a participant in.
      *
      * @return BelongsToMany<Conversation, $this>
@@ -190,6 +201,16 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     public function belongsToCustomer(Tenant $customer): bool
     {
         return $this->customers()->whereKey($customer->getKey())->exists();
+    }
+
+    /**
+     * File-system entries owned by this user across all customers.
+     *
+     * @return HasMany<FileItem, $this>
+     */
+    public function files(): HasMany
+    {
+        return $this->hasMany(FileItem::class);
     }
 
     /**
@@ -248,6 +269,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
             'banned_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
+            'storage_used_bytes' => 'integer',
         ];
     }
 }

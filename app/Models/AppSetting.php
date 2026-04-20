@@ -8,6 +8,11 @@ class AppSetting extends Model
 {
     protected $guarded = ['id'];
 
+    public function getConnectionName(): ?string
+    {
+        return config('tenancy.database.central_connection');
+    }
+
     protected $casts = [
         'site_up' => 'boolean',
         'registration_open' => 'boolean',
@@ -15,6 +20,8 @@ class AppSetting extends Model
         'require_email_verification' => 'boolean',
         'require_2fa_for_admins' => 'boolean',
         'send_welcome_notification' => 'boolean',
+        'files_feature_enabled' => 'boolean',
+        'max_share_days' => 'integer',
     ];
 
     public static function current(): self
@@ -28,6 +35,8 @@ class AppSetting extends Model
             'require_2fa_for_admins' => false,
             'send_welcome_notification' => true,
             'announcement_severity' => 'info',
+            'files_feature_enabled' => false,
+            'max_share_days' => 7,
         ]);
     }
 }

@@ -37,6 +37,8 @@ it('saves app settings and logs the change', function () {
         'maintenance_message' => 'Back soon',
         'announcement_banner' => 'Friday maintenance',
         'announcement_severity' => 'warn',
+        'files_feature_enabled' => false,
+        'max_share_days' => 7,
     ])->assertRedirect();
 
     $s = AppSetting::current();
