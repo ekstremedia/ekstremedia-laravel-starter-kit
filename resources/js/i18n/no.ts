@@ -214,6 +214,12 @@ export default {
             quota_unlimited: 'Ubegrenset',
             quota_disabled: 'Deaktivert',
             quota_label: 'Kvote',
+            by_customer: 'Bruk per kunde',
+            customer: 'Kunde',
+            slug: 'Slug',
+            search_users: 'Søk brukere …',
+            search_customers: 'Søk kunder …',
+            customers: 'Kunder',
         },
         nav: {
             overview: 'Oversikt',

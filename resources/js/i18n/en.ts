@@ -214,6 +214,12 @@ export default {
             quota_unlimited: 'Unlimited',
             quota_disabled: 'Disabled',
             quota_label: 'Quota',
+            by_customer: 'Usage by customer',
+            customer: 'Customer',
+            slug: 'Slug',
+            search_users: 'Search users…',
+            search_customers: 'Search customers…',
+            customers: 'Customers',
         },
         nav: {
             overview: 'Overview',

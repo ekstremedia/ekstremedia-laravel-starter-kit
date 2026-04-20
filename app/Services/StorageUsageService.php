@@ -10,6 +10,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\ApproachingStorageLimitNotification;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -77,10 +78,22 @@ class StorageUsageService
     /**
      * @return array<int, array{user_id: int, name: string, email: string, bytes: int}>
      */
-    public function topUsers(int $limit = 20): array
+    public function topUsers(int $limit = 20, ?string $search = null): array
     {
-        return User::query()
-            ->orderByDesc('storage_used_bytes')
+        $query = User::query();
+
+        if ($search !== null && $search !== '') {
+            // Escape LIKE wildcards — mirrors how we filter the admin user list.
+            $escaped = addcslashes($search, '%_\\');
+            $like = "%{$escaped}%";
+            $query->where(function ($q) use ($like): void {
+                $q->where('first_name', 'ilike', $like)
+                    ->orWhere('last_name', 'ilike', $like)
+                    ->orWhere('email', 'ilike', $like);
+            });
+        }
+
+        return $query->orderByDesc('storage_used_bytes')
             ->limit($limit)
             ->get(['id', 'first_name', 'last_name', 'email', 'storage_used_bytes'])
             ->map(fn (User $u) => [
@@ -89,6 +102,59 @@ class StorageUsageService
                 'email' => $u->email,
                 'bytes' => (int) $u->storage_used_bytes,
             ])
+            ->all();
+    }
+
+    /**
+     * Billable usage per customer (tenant). Sums the `file` collection only,
+     * so previews/chat/avatars don't leak into the per-customer breakdown.
+     * Optional search filters by tenant name or slug (case-insensitive).
+     *
+     * @return array<int, array{tenant_id: int, name: string, slug: string, bytes: int, file_count: int}>
+     */
+    public function usageByTenant(?string $search = null, int $limit = 50): array
+    {
+        $conn = $this->central();
+
+        $usage = DB::connection($conn)
+            ->table('media')
+            ->join('file_items', function ($join): void {
+                $join->on('file_items.id', '=', 'media.model_id')
+                    ->where('media.model_type', FileItem::class);
+            })
+            ->where('media.collection_name', self::BILLABLE_COLLECTION)
+            ->selectRaw('file_items.tenant_id as tenant_id, SUM(media.size) as bytes, COUNT(*) as file_count')
+            ->groupBy('file_items.tenant_id')
+            ->get()
+            ->keyBy('tenant_id');
+
+        $tenantsQuery = Tenant::query()->orderBy('name');
+
+        if ($search !== null && $search !== '') {
+            $escaped = addcslashes($search, '%_\\');
+            $like = "%{$escaped}%";
+            $tenantsQuery->where(function ($q) use ($like): void {
+                $q->where('name', 'ilike', $like)->orWhere('slug', 'ilike', $like);
+            });
+        }
+
+        /** @var Collection<int, Tenant> $tenants */
+        $tenants = $tenantsQuery->limit($limit)->get(['id', 'name', 'slug']);
+
+        return $tenants
+            ->map(function (Tenant $t) use ($usage): array {
+                $row = $usage->get($t->id);
+
+                return [
+                    'tenant_id' => (int) $t->id,
+                    'name' => (string) $t->name,
+                    'slug' => (string) $t->slug,
+                    'bytes' => (int) ($row->bytes ?? 0),
+                    'file_count' => (int) ($row->file_count ?? 0),
+                ];
+            })
+            ->sortByDesc('bytes')
+            ->values()
             ->all();
     }
 

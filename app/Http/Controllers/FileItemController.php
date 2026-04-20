@@ -57,6 +57,11 @@ class FileItemController extends Controller
 
         $usedBytes = $this->usage->usedBytesForUserInTenant($user, $tenant);
 
+        $trashedCount = FileItem::onlyTrashed()
+            ->where('tenant_id', $tenant->id)
+            ->where('user_id', $user->id)
+            ->count();
+
         return Inertia::render('Files/Index', [
             'items' => FileItemResource::collection($items),
             'breadcrumbs' => $this->breadcrumbs($folder),
@@ -66,6 +71,7 @@ class FileItemController extends Controller
                 'quota_bytes' => $user->settings()->resolved()['storage_quota_bytes'] ?? null,
                 'percent' => $this->usage->percentUsedInTenant($user, $tenant),
             ],
+            'trashed_count' => $trashedCount,
             'search' => $search ?: null,
         ]);
     }
@@ -75,6 +81,7 @@ class FileItemController extends Controller
         $tenant = $this->currentTenant($request);
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
+        abort_unless($user->can('create folders'), 403, __('files.permission_denied'));
 
         $data = $request->validate([
             'name' => 'required|string|max:255',
@@ -105,6 +112,7 @@ class FileItemController extends Controller
         $tenant = $this->currentTenant($request);
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
+        abort_unless($user->can('upload files'), 403, __('files.permission_denied'));
 
         $request->validate([
             'files' => 'required|array|min:1',
@@ -185,6 +193,7 @@ class FileItemController extends Controller
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
         $this->authorizeOwn($file, $user->id, $tenant->id);
+        abort_unless($user->can('rename files'), 403, __('files.permission_denied'));
 
         $data = $request->validate([
             'name' => 'sometimes|string|max:255',
@@ -226,6 +235,7 @@ class FileItemController extends Controller
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
         $this->authorizeOwn($file, $user->id, $tenant->id);
+        abort_unless($user->can('delete files'), 403, __('files.permission_denied'));
 
         $file->delete();
         $this->usage->recomputeForUser($user);

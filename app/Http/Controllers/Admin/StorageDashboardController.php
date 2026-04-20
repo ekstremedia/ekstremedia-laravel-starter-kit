@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Services\StorageUsageService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -16,12 +18,19 @@ class StorageDashboardController extends Controller
 {
     public function __construct(private readonly StorageUsageService $usage) {}
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $totalBytes = $this->usage->systemTotalBytes();
         $byType = $this->usage->systemBreakdownByType();
         $byCollection = $this->usage->systemBreakdownByCollection();
-        $topUsers = $this->usage->topUsers(10);
+
+        // Search inputs let admins find a user/customer without scrolling
+        // through a long top-N list. Empty strings = no filter.
+        $userSearch = trim((string) $request->string('user_search')->toString());
+        $customerSearch = trim((string) $request->string('customer_search')->toString());
+
+        $topUsers = $this->usage->topUsers(20, $userSearch ?: null);
+        $byCustomer = $this->usage->usageByTenant($customerSearch ?: null, 50);
 
         $diskTotal = (int) @disk_total_space(storage_path());
         $diskFree = (int) @disk_free_space(storage_path());
@@ -34,11 +43,17 @@ class StorageDashboardController extends Controller
                 'file_count' => (int) DB::connection(config('tenancy.database.central_connection'))
                     ->table('media')->count(),
                 'user_count' => User::query()->count(),
+                'customer_count' => Tenant::query()->count(),
             ],
             'by_type' => $byType,
             'by_collection' => $byCollection,
+            'by_customer' => $byCustomer,
             'top_users' => $topUsers,
             'growth' => $this->growth(),
+            'filters' => [
+                'user_search' => $userSearch,
+                'customer_search' => $customerSearch,
+            ],
         ]);
     }
 

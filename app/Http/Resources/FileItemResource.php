@@ -32,6 +32,25 @@ class FileItemResource extends JsonResource
         $videoReady = $isVideo && ($videoWeb !== null || (bool) $webCompatible);
         $videoProcessing = $isVideo && ! $videoReady;
 
+        // Doc preview is "processing" when the file's mime is in the preview
+        // allowlist but the doc_preview media row hasn't arrived yet. The
+        // queued GenerateDocumentPreview job broadcasts FileItemUpdated when
+        // it finishes, which flips this off in the UI.
+        $docPreviewMimes = config('files.preview_mime_types', []);
+        $docPreviewProcessing = ! $this->isFolder()
+            && in_array((string) $this->mime_type, $docPreviewMimes, true)
+            && $docPreview === null;
+
+        // Image thumbnail is "processing" until Spatie generates the `thumb`
+        // conversion. Conversions run on the queue, so the initial Inertia
+        // render can land before they're ready.
+        $imageThumbProcessing = ! $this->isFolder()
+            && $this->isImage()
+            && $media !== null
+            && ! $media->hasGeneratedConversion('thumb');
+
+        $previewProcessing = $videoProcessing || $docPreviewProcessing || $imageThumbProcessing;
+
         return [
             'id' => $this->id,
             'uuid' => $this->uuid,
@@ -44,6 +63,7 @@ class FileItemResource extends JsonResource
             'is_video' => $isVideo,
             'video_processing' => $videoProcessing,
             'video_ready' => $videoReady,
+            'preview_processing' => $previewProcessing,
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),
 

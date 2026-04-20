@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Jobs\GenerateDocumentPreview;
 use App\Models\AppSetting;
 use App\Models\User;
+use Database\Seeders\RoleAndPermissionSeeder;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
@@ -12,7 +13,9 @@ use Illuminate\Support\Facades\Queue;
 it('dispatches the preview job after uploading a PDF', function () {
     Queue::fake([GenerateDocumentPreview::class]);
 
+    $this->seed(RoleAndPermissionSeeder::class);
     $user = User::factory()->create();
+    $user->assignRole('User');
     $customer = createCustomer();
     AppSetting::current()->update(['files_feature_enabled' => true]);
     $customer->update(['files_feature_enabled' => true]);
@@ -31,7 +34,9 @@ it('dispatches the preview job after uploading a PDF', function () {
 it('skips the preview job for plain images', function () {
     Queue::fake([GenerateDocumentPreview::class]);
 
+    $this->seed(RoleAndPermissionSeeder::class);
     $user = User::factory()->create();
+    $user->assignRole('User');
     $customer = createCustomer();
     AppSetting::current()->update(['files_feature_enabled' => true]);
     $customer->update(['files_feature_enabled' => true]);

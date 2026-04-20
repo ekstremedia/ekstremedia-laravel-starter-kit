@@ -92,6 +92,7 @@ class FileTrashController extends Controller
         $tenant = $this->currentTenant($request);
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
+        abort_unless($user->can('delete files'), 403, __('files.permission_denied'));
 
         $item = FileItem::onlyTrashed()->findOrFail($id);
         $this->authorizeOwn($item, $user->id, $tenant->id);
@@ -116,6 +117,7 @@ class FileTrashController extends Controller
         $tenant = $this->currentTenant($request);
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
+        abort_unless($user->can('delete files'), 403, __('files.permission_denied'));
 
         DB::connection((string) config('tenancy.database.central_connection'))
             ->transaction(function () use ($tenant, $user): void {

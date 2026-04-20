@@ -30,6 +30,7 @@ class FileShareController extends Controller
         $user = $request->user();
         $this->assertOwns($file, $user->id, $tenant->id);
         $this->assertFeatureAvailable($tenant, $user);
+        abort_unless($user->can('share files'), 403, __('files.permission_denied'));
 
         $maxDays = AppSetting::current()->max_share_days ?? 7;
 
@@ -76,6 +77,7 @@ class FileShareController extends Controller
         $tenant = $this->currentTenant($request);
         $user = $request->user();
         $this->assertOwns($share->fileItem, $user->id, $tenant->id);
+        abort_unless($user->can('share files'), 403, __('files.permission_denied'));
 
         $share->delete();
 
@@ -92,6 +94,7 @@ class FileShareController extends Controller
         $user = $request->user();
         $this->assertOwns($file, $user->id, $tenant->id);
         $this->assertFeatureAvailable($tenant, $user);
+        abort_unless($user->can('share files'), 403, __('files.permission_denied'));
 
         if ($file->isFolder()) {
             abort(422, __('files.cannot_share_folder_quick'));

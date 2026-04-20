@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import UploadDialog from '@/Components/Files/UploadDialog.vue';
 import ImageLightbox from '@/Components/Files/ImageLightbox.vue';
 import VideoPlayer from '@/Components/Files/VideoPlayer.vue';
+import ItemActionsMenu from '@/Components/Files/ItemActionsMenu.vue';
 import ConfirmDialog from 'primevue/confirmdialog';
 import { useConfirm } from 'primevue/useconfirm';
 import Dialog from 'primevue/dialog';
@@ -28,6 +29,8 @@ interface FileItem {
     is_video?: boolean;
     video_processing?: boolean;
     video_ready?: boolean;
+    preview_processing?: boolean;
+    has_doc_preview?: boolean;
     thumbnail_url: string | null;
     preview_url: string | null;
     original_url: string | null;
@@ -48,6 +51,7 @@ interface PageData {
     breadcrumbs: Breadcrumb[];
     current_folder: { id: number; name: string; uuid: string } | null;
     usage: { used_bytes: number; quota_bytes: number | null; percent: number };
+    trashed_count: number;
     search: string | null;
 }
 
@@ -58,12 +62,22 @@ const page = usePage<PageProps>();
 
 const viewMode = ref<'grid' | 'list'>((localStorage.getItem('files.viewMode') as 'grid' | 'list') || 'grid');
 const uploadOpen = ref(false);
+const uploadDialogRef = ref<InstanceType<typeof UploadDialog> | null>(null);
+const externalDragOver = ref(false);
+let externalDragCounter = 0;
 const lightboxIndex = ref<number | null>(null);
 const videoOpen = ref(false);
 const videoItem = ref<FileItem | null>(null);
+const docPreviewItem = ref<FileItem | null>(null);
 const searchQuery = ref(props.search ?? '');
 const renamingId = ref<number | null>(null);
 const renameValue = ref('');
+const renameInputRefs = ref<Record<number, HTMLInputElement | null>>({});
+
+function registerRenameInput(id: number, el: unknown): void {
+    // `el` arrives as HTMLElement | ComponentPublicInstance | null.
+    renameInputRefs.value[id] = el instanceof HTMLInputElement ? el : null;
+}
 const draggingId = ref<number | null>(null);
 const dragOverId = ref<number | null>(null);
 
@@ -153,6 +167,16 @@ async function quickShare(item: FileItem) {
 
 const currentFolderId = computed(() => props.current_folder?.id ?? null);
 
+const perms = computed<string[]>(() => (page.props.auth?.user?.permissions ?? []) as string[]);
+function hasPerm(name: string): boolean {
+    return perms.value.includes(name);
+}
+const canUpload = computed(() => hasPerm('upload files'));
+const canCreateFolder = computed(() => hasPerm('create folders'));
+const canRename = computed(() => hasPerm('rename files'));
+const canDelete = computed(() => hasPerm('delete files'));
+const canShare = computed(() => hasPerm('share files'));
+
 const mergedItems = computed(() => props.items.data.map((i) => ({ ...i, ...(liveItems[i.id] ?? {}) })));
 const imageItems = computed(() => mergedItems.value.filter((i) => i.type === 'file' && i.is_image));
 
@@ -187,6 +211,18 @@ function openItem(item: FileItem) {
         // Soft nudge — processing spinner already tells the story.
         return;
     }
+    // Documents with a rendered preview open a modal instead of downloading.
+    // The modal has a Download button for users who want the original.
+    if (item.has_doc_preview) {
+        docPreviewItem.value = item;
+        return;
+    }
+    // Still rendering a preview? Wait for the broadcast to flip
+    // has_doc_preview; meanwhile don't start a download — the user expected
+    // to see a preview.
+    if (item.preview_processing) {
+        return;
+    }
     window.location.href = customerUrl(`/files/${item.id}/download`);
 }
 
@@ -206,6 +242,20 @@ function confirmDelete(item: FileItem) {
 function startRename(item: FileItem) {
     renamingId.value = item.id;
     renameValue.value = item.name;
+    // The input is v-if'd in, so wait for the DOM update before focusing.
+    // Select the filename stem (everything before the extension) so typing
+    // replaces the name but keeps the extension by default.
+    nextTick(() => {
+        const el = renameInputRefs.value[item.id];
+        if (!el) return;
+        el.focus();
+        const dot = item.name.lastIndexOf('.');
+        if (dot > 0 && item.type === 'file') {
+            el.setSelectionRange(0, dot);
+        } else {
+            el.select();
+        }
+    });
 }
 
 function submitRename(item: FileItem) {
@@ -255,6 +305,18 @@ function onDragOverFolder(item: FileItem, event: DragEvent) {
 function onDropOnFolder(target: FileItem | null, event: DragEvent) {
     event.preventDefault();
     dragOverId.value = null;
+    externalDragOver.value = false;
+    externalDragCounter = 0;
+
+    // External files coming from the OS — hand them off to the upload dialog.
+    if (hasExternalFiles(event)) {
+        const files = event.dataTransfer?.files;
+        if (files && files.length > 0 && canUpload.value) {
+            openUploadWithFiles(Array.from(files));
+        }
+        return;
+    }
+
     const id = draggingId.value;
     draggingId.value = null;
     if (id === null) return;
@@ -266,7 +328,35 @@ function onDropOnFolder(target: FileItem | null, event: DragEvent) {
     const moving = mergedItems.value.find((i) => i.id === id);
     // No-op when already in that folder (drop on blank inside current folder).
     if (moving && moving.parent_id === targetId) return;
+    if (!canRename.value) return;
     router.patch(customerUrl(`/files/${id}`), { parent_id: targetId }, { preserveScroll: true });
+}
+
+function hasExternalFiles(event: DragEvent): boolean {
+    const types = event.dataTransfer?.types;
+    if (!types) return false;
+    // DataTransferItemList exposes a `Files` type when the drag contains OS files.
+    return Array.from(types).includes('Files');
+}
+
+function onAreaDragEnter(event: DragEvent) {
+    if (!hasExternalFiles(event)) return;
+    externalDragCounter++;
+    externalDragOver.value = true;
+}
+
+function onAreaDragLeave(event: DragEvent) {
+    if (!hasExternalFiles(event)) return;
+    externalDragCounter = Math.max(0, externalDragCounter - 1);
+    if (externalDragCounter === 0) externalDragOver.value = false;
+}
+
+async function openUploadWithFiles(files: File[]) {
+    uploadOpen.value = true;
+    // Wait for the dialog's `watch(open)` reset to run, then forward the files.
+    await nextTick();
+    await nextTick();
+    uploadDialogRef.value?.handleFiles(files);
 }
 
 function onSearch() {
@@ -308,6 +398,7 @@ function onKey(e: KeyboardEvent) {
         renamingId.value = null;
         uploadOpen.value = false;
         shareDialogFile.value = null;
+        docPreviewItem.value = null;
     }
 }
 
@@ -368,10 +459,22 @@ const usageLabel = computed(() => {
         <ConfirmDialog group="files" />
 
         <div
-            class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8"
+            class="relative mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8"
+            @dragenter="onAreaDragEnter"
+            @dragleave="onAreaDragLeave"
             @dragover.prevent
             @drop="onDropOnFolder(null, $event)"
         >
+            <!-- External file drag overlay — shown only while an OS drag is over the page. -->
+            <div
+                v-if="externalDragOver && canUpload"
+                class="pointer-events-none fixed inset-4 z-30 flex items-center justify-center rounded-2xl border-2 border-dashed border-indigo-400 bg-indigo-500/10 backdrop-blur-sm"
+            >
+                <div class="flex flex-col items-center gap-2 text-indigo-600 dark:text-indigo-300">
+                    <i class="pi pi-upload text-4xl" />
+                    <span class="text-lg font-medium">{{ t('files.drop_to_upload') }}</span>
+                </div>
+            </div>
             <!-- Toolbar -->
             <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-center gap-2 text-sm">
@@ -392,22 +495,8 @@ const usageLabel = computed(() => {
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                    <input
-                        v-model="searchQuery"
-                        type="search"
-                        :placeholder="t('files.search_placeholder')"
-                        class="w-48 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-dark-700 dark:bg-dark-900 dark:text-slate-100"
-                        @keyup.enter="onSearch"
-                    />
                     <button
-                        type="button"
-                        class="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-dark-700 dark:bg-dark-900 dark:text-slate-200 dark:hover:bg-dark-800"
-                        @click="createFolder"
-                    >
-                        <i class="pi pi-folder-plus" />
-                        <span>{{ t('files.new_folder') }}</span>
-                    </button>
-                    <button
+                        v-if="canUpload"
                         type="button"
                         class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500"
                         @click="uploadOpen = true"
@@ -415,6 +504,22 @@ const usageLabel = computed(() => {
                         <i class="pi pi-upload" />
                         <span>{{ t('files.upload') }}</span>
                     </button>
+                    <button
+                        v-if="canCreateFolder"
+                        type="button"
+                        class="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-dark-700 dark:bg-dark-900 dark:text-slate-200 dark:hover:bg-dark-800"
+                        @click="createFolder"
+                    >
+                        <i class="pi pi-folder-plus" />
+                        <span>{{ t('files.new_folder') }}</span>
+                    </button>
+                    <input
+                        v-model="searchQuery"
+                        type="search"
+                        :placeholder="t('files.search_placeholder')"
+                        class="w-48 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-dark-700 dark:bg-dark-900 dark:text-slate-100"
+                        @keyup.enter="onSearch"
+                    />
                     <div class="inline-flex rounded-md border border-slate-300 p-0.5 dark:border-dark-700">
                         <button
                             type="button"
@@ -439,10 +544,16 @@ const usageLabel = computed(() => {
                     </div>
                     <Link
                         :href="customerUrl('/files/trash')"
-                        class="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-dark-700 dark:text-slate-200 dark:hover:bg-dark-800"
+                        class="relative inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-dark-700 dark:text-slate-200 dark:hover:bg-dark-800"
                     >
                         <i class="pi pi-trash" />
                         <span>{{ t('files.trash') }}</span>
+                        <span
+                            v-if="props.trashed_count > 0"
+                            class="ml-1 inline-flex min-w-[1.25rem] justify-center rounded-full bg-rose-500/10 px-1.5 py-0.5 text-[0.65rem] font-semibold text-rose-600 dark:bg-rose-500/15 dark:text-rose-300"
+                        >
+                            {{ props.trashed_count }}
+                        </span>
                     </Link>
                 </div>
             </div>
@@ -524,54 +635,38 @@ const usageLabel = computed(() => {
                             <i class="pi pi-spin pi-spinner text-2xl" />
                             <span>{{ t('files.video_processing') }}</span>
                         </div>
+                        <div
+                            v-else-if="item.preview_processing"
+                            class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 bg-slate-900/50 text-white text-xs"
+                        >
+                            <i class="pi pi-spin pi-spinner text-2xl" />
+                            <span>{{ t('files.preview_processing') }}</span>
+                        </div>
                     </div>
                     <div class="flex items-center justify-between gap-2 px-2 py-1.5 text-xs">
                         <input
                             v-if="renamingId === item.id"
+                            :ref="(el) => registerRenameInput(item.id, el)"
                             v-model="renameValue"
                             type="text"
                             class="flex-1 rounded border border-indigo-300 bg-white px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-indigo-600 dark:bg-dark-900"
-                            autofocus
                             @click.stop
                             @keyup.enter="submitRename(item)"
                             @blur="submitRename(item)"
                         />
                         <span v-else class="truncate text-slate-700 dark:text-slate-200" :title="item.name">{{ item.name }}</span>
                     </div>
-                    <!-- Actions overlay -->
-                    <div class="pointer-events-none absolute right-1 top-1 flex gap-1 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
-                        <button
-                            type="button"
-                            class="rounded bg-slate-900/70 p-1 text-xs text-white hover:bg-slate-900"
-                            :title="t('files.open')"
-                            @click.stop="openItem(item)"
-                        >
-                            <i class="pi pi-external-link" />
-                        </button>
-                        <button
-                            type="button"
-                            class="rounded bg-slate-900/70 p-1 text-xs text-white hover:bg-slate-900"
-                            :title="t('files.rename')"
-                            @click.stop="startRename(item)"
-                        >
-                            <i class="pi pi-pencil" />
-                        </button>
-                        <button
-                            type="button"
-                            class="rounded bg-slate-900/70 p-1 text-xs text-white hover:bg-slate-900"
-                            :title="t('files.share')"
-                            @click.stop="openShareDialog(item)"
-                        >
-                            <i class="pi pi-share-alt" />
-                        </button>
-                        <button
-                            type="button"
-                            class="rounded bg-rose-600/80 p-1 text-xs text-white hover:bg-rose-600"
-                            :title="t('files.delete')"
-                            @click.stop="confirmDelete(item)"
-                        >
-                            <i class="pi pi-trash" />
-                        </button>
+                    <!-- Actions overlay — single cog that opens a menu. -->
+                    <div class="absolute right-1 top-1 opacity-0 transition group-hover:opacity-100">
+                        <ItemActionsMenu
+                            :item="item"
+                            :download-url="item.type === 'file' ? customerUrl(`/files/${item.id}/download`) : undefined"
+                            variant="overlay"
+                            @open="openItem(item)"
+                            @rename="startRename(item)"
+                            @share="openShareDialog(item)"
+                            @delete="confirmDelete(item)"
+                        />
                     </div>
                 </div>
             </TransitionGroup>
@@ -609,10 +704,10 @@ const usageLabel = computed(() => {
                                 </button>
                                 <input
                                     v-else
+                                    :ref="(el) => registerRenameInput(item.id, el)"
                                     v-model="renameValue"
                                     type="text"
                                     class="rounded border border-indigo-300 bg-white px-1 py-0.5 text-xs dark:border-indigo-600 dark:bg-dark-900"
-                                    autofocus
                                     @click.stop
                                     @keyup.enter="submitRename(item)"
                                     @blur="submitRename(item)"
@@ -625,21 +720,16 @@ const usageLabel = computed(() => {
                                 {{ item.updated_at ? new Date(item.updated_at).toLocaleString() : '—' }}
                             </td>
                             <td class="px-4 py-2 text-right">
-                                <div class="flex justify-end gap-1">
-                                    <button type="button" class="rounded p-1 hover:bg-slate-100 dark:hover:bg-dark-700" :title="t('files.rename')" @click="startRename(item)">
-                                        <i class="pi pi-pencil text-slate-500" />
-                                    </button>
-                                    <a
-                                        v-if="item.type === 'file'"
-                                        :href="customerUrl(`/files/${item.id}/download`)"
-                                        class="rounded p-1 hover:bg-slate-100 dark:hover:bg-dark-700"
-                                        :title="t('files.download')"
-                                    >
-                                        <i class="pi pi-download text-slate-500" />
-                                    </a>
-                                    <button type="button" class="rounded p-1 hover:bg-rose-50 dark:hover:bg-rose-900/40" :title="t('files.delete')" @click="confirmDelete(item)">
-                                        <i class="pi pi-trash text-rose-500" />
-                                    </button>
+                                <div class="flex justify-end">
+                                    <ItemActionsMenu
+                                        :item="item"
+                                        :download-url="item.type === 'file' ? customerUrl(`/files/${item.id}/download`) : undefined"
+                                        variant="inline"
+                                        @open="openItem(item)"
+                                        @rename="startRename(item)"
+                                        @share="openShareDialog(item)"
+                                        @delete="confirmDelete(item)"
+                                    />
                                 </div>
                             </td>
                         </tr>
@@ -649,6 +739,7 @@ const usageLabel = computed(() => {
         </div>
 
         <UploadDialog
+            ref="uploadDialogRef"
             v-model:open="uploadOpen"
             :upload-url="uploadUrl"
             :extra-data="extraUploadData"
@@ -664,6 +755,60 @@ const usageLabel = computed(() => {
             :poster="videoItem?.video_poster_url ?? videoItem?.thumbnail_url ?? null"
             :title="videoItem?.name ?? null"
         />
+
+        <!-- Doc preview dialog — shows the rendered first-page image with a
+             Download link for the original file. -->
+        <Teleport to="body">
+            <Transition name="doc-preview">
+                <div
+                    v-if="docPreviewItem"
+                    class="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+                    role="dialog"
+                    aria-modal="true"
+                    @click.self="docPreviewItem = null"
+                >
+                    <div class="flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-900">
+                        <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3 dark:border-dark-700">
+                            <div class="flex min-w-0 items-center gap-2">
+                                <i class="pi pi-file text-indigo-500" />
+                                <h2 class="truncate text-base font-semibold text-slate-800 dark:text-slate-100">
+                                    {{ docPreviewItem.name }}
+                                </h2>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <a
+                                    :href="customerUrl(`/files/${docPreviewItem.id}/download`)"
+                                    class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500"
+                                >
+                                    <i class="pi pi-download" />
+                                    <span>{{ t('files.download_original') }}</span>
+                                </a>
+                                <button
+                                    type="button"
+                                    class="rounded-md p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-dark-800"
+                                    :aria-label="t('common.close')"
+                                    @click="docPreviewItem = null"
+                                >
+                                    <i class="pi pi-times" />
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex-1 overflow-auto bg-slate-50 p-4 dark:bg-dark-950">
+                            <img
+                                v-if="docPreviewItem.preview_url"
+                                :src="docPreviewItem.preview_url"
+                                :alt="docPreviewItem.name"
+                                class="mx-auto max-h-[75vh] rounded shadow"
+                            />
+                            <div v-else class="flex flex-col items-center gap-2 py-20 text-sm text-slate-500 dark:text-slate-400">
+                                <i class="pi pi-spin pi-spinner text-3xl" />
+                                <span>{{ t('files.preview_processing') }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
 
         <!-- New folder dialog -->
         <Dialog
@@ -783,5 +928,13 @@ const usageLabel = computed(() => {
 }
 .item-fade-leave-active {
     position: absolute;
+}
+.doc-preview-enter-active,
+.doc-preview-leave-active {
+    transition: opacity 200ms ease;
+}
+.doc-preview-enter-from,
+.doc-preview-leave-to {
+    opacity: 0;
 }
 </style>

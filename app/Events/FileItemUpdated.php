@@ -50,6 +50,12 @@ class FileItemUpdated implements ShouldBroadcast
         $isVideo = $this->item->isVideo();
         $webCompatible = $media ? $media->getCustomProperty('web_compatible', false) : false;
         $videoReady = $isVideo && ($videoWeb !== null || (bool) $webCompatible);
+        $videoProcessing = $isVideo && ! $videoReady;
+
+        $docPreviewMimes = config('files.preview_mime_types', []);
+        $docPreviewProcessing = in_array((string) $this->item->mime_type, $docPreviewMimes, true) && $doc === null;
+        $imageThumbProcessing = $this->item->isImage() && $media !== null && ! $media->hasGeneratedConversion('thumb');
+        $previewProcessing = $videoProcessing || $docPreviewProcessing || $imageThumbProcessing;
 
         return [
             'id' => $this->item->id,
@@ -61,8 +67,10 @@ class FileItemUpdated implements ShouldBroadcast
             'parent_id' => $this->item->parent_id,
             'is_image' => $this->item->isImage(),
             'is_video' => $isVideo,
-            'video_processing' => $isVideo && ! $videoReady,
+            'video_processing' => $videoProcessing,
             'video_ready' => $videoReady,
+            'preview_processing' => $previewProcessing,
+            'has_doc_preview' => $doc !== null,
             'thumbnail_url' => $media && $media->hasGeneratedConversion('thumb')
                 ? $media->getUrl('thumb')
                 : ($videoPoster?->getUrl() ?? $doc?->getUrl() ?? $media?->getUrl()),
