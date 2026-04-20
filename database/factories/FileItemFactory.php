@@ -8,6 +8,7 @@ use App\Models\FileItem;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 /**
  * @extends Factory<FileItem>
@@ -19,12 +20,15 @@ class FileItemFactory extends Factory
      */
     public function definition(): array
     {
+        // Human-readable base + short random suffix keeps names readable in
+        // test output while avoiding Faker's ->unique() pool overflowing when
+        // suites create many items.
         return [
             'tenant_id' => Tenant::factory(),
             'user_id' => User::factory(),
             'parent_id' => null,
             'type' => FileItem::TYPE_FILE,
-            'name' => fake()->unique()->word().'.jpg',
+            'name' => fake()->word().'-'.Str::random(6).'.jpg',
             'mime_type' => 'image/jpeg',
             'size' => fake()->numberBetween(1_000, 5_000_000),
         ];
@@ -36,7 +40,7 @@ class FileItemFactory extends Factory
             'type' => FileItem::TYPE_FOLDER,
             'mime_type' => null,
             'size' => 0,
-            'name' => fake()->unique()->word(),
+            'name' => fake()->word().'-'.Str::random(6),
         ]);
     }
 }

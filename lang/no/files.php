@@ -25,6 +25,7 @@ return [
     'modified' => 'Endret',
     'empty_folder' => 'Denne mappen er tom.',
     'drop_to_upload' => 'Slipp filer for å laste opp',
+    'cannot_share_folder_quick' => 'Mapper kan ikke deles med hurtiglenke. Bruk en full deling med utløp.',
     'restored' => 'Gjenopprettet.',
     'force_deleted' => 'Permanent slettet.',
     'trash_emptied' => 'Papirkurven er tømt.',

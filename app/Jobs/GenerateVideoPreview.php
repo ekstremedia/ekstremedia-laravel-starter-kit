@@ -70,7 +70,10 @@ class GenerateVideoPreview implements ShouldQueue
 
         // Broadcast poster-ready so the grid swaps the generic video icon
         // for the poster image immediately, before the MP4 transcode runs.
-        event(new FileItemUpdated($item->fresh(['media'])));
+        // Guard against force-deletes mid-job (would throw at the event).
+        if ($fresh = $item->fresh(['media'])) {
+            event(new FileItemUpdated($fresh));
+        }
 
         try {
             $this->generateWebMp4($item, $videoPath);
@@ -81,7 +84,9 @@ class GenerateVideoPreview implements ShouldQueue
             ]);
         }
 
-        event(new FileItemUpdated($item->fresh(['media'])));
+        if ($fresh = $item->fresh(['media'])) {
+            event(new FileItemUpdated($fresh));
+        }
     }
 
     private function isVideo(FileItem $item): bool
@@ -110,7 +115,9 @@ class GenerateVideoPreview implements ShouldQueue
 
         $video = $ffmpeg->open($videoPath);
         /** @var Video $video */
-        $video->frame(TimeCode::fromSeconds((int) $at))->save($tmp);
+        // FFMpeg's TimeCode::fromSeconds accepts fractional seconds — pass
+        // the float so we don't round off sub-second precision on short clips.
+        $video->frame(TimeCode::fromSeconds((float) $at))->save($tmp);
 
         if (! is_file($tmp)) {
             return;

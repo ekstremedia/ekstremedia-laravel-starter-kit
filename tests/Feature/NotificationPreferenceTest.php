@@ -51,7 +51,8 @@ it('saves notification preferences', function () {
         ->and($settings['notification_digest'])->toBe('daily')
         ->and($settings['notification_chat_messages'])->toBeFalse()
         ->and($settings['notification_account_updates'])->toBeTrue()
-        ->and($settings['notification_system_alerts'])->toBeFalse();
+        ->and($settings['notification_system_alerts'])->toBeFalse()
+        ->and($settings['notification_storage_alerts'])->toBeTrue();
 });
 
 it('validates digest frequency value', function () {

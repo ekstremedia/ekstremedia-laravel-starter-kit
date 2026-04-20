@@ -193,6 +193,11 @@ class FileItemController extends Controller
 
         if (array_key_exists('parent_id', $data)) {
             if ($data['parent_id'] !== null) {
+                // Refuse self-parenting up front — the descendant check below
+                // wouldn't catch (id === id) because the walk stops at root.
+                if ((int) $data['parent_id'] === (int) $file->id) {
+                    abort(422, 'Cannot set an item as its own parent.');
+                }
                 $parent = FileItem::findOrFail($data['parent_id']);
                 $this->authorizeOwn($parent, $user->id, $tenant->id);
                 if (! $parent->isFolder()) {

@@ -23,7 +23,7 @@ interface PageData {
 }
 
 const props = defineProps<PageData>();
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const { customerUrl } = useCustomer();
 const confirm = useConfirm();
 
@@ -130,7 +130,7 @@ function iconFor(item: FileItem) {
                         <div class="truncate text-sm text-slate-700 dark:text-slate-200">{{ item.name }}</div>
                         <div class="text-xs text-slate-500 dark:text-slate-400">
                             {{ item.type === 'file' ? formatBytes(item.size) : '—' }}
-                            <span v-if="item.updated_at">· {{ t('files.deleted_on', { when: new Date(item.updated_at).toLocaleDateString() }) }}</span>
+                            <span v-if="item.updated_at">· {{ t('files.deleted_on', { when: new Date(item.updated_at).toLocaleDateString(locale) }) }}</span>
                         </div>
                     </div>
                     <button

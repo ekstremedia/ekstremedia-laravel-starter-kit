@@ -149,6 +149,19 @@ it('moves a file into a folder', function () {
     expect($file->fresh()->parent_id)->toBe($folder->id);
 });
 
+it('refuses setting a folder as its own parent', function () {
+    $folder = FileItem::factory()->folder()->create([
+        'tenant_id' => $this->customer->id,
+        'user_id' => $this->user->id,
+    ]);
+
+    $this->actingAs($this->user)
+        ->patch(customerUrl($this->customer, "/files/{$folder->id}"), ['parent_id' => $folder->id])
+        ->assertStatus(422);
+
+    expect($folder->fresh()->parent_id)->toBeNull();
+});
+
 it('refuses moving a folder into its own descendant', function () {
     $parent = FileItem::factory()->folder()->create([
         'tenant_id' => $this->customer->id,

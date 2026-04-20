@@ -24,6 +24,8 @@ function submit() {
                 <input
                     v-model="form.password"
                     type="password"
+                    name="password"
+                    autocomplete="current-password"
                     autofocus
                     :placeholder="t('share.enter_password')"
                     class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-dark-700 dark:bg-dark-800 dark:text-slate-100"

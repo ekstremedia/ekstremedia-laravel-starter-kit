@@ -25,6 +25,7 @@ return [
     'modified' => 'Modified',
     'empty_folder' => 'This folder is empty.',
     'drop_to_upload' => 'Drop files to upload',
+    'cannot_share_folder_quick' => 'Folders cannot be shared via a quick link. Use a full share with expiry.',
     'restored' => 'Restored.',
     'force_deleted' => 'Permanently deleted.',
     'trash_emptied' => 'Trash emptied.',

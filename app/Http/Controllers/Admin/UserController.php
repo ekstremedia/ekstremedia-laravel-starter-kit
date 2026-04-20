@@ -88,9 +88,17 @@ class UserController extends Controller
         $patch = [];
         if (array_key_exists('storage_quota_bytes', $data)) {
             $patch['storage_quota_bytes'] = $data['storage_quota_bytes'];
+            // Reset alert tracking when quota moves, otherwise users who
+            // already crossed 95/100 % under the old cap would silently stop
+            // receiving alerts (the stored threshold would shadow the new one).
+            $patch['storage_last_alerted_threshold'] = null;
         }
         if (array_key_exists('files_enabled', $data)) {
             $patch['files_enabled'] = (bool) $data['files_enabled'];
+        }
+
+        if ($patch === []) {
+            return back();
         }
 
         $user->settings()->merge($patch);

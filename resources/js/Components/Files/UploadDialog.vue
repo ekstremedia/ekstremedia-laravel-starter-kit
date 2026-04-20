@@ -239,7 +239,9 @@ async function startUpload() {
                         preserveScroll: true,
                         preserveState: true,
                         onProgress: (progress) => {
-                            if (progress?.percentage) {
+                            // Existence check, not truthiness — 0% is a valid
+                            // initial progress value and was being dropped.
+                            if (progress && typeof progress.percentage === 'number') {
                                 uploadFile.progress = progress.percentage;
                             }
                         },

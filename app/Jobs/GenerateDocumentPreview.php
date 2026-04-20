@@ -94,8 +94,13 @@ class GenerateDocumentPreview implements ShouldQueue
             ->usingName($item->name.' preview')
             ->toMediaCollection('doc_preview');
 
-        // Broadcast so the file grid can swap in the preview live (Phase 8).
-        event(new FileItemUpdated($item->fresh(['media'])));
+        // Broadcast so the file grid can swap in the preview live.
+        // fresh() can return null if the item was force-deleted while the
+        // job ran — skip rather than throwing a TypeError that makes the
+        // queue retry a best-effort preview.
+        if ($fresh = $item->fresh(['media'])) {
+            event(new FileItemUpdated($fresh));
+        }
     }
 
     private function convertToPdfViaGotenberg(HttpFactory $http, string $path, string $filename): ?string

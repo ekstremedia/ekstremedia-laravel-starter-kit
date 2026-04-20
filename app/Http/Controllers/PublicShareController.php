@@ -31,7 +31,7 @@ class PublicShareController extends Controller
             abort(410, __('share.expired'));
         }
 
-        if ($share->requiresPassword() && ! $this->isUnlocked($request, $share)) {
+        if ($share->requiresPassword() && ! $this->isUnlocked($share)) {
             return Inertia::render('Share/Password', [
                 'token' => $share->token,
                 'action' => route('public.share.unlock', $share->token),
@@ -86,11 +86,14 @@ class PublicShareController extends Controller
         if ($share->isExpired()) {
             abort(410);
         }
-        if ($share->requiresPassword() && ! $this->isUnlocked($request, $share)) {
+        if ($share->requiresPassword() && ! $this->isUnlocked($share)) {
             abort(403);
         }
 
-        $root = $share->fileItem;
+        // Use the relation's query so a dangling share (file deleted before
+        // cascade kicked in) 404s cleanly instead of dereferencing null.
+        /** @var FileItem $root */
+        $root = $share->fileItem()->firstOrFail();
         /** @var FileItem $target */
         $target = FileItem::findOrFail($fileId);
         if ($target->id !== $root->id && ! $this->isDescendantOf($target, $root)) {
@@ -120,7 +123,7 @@ class PublicShareController extends Controller
         return response()->download($media->getPath(), $item->name);
     }
 
-    private function isUnlocked(Request $request, FileShare $share): bool
+    private function isUnlocked(FileShare $share): bool
     {
         return (bool) session("share.unlocked.{$share->token}");
     }

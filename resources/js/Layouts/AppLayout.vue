@@ -26,12 +26,14 @@ const filesUrl = computed(() => customerUrl('/files'));
 const filesEnabled = computed(() => {
     const us = (page.props.user_settings ?? {}) as Record<string, unknown>;
     const appSettings = (page.props.app_settings ?? {}) as Record<string, unknown>;
+    const tenancyOn = Boolean(page.props.tenancy?.enabled);
     // Show the link only when every gate is green:
-    //   global app toggle + active customer has it on + per-user setting.
+    //   global app toggle + per-user setting,
+    //   AND (tenancy off | the active customer has it on).
     return (
         Boolean(appSettings.files_feature_enabled)
-        && Boolean(page.props.customer?.files_feature_enabled)
         && Boolean(us.files_enabled)
+        && (!tenancyOn || Boolean(page.props.customer?.files_feature_enabled))
     );
 });
 const notificationSettingsUrl = '/settings/notifications';

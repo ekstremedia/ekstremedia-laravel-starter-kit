@@ -12,6 +12,7 @@ use App\Services\StorageUsageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -95,11 +96,17 @@ class FileTrashController extends Controller
         $item = FileItem::onlyTrashed()->findOrFail($id);
         $this->authorizeOwn($item, $user->id, $tenant->id);
 
-        if ($item->isFolder()) {
-            $this->cascadeForceDelete($item);
-        }
-        $item->forceDelete();
-        $this->usage->recomputeForUser($user);
+        // Atomic — either the whole cascade + usage refresh commits, or
+        // nothing does. Otherwise a partial delete leaves orphaned children
+        // plus a stale denormalized storage_used_bytes.
+        DB::connection((string) config('tenancy.database.central_connection'))
+            ->transaction(function () use ($item, $user): void {
+                if ($item->isFolder()) {
+                    $this->cascadeForceDelete($item);
+                }
+                $item->forceDelete();
+                $this->usage->recomputeForUser($user);
+            });
 
         return back()->with('success', __('files.force_deleted'));
     }
@@ -110,17 +117,20 @@ class FileTrashController extends Controller
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
 
-        // Chunk so huge trashes don't load everything into memory.
-        FileItem::onlyTrashed()
-            ->where('tenant_id', $tenant->id)
-            ->where('user_id', $user->id)
-            ->chunkById(100, function ($items): void {
-                foreach ($items as $item) {
-                    $item->forceDelete();
-                }
-            });
+        DB::connection((string) config('tenancy.database.central_connection'))
+            ->transaction(function () use ($tenant, $user): void {
+                // Chunk so huge trashes don't load everything into memory.
+                FileItem::onlyTrashed()
+                    ->where('tenant_id', $tenant->id)
+                    ->where('user_id', $user->id)
+                    ->chunkById(100, function ($items): void {
+                        foreach ($items as $item) {
+                            $item->forceDelete();
+                        }
+                    });
 
-        $this->usage->recomputeForUser($user);
+                $this->usage->recomputeForUser($user);
+            });
 
         return back()->with('success', __('files.trash_emptied'));
     }

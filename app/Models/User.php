@@ -6,6 +6,7 @@ use App\Notifications\ResetPasswordNotification;
 use App\Notifications\VerifyEmailNotification;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -27,12 +28,21 @@ use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['first_name', 'last_name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable implements HasMedia, MustVerifyEmail
+class User extends Authenticatable implements HasLocalePreference, HasMedia, MustVerifyEmail
 {
     public const ROLE_ADMIN = 'Admin';
 
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasRoles, Impersonate, InteractsWithMedia, LogsActivity, Notifiable, Searchable, TwoFactorAuthenticatable;
+
+    /**
+     * User rows live in the central schema — pin so queries don't follow the
+     * tenant schema swap performed by stancl/tenancy's DatabaseTenancyBootstrapper.
+     */
+    public function getConnectionName(): ?string
+    {
+        return config('tenancy.database.central_connection');
+    }
 
     public function canImpersonate(): bool
     {

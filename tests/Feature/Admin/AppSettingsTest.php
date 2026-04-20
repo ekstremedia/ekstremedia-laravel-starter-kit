@@ -44,7 +44,9 @@ it('saves app settings and logs the change', function () {
     $s = AppSetting::current();
     expect($s->site_up)->toBeFalse()
         ->and($s->registration_open)->toBeFalse()
-        ->and($s->announcement_banner)->toBe('Friday maintenance');
+        ->and($s->announcement_banner)->toBe('Friday maintenance')
+        ->and($s->files_feature_enabled)->toBeFalse()
+        ->and($s->max_share_days)->toBe(7);
 });
 
 it('shows maintenance page to non-admins when site is down', function () {

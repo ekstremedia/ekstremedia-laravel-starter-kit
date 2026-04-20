@@ -30,5 +30,8 @@ return [
         'application/rtf',
     ],
 
-    'trash_retention_days' => (int) env('FILES_TRASH_DAYS', 30),
+    // Clamp to at least 1 — downstream commands subtract this from "now" to
+    // compute the cutoff; 0 or negative would hard-delete everything on the
+    // next scheduled run.
+    'trash_retention_days' => max(1, (int) env('FILES_TRASH_DAYS', 30)),
 ];

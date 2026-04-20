@@ -21,7 +21,7 @@ interface Item {
 const props = defineProps<{
     item: Item;
     children: Item[];
-    share: { token: string; expires_at: string };
+    share: { token: string; expires_at: string | null };
 }>();
 
 const { t } = useI18n();
@@ -73,7 +73,9 @@ function formatBytes(n: number): string {
     return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-const expiresLabel = computed(() => new Date(props.share.expires_at).toLocaleString());
+const expiresLabel = computed(() =>
+    props.share.expires_at ? new Date(props.share.expires_at).toLocaleString() : t('share.no_expiry'),
+);
 </script>
 
 <template>

@@ -54,9 +54,8 @@ const search = ref(props.filters.search ?? '');
 const confirm = useConfirm();
 
 const quotaDialogUser = ref<UserRow | null>(null);
-const quotaPreset = ref<'unlimited' | 'disabled' | 'gb' | 'custom'>('gb');
+const quotaPreset = ref<'unlimited' | 'disabled' | 'gb'>('gb');
 const quotaGb = ref(1);
-const quotaCustomBytes = ref(0);
 
 function doSearch() {
     router.get('/admin/users', { search: search.value }, { preserveState: true, replace: true });
@@ -70,7 +69,6 @@ function openQuotaDialog(u: UserRow) {
         quotaPreset.value = 'gb';
         quotaGb.value = Math.max(1, Math.round(u.storage_quota_bytes / (1024 * 1024 * 1024)));
     }
-    quotaCustomBytes.value = u.storage_quota_bytes ?? 0;
 }
 
 function saveQuota() {
@@ -79,8 +77,7 @@ function saveQuota() {
     let bytes: number | null;
     if (quotaPreset.value === 'unlimited') bytes = null;
     else if (quotaPreset.value === 'disabled') bytes = 0;
-    else if (quotaPreset.value === 'gb') bytes = Math.max(0, quotaGb.value) * 1024 * 1024 * 1024;
-    else bytes = Math.max(0, quotaCustomBytes.value);
+    else bytes = Math.max(0, quotaGb.value) * 1024 * 1024 * 1024;
 
     router.patch(`/admin/users/${u.id}/quota`, { storage_quota_bytes: bytes }, {
         preserveScroll: true,
@@ -178,10 +175,15 @@ function canImpersonate(u: UserRow) {
     <div
         v-if="quotaDialogUser"
         class="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quota-dialog-title"
+        tabindex="-1"
         @click.self="quotaDialogUser = null"
+        @keydown.esc="quotaDialogUser = null"
     >
         <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-dark-900">
-            <h2 class="mb-4 text-lg font-semibold text-slate-800 dark:text-slate-100">
+            <h2 id="quota-dialog-title" class="mb-4 text-lg font-semibold text-slate-800 dark:text-slate-100">
                 {{ t('admin.storage.set_quota') }} — {{ quotaDialogUser.first_name }} {{ quotaDialogUser.last_name }}
             </h2>
             <div class="space-y-3 text-sm">

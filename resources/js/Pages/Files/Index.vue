@@ -11,6 +11,7 @@ import { useConfirm } from 'primevue/useconfirm';
 import Dialog from 'primevue/dialog';
 import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
+import { useToast } from 'primevue/usetoast';
 import { useCustomer } from '@/composables/useCustomer';
 import type { LightboxItem } from '@/types/lightbox';
 import type { PageProps } from '@/types';
@@ -69,6 +70,7 @@ const dragOverId = ref<number | null>(null);
 const newFolderOpen = ref(false);
 const newFolderName = ref('');
 const confirm = useConfirm();
+const toast = useToast();
 
 const shareDialogFile = ref<FileItem | null>(null);
 const sharePassword = ref('');
@@ -81,6 +83,15 @@ function openShareDialog(item: FileItem) {
     sharePassword.value = '';
     shareHours.value = 24;
     shareResultUrl.value = null;
+}
+
+function shareErrorToast() {
+    toast.add({
+        severity: 'error',
+        summary: t('files.share'),
+        detail: t('files.share_failed'),
+        life: 4000,
+    });
 }
 
 async function createShare() {
@@ -100,10 +111,15 @@ async function createShare() {
                 password: sharePassword.value || null,
             }),
         });
-        if (!res.ok) throw new Error('share create failed');
+        if (!res.ok) {
+            shareErrorToast();
+            return;
+        }
         const data = await res.json();
         shareResultUrl.value = data.url;
         await navigator.clipboard?.writeText(data.url).catch(() => undefined);
+    } catch {
+        shareErrorToast();
     } finally {
         shareCreating.value = false;
     }
@@ -111,21 +127,28 @@ async function createShare() {
 
 async function quickShare(item: FileItem) {
     if (item.type !== 'file') return openShareDialog(item);
-    const res = await fetch(customerUrl(`/files/${item.id}/shares/signed`), {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-XSRF-TOKEN': decodeURIComponent((document.cookie.match(/XSRF-TOKEN=([^;]+)/) ?? [])[1] ?? ''),
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify({ hours: 24 }),
-    });
-    if (!res.ok) return;
-    const data = await res.json();
-    await navigator.clipboard?.writeText(data.url).catch(() => undefined);
-    shareResultUrl.value = data.url;
-    shareDialogFile.value = item;
+    try {
+        const res = await fetch(customerUrl(`/files/${item.id}/shares/signed`), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-XSRF-TOKEN': decodeURIComponent((document.cookie.match(/XSRF-TOKEN=([^;]+)/) ?? [])[1] ?? ''),
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ hours: 24 }),
+        });
+        if (!res.ok) {
+            shareErrorToast();
+            return;
+        }
+        const data = await res.json();
+        await navigator.clipboard?.writeText(data.url).catch(() => undefined);
+        shareResultUrl.value = data.url;
+        shareDialogFile.value = item;
+    } catch {
+        shareErrorToast();
+    }
 }
 
 const currentFolderId = computed(() => props.current_folder?.id ?? null);
@@ -235,9 +258,14 @@ function onDropOnFolder(target: FileItem | null, event: DragEvent) {
     const id = draggingId.value;
     draggingId.value = null;
     if (id === null) return;
-    const targetId = target?.id ?? null;
     if (target && target.type !== 'folder') return;
+    // No target = dropped on empty space. Stay in the current folder rather
+    // than yanking the file to root (classic file-manager behaviour).
+    const targetId = target?.id ?? currentFolderId.value;
     if (id === targetId) return;
+    const moving = mergedItems.value.find((i) => i.id === id);
+    // No-op when already in that folder (drop on blank inside current folder).
+    if (moving && moving.parent_id === targetId) return;
     router.patch(customerUrl(`/files/${id}`), { parent_id: targetId }, { preserveScroll: true });
 }
 
@@ -279,6 +307,7 @@ function onKey(e: KeyboardEvent) {
     if (e.key === 'Escape') {
         renamingId.value = null;
         uploadOpen.value = false;
+        shareDialogFile.value = null;
     }
 }
 
@@ -319,12 +348,6 @@ watch(
     },
     { immediate: true },
 );
-
-// Merge live updates onto server-rendered items (used in templates below).
-function itemFor(item: FileItem): FileItem {
-    const patch = liveItems[item.id];
-    return patch ? { ...item, ...(patch as FileItem) } : item;
-}
 
 const uploadUrl = computed(() => customerUrl('/files'));
 const extraUploadData = computed(() => ({ parent_id: currentFolderId.value }));

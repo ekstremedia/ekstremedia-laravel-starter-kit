@@ -726,7 +726,7 @@ defineExpose({
                         <!-- Original status -->
                         <span v-if="hasOriginal" class="flex items-center gap-1" :class="originalActive ? 'text-purple-300' : 'text-white/80'">
                             <Check v-if="originalActive" class="h-3 w-3" />
-                            <span>Original</span>
+                            <span>{{ t('lightbox.original') }}</span>
                         </span>
 
                         <span class="hidden items-center gap-1 lg:flex">

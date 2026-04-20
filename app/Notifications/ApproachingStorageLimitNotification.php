@@ -98,8 +98,14 @@ class ApproachingStorageLimitNotification extends Notification implements Should
 
     private function localeFor(object $notifiable): string
     {
-        if (method_exists($notifiable, 'settings')) {
-            return (string) ($notifiable->settings()->resolved()['locale'] ?? 'en');
+        // Use the User model's HasLocalePreference contract so locale
+        // resolution is centralised and matches what Laravel's mail pipeline
+        // would pick up on its own.
+        if (method_exists($notifiable, 'preferredLocale')) {
+            $locale = $notifiable->preferredLocale();
+            if (is_string($locale) && $locale !== '') {
+                return $locale;
+            }
         }
 
         return 'en';

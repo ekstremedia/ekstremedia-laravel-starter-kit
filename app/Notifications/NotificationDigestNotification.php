@@ -57,20 +57,16 @@ class NotificationDigestNotification extends Notification implements ShouldQueue
 
     private function localeFor(object $notifiable): string
     {
-        if (! method_exists($notifiable, 'settings')) {
-            return 'en';
+        // Notifiables that implement HasLocalePreference (our User model does)
+        // expose the recipient's locale via preferredLocale(); fall back to
+        // English for guest-shaped notifiables.
+        if (method_exists($notifiable, 'preferredLocale')) {
+            $locale = $notifiable->preferredLocale();
+            if (is_string($locale) && $locale !== '') {
+                return $locale;
+            }
         }
 
-        $settings = $notifiable->settings();
-        if (! is_object($settings) || ! method_exists($settings, 'resolved')) {
-            return 'en';
-        }
-
-        $resolved = $settings->resolved();
-        if (! is_array($resolved)) {
-            return 'en';
-        }
-
-        return (string) ($resolved['locale'] ?? 'en');
+        return 'en';
     }
 }

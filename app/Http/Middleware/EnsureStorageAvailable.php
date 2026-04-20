@@ -8,6 +8,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\StorageUsageService;
 use Closure;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
@@ -78,7 +79,12 @@ class EnsureStorageAvailable
             throw ValidationException::withMessages([$fileField => [$message]]);
         }
 
-        abort(redirect()->back()->withErrors([$fileField => $message])->with('error', $message));
+        // Non-AJAX form posts get a back-redirect with the flash error. Throw
+        // HttpResponseException so Laravel short-circuits the pipeline rather
+        // than using `abort(redirect())`, which isn't an idiomatic abort() call.
+        throw new HttpResponseException(
+            redirect()->back()->withErrors([$fileField => $message])->with('error', $message),
+        );
     }
 
     private function uploadFieldName(Request $request): string

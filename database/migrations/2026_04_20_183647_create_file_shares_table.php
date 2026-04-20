@@ -15,7 +15,10 @@ return new class extends Migration
             $table->string('token', 40)->unique();
             $table->foreignId('file_item_id')->constrained()->cascadeOnDelete();
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->timestamp('expires_at');
+            // dateTime (not timestamp) — MySQL auto-defaults the first
+            // non-nullable TIMESTAMP column to CURRENT_TIMESTAMP; dateTime
+            // avoids that footgun and matches the explicit set done in code.
+            $table->dateTime('expires_at');
             $table->string('password_hash')->nullable();
             $table->unsignedInteger('view_count')->default(0);
             $table->timestamp('last_viewed_at')->nullable();

@@ -8,6 +8,7 @@ use App\Models\AppSetting;
 use App\Models\FileItem;
 use App\Models\FileShare;
 use App\Models\Tenant;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -93,7 +94,7 @@ class FileShareController extends Controller
         $this->assertFeatureAvailable($tenant, $user);
 
         if ($file->isFolder()) {
-            abort(422, 'Folders cannot be shared via a quick signed link. Use a full share.');
+            abort(422, __('files.cannot_share_folder_quick'));
         }
 
         $maxDays = AppSetting::current()->max_share_days ?? 7;
@@ -148,7 +149,7 @@ class FileShareController extends Controller
         }
     }
 
-    private function assertFeatureAvailable(Tenant $tenant, $user): void
+    private function assertFeatureAvailable(Tenant $tenant, User $user): void
     {
         if (! AppSetting::current()->files_feature_enabled) {
             abort(404);

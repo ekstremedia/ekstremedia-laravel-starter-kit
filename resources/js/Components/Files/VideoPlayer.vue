@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { onUnmounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const props = defineProps<{
@@ -19,9 +19,16 @@ function close() {
 }
 
 function onKey(e: KeyboardEvent) {
-    if (!props.modelValue) return;
-    if (e.key === 'Escape') close();
+    if (e.key === 'Escape') {
+        close();
+        return;
+    }
     if (e.key === ' ') {
+        // Don't hijack Space in editable/interactive elements (inputs, the
+        // close button, etc.) — only treat it as play/pause when focus is
+        // elsewhere.
+        const tag = (e.target as HTMLElement | null)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
         e.preventDefault();
         const v = videoRef.value;
         if (!v) return;
@@ -29,7 +36,19 @@ function onKey(e: KeyboardEvent) {
     }
 }
 
-onMounted(() => document.addEventListener('keydown', onKey));
+// Bind the listener only while the modal is open so it can't swallow
+// keystrokes for the rest of the page lifetime.
+watch(
+    () => props.modelValue,
+    (open) => {
+        if (open) {
+            document.addEventListener('keydown', onKey);
+        } else {
+            document.removeEventListener('keydown', onKey);
+        }
+    },
+    { immediate: true },
+);
 onUnmounted(() => document.removeEventListener('keydown', onKey));
 
 // Auto-play when opened. Muted first so most browsers honor it, then the
