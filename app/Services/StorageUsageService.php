@@ -254,6 +254,10 @@ class StorageUsageService
      * Build the billable subquery: only media rows from the FileItem `file`
      * collection, optionally scoped to one tenant. Previews + chat + avatars
      * are intentionally excluded.
+     *
+     * Callers pick their own projection — leaving the SELECT empty here
+     * avoids poisoning aggregate callers like `breakdownByTypeForUser`
+     * (Postgres rejects non-grouped columns; SQLite silently accepts them).
      */
     private function billableQuery(User $user, ?Tenant $tenant): Builder
     {
@@ -267,8 +271,7 @@ class StorageUsageService
             })
             ->where('media.collection_name', self::BILLABLE_COLLECTION)
             ->where('file_items.user_id', $user->id)
-            ->when($tenant !== null, fn ($q) => $q->where('file_items.tenant_id', $tenant->id))
-            ->select('media.mime_type', 'media.size');
+            ->when($tenant !== null, fn ($q) => $q->where('file_items.tenant_id', $tenant->id));
     }
 
     private function bucketFor(string $modelType, string $collection): string
