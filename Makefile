@@ -19,7 +19,7 @@ else
 DISPLAY_URL := $(APP_URL):$(APP_HOST_PORT)
 endif
 
-.PHONY: help init build up down restart destroy shell test migrate seed fresh rebuild logs tinker pint queue vite npm-install composer-install cache-clear reverb-restart _require-local
+.PHONY: help init build up down restart destroy shell test test-parallel test-js test-all migrate seed fresh rebuild logs tinker pint queue vite npm-install composer-install cache-clear reverb-restart _require-local
 
 # Default target
 help: ## Show this help
@@ -78,13 +78,16 @@ shell: ## Open a shell in the app container
 test: ## Run Pest tests
 	docker compose exec $(APP_SERVICE) php artisan test
 
+test-parallel: ## Run Pest tests in parallel (paratest; one DB per worker)
+	docker compose exec $(APP_SERVICE) php artisan test --parallel
+
 test-js: ## Run Vitest frontend tests
 	docker compose exec $(APP_SERVICE) npm test
 
-test-all: ## Run full CI locally (Pint, Larastan, Pest, tsc, Vitest)
+test-all: ## Run full CI locally (Pint, Larastan, Pest parallel, tsc, Vitest)
 	docker compose exec $(APP_SERVICE) vendor/bin/pint --test
 	docker compose exec $(APP_SERVICE) vendor/bin/phpstan analyse --memory-limit=1G --no-progress
-	docker compose exec $(APP_SERVICE) php artisan test --compact
+	docker compose exec $(APP_SERVICE) php artisan test --parallel --compact
 	docker compose exec $(APP_SERVICE) npm run typecheck
 	docker compose exec $(APP_SERVICE) npm test
 

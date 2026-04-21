@@ -47,6 +47,7 @@ docker compose exec app php artisan test --compact
 - Use factories for models, `fake()` for test data
 - `php artisan make:test --pest {name}` for feature tests, `--unit` for unit tests
 - Do NOT delete tests without approval
+- `make test` runs serially (clearer failures when iterating on one test); `make test-parallel` uses paratest with one DB per worker (~6× faster on a warm machine). CI runs parallel by default
 - **`MjmlCompiler` is faked in `tests/Pest.php` `beforeEach`** — real `npx mjml` is ~600 ms per template × 18 seeded templates × `RefreshDatabase`, so the suite would take 2+ minutes otherwise. The one test that exercises real compilation instantiates `new MjmlCompiler` directly to bypass the binding. Don't remove the fake
 - **`Notification::fake()` does not persist to the DB** — tests that exercise code reading `unreadNotifications()` must seed real notifications via `$user->notify(...)` *before* calling `Notification::fake()`, otherwise the query finds nothing
 - **Use `postJson`, not `post` + `X-Requested-With`, to test JSON validation errors.** `postJson` sets `Accept: application/json` so Laravel's ValidationException renders as 422 JSON. A bare XHR without that header crashes inside Inertia's exception rendering with `Call to a member function all() on array`
