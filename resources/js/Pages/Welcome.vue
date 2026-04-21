@@ -9,17 +9,29 @@ const { t } = useI18n();
 const page = usePage<PageProps>();
 const user = computed(() => page.props.auth?.user);
 const isAdmin = computed(() => user.value?.roles?.includes('Admin') ?? false);
+const registrationOpen = computed(() => page.props.app_settings?.registration_open !== false);
 const appName = import.meta.env.VITE_APP_NAME || t('app.name');
 
-const primaryHref = computed(() => (user.value ? '/app' : '/register'));
-const primaryLabel = computed(() =>
-    user.value ? t('welcome.primary_cta_user') : t('welcome.primary_cta_guest'),
-);
+// When registration is disabled the primary CTA collapses to "Sign in" so the
+// hero never dead-ends at a 403 "registration closed" page.
+const primaryHref = computed(() => {
+    if (user.value) return '/app';
+    return registrationOpen.value ? '/register' : '/login';
+});
+const primaryLabel = computed(() => {
+    if (user.value) return t('welcome.primary_cta_user');
+    return registrationOpen.value ? t('welcome.primary_cta_guest') : t('nav.login');
+});
 const secondaryHref = computed(() => (user.value ? '/admin' : '/login'));
 const secondaryLabel = computed(() =>
     user.value ? t('welcome.secondary_cta_user') : t('welcome.secondary_cta_guest'),
 );
-const secondaryVisible = computed(() => !user.value || isAdmin.value);
+// For guests the secondary link duplicates the primary CTA once registration
+// is closed (both point at /login), so hide it in that case.
+const secondaryVisible = computed(() => {
+    if (user.value) return isAdmin.value;
+    return registrationOpen.value;
+});
 
 interface Feature {
     key: string;

@@ -65,6 +65,7 @@ useUserChannel((n) => {
 
 const isImpersonating = computed(() => user.value?.is_impersonating ?? false);
 const announcement = computed(() => (page.props as any).app_settings?.announcement as { text: string; severity: string } | null);
+const registrationOpen = computed(() => page.props.app_settings?.registration_open !== false);
 const announcementClass: Record<string, string> = {
     info: 'bg-sky-500/90',
     warn: 'bg-amber-500/90',
@@ -265,6 +266,7 @@ function initials(u: { first_name: string; last_name: string }) {
                                 {{ t('nav.login') }}
                             </Link>
                             <Link
+                                v-if="registrationOpen"
                                 href="/register"
                                 class="text-sm px-3 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors whitespace-nowrap"
                             >

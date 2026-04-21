@@ -7,10 +7,12 @@ import type { Customer, PageProps } from '@/types';
 /**
  * Customer / tenant chip in the navbar.
  *
- *   - 0 memberships → hidden entirely (prevents a bare chip on the welcome page)
- *   - 1 membership, not inside it → Link straight to that customer's dashboard
- *   - 1 membership, inside it      → static badge showing the name
- *   - N memberships                → button + dropdown; highlights the current one
+ *   - 0 memberships → hidden (prevents a bare chip on the welcome page)
+ *   - 1 membership  → always a Link straight to /c/{slug}/dashboard, even
+ *                     when the user is already scoped to it. A disabled
+ *                     "you're here" badge was counter-intuitive — clicks
+ *                     on the nav chip now always take you *somewhere*.
+ *   - N memberships → button + dropdown; highlights the current one
  *
  * Clicking any customer routes to `/c/{slug}/dashboard`, which triggers
  * InitializeTenancyByPath to swap the schema server-side.

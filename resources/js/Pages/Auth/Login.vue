@@ -21,6 +21,7 @@ const easyLoginForm = useForm({});
 const formFields = ref<HTMLElement>();
 
 const oauthProviders = computed(() => page.props.oauth?.providers ?? []);
+const registrationOpen = computed(() => page.props.app_settings?.registration_open !== false);
 
 const providerIcons: Record<string, string> = { google: 'pi-google', github: 'pi-github' };
 function providerIcon(name: string): string {
@@ -158,7 +159,7 @@ function easyLogin() {
             </div>
 
             <!-- Register link -->
-            <p class="mt-6 text-center text-sm text-gray-600 dark:text-dark-400">
+            <p v-if="registrationOpen" class="mt-6 text-center text-sm text-gray-600 dark:text-dark-400">
                 {{ t('auth.no_account') }}
                 <Link href="/register" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
                     {{ t('nav.register') }}

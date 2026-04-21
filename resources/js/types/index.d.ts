@@ -63,6 +63,12 @@ export interface PageProps extends InertiaPageProps {
     oauth?: {
         providers: Array<{ name: string; label: string }>;
     };
+    app_settings?: {
+        registration_open?: boolean;
+        login_enabled?: boolean;
+        files_feature_enabled?: boolean;
+        announcement?: { text: string; severity: string } | null;
+    };
     customer: Customer | null;
     customers: Customer[];
 }

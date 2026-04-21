@@ -48,3 +48,6 @@ cr.md
 # Local docker-compose overrides (per-machine, not shared)
 /docker-compose.override.yml
 /compose.override.yml
+
+# Playwright MCP browser snapshots (ad-hoc verification output)
+/.playwright-mcp
