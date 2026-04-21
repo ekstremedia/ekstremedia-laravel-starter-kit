@@ -56,7 +56,7 @@ it('allows admin to attach a customer to a user', function () {
 
     $this->actingAs($admin)
         ->post("/admin/users/{$user->id}/customers", [
-            'customer_id' => $customer->id,
+            'customer_ids' => [$customer->id],
             'notify' => false,
         ])
         ->assertRedirect();
@@ -92,7 +92,7 @@ it('dispatches notification when notify is true on attach', function () {
 
     $this->actingAs($admin)
         ->post("/admin/users/{$user->id}/customers", [
-            'customer_id' => $customer->id,
+            'customer_ids' => [$customer->id],
             'notify' => true,
         ])
         ->assertRedirect();
@@ -111,7 +111,7 @@ it('does not dispatch notification when notify is false', function () {
 
     $this->actingAs($admin)
         ->post("/admin/users/{$user->id}/customers", [
-            'customer_id' => $customer->id,
+            'customer_ids' => [$customer->id],
             'notify' => false,
         ])
         ->assertRedirect();
@@ -147,7 +147,7 @@ it('rejects non-admin from attaching customers', function () {
 
     $this->actingAs($user)
         ->post("/admin/users/{$target->id}/customers", [
-            'customer_id' => $customer->id,
+            'customer_ids' => [$customer->id],
             'notify' => false,
         ])
         ->assertForbidden();
