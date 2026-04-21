@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\ImpersonateController;
 use App\Http\Controllers\Admin\MailSettingsController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\StorageDashboardController;
 use App\Http\Controllers\Admin\SystemInfoController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\DevLoginController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CustomerLandingController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationPreferenceController;
+use App\Http\Controllers\PublicShareController;
 use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -24,6 +26,18 @@ use Inertia\Inertia;
 Route::get('/', function () {
     return Inertia::render('Welcome');
 })->name('home');
+
+// Public, unauthenticated share links. Full shares carry optional password
+// gating; signed links are Laravel-signed URLs with no DB row.
+Route::get('/share/{token}', [PublicShareController::class, 'view'])->name('public.share.view');
+Route::post('/share/{token}/unlock', [PublicShareController::class, 'unlock'])->name('public.share.unlock');
+Route::get('/share/{token}/files/{fileId}/download', [PublicShareController::class, 'download'])
+    ->whereNumber('fileId')
+    ->name('public.share.download');
+Route::get('/share/signed/file/{file}', [PublicShareController::class, 'signedDownload'])
+    ->whereNumber('file')
+    ->middleware('signed')
+    ->name('public.share.signed');
 
 // Dev easy-login (local/test only)
 if (app()->isLocal() || app()->runningUnitTests()) {
@@ -57,7 +71,8 @@ Route::middleware('auth')->group(function () {
             Route::get('/chat/conversations-list', [ChatController::class, 'conversationsJson'])->name('chat.conversations.list');
             Route::post('/chat/conversations', [ChatController::class, 'store'])->name('chat.conversations.store');
             Route::get('/chat/conversations/{conversation}', [ChatController::class, 'show'])->name('chat.conversations.show');
-            Route::post('/chat/conversations/{conversation}/messages', [ChatController::class, 'sendMessage'])->name('chat.conversations.messages.store');
+            Route::post('/chat/conversations/{conversation}/messages', [ChatController::class, 'sendMessage'])
+                ->name('chat.conversations.messages.store');
             Route::get('/chat/conversations/{conversation}/attachments/{media}', [ChatController::class, 'downloadAttachment'])->name('chat.conversations.attachments.download');
             Route::post('/chat/conversations/{conversation}/read', [ChatController::class, 'markRead'])->name('chat.conversations.read');
             Route::post('/chat/read-all', [ChatController::class, 'markAllRead'])->name('chat.read-all');
@@ -87,6 +102,7 @@ Route::middleware(['auth', 'verified', 'role:Admin'])
         Route::post('users/{user}/reset-2fa', [UserController::class, 'reset2fa'])->name('users.reset2fa');
         Route::post('users/{user}/send-password-reset', [UserController::class, 'sendPasswordReset'])->name('users.sendPasswordReset');
         Route::post('users/{user}/notify-test', [UserController::class, 'notifyTest'])->name('users.notifyTest');
+        Route::patch('users/{user}/quota', [UserController::class, 'setQuota'])->name('users.setQuota');
 
         Route::resource('roles', RoleController::class)->except(['show']);
 
@@ -113,6 +129,8 @@ Route::middleware(['auth', 'verified', 'role:Admin'])
 
         Route::get('settings', [AppSettingsController::class, 'show'])->name('settings.show');
         Route::patch('settings', [AppSettingsController::class, 'update'])->name('settings.update');
+
+        Route::get('storage', [StorageDashboardController::class, 'index'])->name('storage.index');
 
         Route::get('backups', [BackupController::class, 'index'])->name('backups.index');
         Route::post('backups/run', [BackupController::class, 'run'])->name('backups.run');

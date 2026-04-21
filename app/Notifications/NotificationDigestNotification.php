@@ -37,6 +37,8 @@ class NotificationDigestNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
+        $locale = $this->localeFor($notifiable);
+
         $lines = $this->notifications->map(function ($n) {
             $title = $n->data['title'] ?? class_basename($n->type);
             $message = $n->data['message'] ?? '';
@@ -46,10 +48,25 @@ class NotificationDigestNotification extends Notification implements ShouldQueue
 
         return $this->renderTemplate('notification-digest', $notifiable, [
             'count' => (string) $this->notifications->count(),
-            'frequency' => __('notifications.digest.frequency_'.$this->frequency),
+            'frequency' => __('notifications.digest.frequency_'.$this->frequency, [], $locale),
             'lines' => $lines,
             'app_name' => (string) config('app.name'),
             'app_url' => (string) config('app.url'),
         ]);
+    }
+
+    private function localeFor(object $notifiable): string
+    {
+        // Notifiables that implement HasLocalePreference (our User model does)
+        // expose the recipient's locale via preferredLocale(); fall back to
+        // English for guest-shaped notifiables.
+        if (method_exists($notifiable, 'preferredLocale')) {
+            $locale = $notifiable->preferredLocale();
+            if (is_string($locale) && $locale !== '') {
+                return $locale;
+            }
+        }
+
+        return 'en';
     }
 }

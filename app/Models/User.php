@@ -6,10 +6,12 @@ use App\Notifications\ResetPasswordNotification;
 use App\Notifications\VerifyEmailNotification;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -26,12 +28,21 @@ use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['first_name', 'last_name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable implements HasMedia, MustVerifyEmail
+class User extends Authenticatable implements HasLocalePreference, HasMedia, MustVerifyEmail
 {
     public const ROLE_ADMIN = 'Admin';
 
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasRoles, Impersonate, InteractsWithMedia, LogsActivity, Notifiable, Searchable, TwoFactorAuthenticatable;
+
+    /**
+     * User rows live in the central schema — pin so queries don't follow the
+     * tenant schema swap performed by stancl/tenancy's DatabaseTenancyBootstrapper.
+     */
+    public function getConnectionName(): ?string
+    {
+        return config('tenancy.database.central_connection');
+    }
 
     public function canImpersonate(): bool
     {
@@ -142,6 +153,16 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     }
 
     /**
+     * Laravel reads this when sending notifications to switch app()->getLocale()
+     * for the duration of rendering — makes `__()` and Blade `@lang` calls in
+     * MailMessage / notifications respect the recipient's own language.
+     */
+    public function preferredLocale(): ?string
+    {
+        return $this->settings()->resolved()['locale'] ?? null;
+    }
+
+    /**
      * Conversations this user is a participant in.
      *
      * @return BelongsToMany<Conversation, $this>
@@ -193,6 +214,16 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     }
 
     /**
+     * File-system entries owned by this user across all customers.
+     *
+     * @return HasMany<FileItem, $this>
+     */
+    public function files(): HasMany
+    {
+        return $this->hasMany(FileItem::class);
+    }
+
+    /**
      * Get the user's settings, creating defaults if none exist yet.
      */
     public function settings(): UserSetting
@@ -239,7 +270,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     /**
      * Get the attributes that should be cast.
      *
-     * @return array<string, string>
+     * @return array{email_verified_at: string, banned_at: string, last_login_at: string, password: string, storage_used_bytes: string}
      */
     protected function casts(): array
     {
@@ -248,6 +279,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
             'banned_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
+            'storage_used_bytes' => 'integer',
         ];
     }
 }

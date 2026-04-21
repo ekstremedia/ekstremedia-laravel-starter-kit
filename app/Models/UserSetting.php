@@ -14,6 +14,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *     notification_chat_messages: bool,
  *     notification_account_updates: bool,
  *     notification_system_alerts: bool,
+ *     notification_storage_alerts: bool,
+ *     files_enabled: bool,
+ *     storage_quota_bytes: int|null,
+ *     storage_last_alerted_threshold: array<string, int>|null,
+ *     last_customer_slug: string|null,
  * }
  */
 class UserSetting extends Model
@@ -38,6 +43,18 @@ class UserSetting extends Model
         'notification_chat_messages' => true,
         'notification_account_updates' => true,
         'notification_system_alerts' => true,
+        'notification_storage_alerts' => true,
+        // Personal file-system opt-in. Even if the tenant feature flag is on,
+        // a user only sees /files when this is true. Admin-controlled.
+        'files_enabled' => false,
+        // null = unlimited, 0 = hard-disabled, otherwise byte cap.
+        'storage_quota_bytes' => null,
+        // Highest threshold (80/95/100) we've already notified about, so we
+        // don't spam the same warning every upload. Reset to null on delete.
+        'storage_last_alerted_threshold' => null,
+        // Most recently visited customer slug — used by CustomerLandingController
+        // to auto-redirect returning users instead of forcing them through the picker.
+        'last_customer_slug' => null,
     ];
 
     public function user(): BelongsTo

@@ -43,6 +43,17 @@ class CustomerLandingController extends Controller
             return redirect()->route('customer.dashboard', ['customer' => $only->slug]);
         }
 
+        // Prefer the user's most recently visited customer. Falls through to
+        // the picker if the slug is stale (customer suspended, user removed)
+        // or has never been set.
+        $remembered = $user->settings()->resolved()['last_customer_slug'] ?? null;
+        if (is_string($remembered) && $remembered !== '') {
+            $match = $customers->firstWhere('slug', $remembered);
+            if ($match) {
+                return redirect()->route('customer.dashboard', ['customer' => $match->slug]);
+            }
+        }
+
         // The picker itself handles the empty case with a friendly "ask an admin
         // to add you" message — let it render so the user sees *why* they can't
         // enter anywhere rather than getting a bare redirect.

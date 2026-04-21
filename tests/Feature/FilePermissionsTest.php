@@ -1,0 +1,118 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Models\AppSetting;
+use App\Models\FileItem;
+use App\Models\User;
+use Database\Seeders\RoleAndPermissionSeeder;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Spatie\Permission\PermissionRegistrar;
+
+/**
+ * Users in this project get file permissions via their "User" role. Revoking
+ * role-granted permissions directly on a user is a no-op — we strip the role
+ * and (optionally) grant back a curated subset, then forget the registrar's
+ * permission cache so the next HTTP request sees the new state.
+ */
+function grantOnly(User $user, array $keep): void
+{
+    $user->syncRoles([]);
+    foreach ($keep as $perm) {
+        $user->givePermissionTo($perm);
+    }
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+}
+
+beforeEach(function () {
+    $this->seed(RoleAndPermissionSeeder::class);
+    Storage::fake('public');
+    AppSetting::current()->update(['files_feature_enabled' => true]);
+
+    $this->customer = createCustomer();
+    $this->customer->update(['files_feature_enabled' => true]);
+
+    $this->user = User::factory()->create();
+    $this->user->assignRole('User');
+    joinCustomer($this->user, $this->customer);
+    $this->user->settings()->merge([
+        'files_enabled' => true,
+        'storage_quota_bytes' => 10_000_000,
+    ]);
+
+    $this->filesUrl = customerUrl($this->customer, '/files');
+});
+
+it('seeded User role has all file permissions', function () {
+    expect($this->user->can('upload files'))->toBeTrue();
+    expect($this->user->can('create folders'))->toBeTrue();
+    expect($this->user->can('rename files'))->toBeTrue();
+    expect($this->user->can('delete files'))->toBeTrue();
+    expect($this->user->can('share files'))->toBeTrue();
+});
+
+it('rejects upload when user lacks the upload permission', function () {
+    grantOnly($this->user, ['create folders', 'rename files', 'delete files', 'share files']);
+
+    $this->actingAs($this->user)
+        ->post($this->filesUrl, ['files' => [UploadedFile::fake()->create('a.txt', 10)]])
+        ->assertForbidden();
+});
+
+it('rejects folder create when user lacks the create-folders permission', function () {
+    grantOnly($this->user, ['upload files', 'rename files', 'delete files', 'share files']);
+
+    $this->actingAs($this->user)
+        ->post(customerUrl($this->customer, '/files/folder'), ['name' => 'dir'])
+        ->assertForbidden();
+});
+
+it('rejects rename when user lacks the rename-files permission', function () {
+    $file = FileItem::factory()->folder()->create([
+        'user_id' => $this->user->id,
+        'tenant_id' => $this->customer->id,
+    ]);
+    grantOnly($this->user, ['upload files', 'create folders', 'delete files', 'share files']);
+
+    $this->actingAs($this->user)
+        ->patch(customerUrl($this->customer, "/files/{$file->id}"), ['name' => 'new'])
+        ->assertForbidden();
+});
+
+it('rejects delete when user lacks the delete-files permission', function () {
+    $file = FileItem::factory()->folder()->create([
+        'user_id' => $this->user->id,
+        'tenant_id' => $this->customer->id,
+    ]);
+    grantOnly($this->user, ['upload files', 'create folders', 'rename files', 'share files']);
+
+    $this->actingAs($this->user)
+        ->delete(customerUrl($this->customer, "/files/{$file->id}"))
+        ->assertForbidden();
+});
+
+it('rejects share when user lacks the share-files permission', function () {
+    $file = FileItem::factory()->folder()->create([
+        'user_id' => $this->user->id,
+        'tenant_id' => $this->customer->id,
+    ]);
+    grantOnly($this->user, ['upload files', 'create folders', 'rename files', 'delete files']);
+
+    $this->actingAs($this->user)
+        ->postJson(customerUrl($this->customer, "/files/{$file->id}/shares"), ['expires_in_hours' => 1])
+        ->assertForbidden();
+});
+
+it('rejects trash force-delete when user lacks the delete-files permission', function () {
+    $file = FileItem::factory()->folder()->create([
+        'user_id' => $this->user->id,
+        'tenant_id' => $this->customer->id,
+    ]);
+    $file->delete();
+    grantOnly($this->user, ['upload files', 'create folders', 'rename files', 'share files']);
+
+    $this->actingAs($this->user)
+        ->delete(customerUrl($this->customer, "/files/trash/{$file->id}"))
+        ->assertForbidden();
+});

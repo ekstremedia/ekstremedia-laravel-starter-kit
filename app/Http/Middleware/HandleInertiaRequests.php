@@ -7,7 +7,6 @@ use App\Models\Tenant;
 use App\Models\UserSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Inertia\Inertia;
 use Inertia\Middleware;
 use Throwable;
 
@@ -87,10 +86,10 @@ class HandleInertiaRequests extends Middleware
                 'enabled' => (bool) config('chat.enabled'),
             ],
             'customer' => fn () => $this->currentCustomer(),
-            // `customers` is only consumed by the picker page (which already
-            // receives the list as an explicit controller prop) — keep it off
-            // shared props unless a page opts in with Inertia::only/Inertia::reload.
-            'customers' => Inertia::optional(fn () => $this->availableCustomers($request)),
+            // The navbar customer switcher needs the user's memberships, so
+            // share a compact list. Capped at 50 — past that, admins should
+            // use the full picker or the /admin/customers UI.
+            'customers' => fn () => $this->availableCustomers($request),
         ];
     }
 
@@ -112,6 +111,7 @@ class HandleInertiaRequests extends Middleware
             'id' => $customer->id,
             'slug' => $customer->slug,
             'name' => $customer->name,
+            'files_feature_enabled' => (bool) $customer->files_feature_enabled,
         ];
     }
 
@@ -138,7 +138,7 @@ class HandleInertiaRequests extends Middleware
             : $user->customers()->where('status', 'active');
 
         /** @var Collection<int, Tenant> $customers */
-        $customers = $query->orderBy('name')->get();
+        $customers = $query->orderBy('name')->limit(50)->get();
 
         return $customers
             ->map(fn (Tenant $customer) => [
@@ -164,12 +164,14 @@ class HandleInertiaRequests extends Middleware
                 'announcement' => $s->announcement_banner
                     ? ['text' => $s->announcement_banner, 'severity' => $s->announcement_severity]
                     : null,
+                'files_feature_enabled' => (bool) $s->files_feature_enabled,
             ];
         } catch (Throwable) {
             return [
                 'registration_open' => true,
                 'login_enabled' => true,
                 'announcement' => null,
+                'files_feature_enabled' => false,
             ];
         }
     }

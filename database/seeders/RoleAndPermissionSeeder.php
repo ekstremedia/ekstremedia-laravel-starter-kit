@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Models\Permission;
+use App\Models\Role;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 class RoleAndPermissionSeeder extends Seeder
@@ -20,6 +20,14 @@ class RoleAndPermissionSeeder extends Seeder
             'manage resources',
             'manage settings',
             'manage profile',
+            'manage storage',
+            // File manager — gate each mutation individually so admins can
+            // carve out read-only roles by removing a subset of these.
+            'upload files',
+            'create folders',
+            'rename files',
+            'delete files',
+            'share files',
         ];
 
         foreach ($permissions as $permission) {
@@ -35,6 +43,11 @@ class RoleAndPermissionSeeder extends Seeder
             'manage resources',
             'manage settings',
             'manage profile',
+            'upload files',
+            'create folders',
+            'rename files',
+            'delete files',
+            'share files',
         ]);
 
         $userRole = Role::firstOrCreate(['name' => 'User']);
@@ -42,6 +55,11 @@ class RoleAndPermissionSeeder extends Seeder
             'view dashboard',
             'manage settings',
             'manage profile',
+            'upload files',
+            'create folders',
+            'rename files',
+            'delete files',
+            'share files',
         ]);
     }
 }

@@ -20,6 +20,7 @@
         "laravel/scout": "^11.1",
         "laravel/tinker": "^3.0",
         "opcodesio/log-viewer": "^3.24",
+        "pbmedia/laravel-ffmpeg": "^8.9",
         "pusher/pusher-php-server": "^7.2",
         "sentry/sentry-laravel": "^4.25",
         "spatie/laravel-activitylog": "^5.0",
@@ -30,6 +31,7 @@
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.7",
+        "brianium/paratest": "^7.20",
         "fakerphp/faker": "^1.23",
         "larastan/larastan": "^3.0",
         "laravel/boost": "^2.4",

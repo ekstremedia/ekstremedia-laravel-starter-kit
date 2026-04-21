@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y \
     libzip-dev \
     libmagickwand-dev \
     imagemagick \
+    ffmpeg \
+    poppler-utils \
     zip \
     unzip \
     ca-certificates \

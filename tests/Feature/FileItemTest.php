@@ -1,0 +1,60 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Models\FileItem;
+use App\Models\Tenant;
+use App\Models\User;
+
+it('creates a file item scoped to a tenant and user', function () {
+    $tenant = Tenant::factory()->create();
+    $user = User::factory()->create();
+    $user->customers()->attach($tenant);
+
+    $folder = FileItem::factory()->folder()->create([
+        'tenant_id' => $tenant->id,
+        'user_id' => $user->id,
+    ]);
+
+    $child = FileItem::factory()->create([
+        'tenant_id' => $tenant->id,
+        'user_id' => $user->id,
+        'parent_id' => $folder->id,
+    ]);
+
+    expect($folder->isFolder())->toBeTrue()
+        ->and($folder->children)->toHaveCount(1)
+        ->and($child->parent->is($folder))->toBeTrue()
+        ->and($child->tenant->id)->toBe($tenant->id)
+        ->and($child->user->id)->toBe($user->id)
+        ->and($child->uuid)->toBeString();
+});
+
+it('cascade-soft-deletes descendants when a folder is trashed', function () {
+    $tenant = Tenant::factory()->create();
+    $user = User::factory()->create();
+
+    $folder = FileItem::factory()->folder()->create([
+        'tenant_id' => $tenant->id,
+        'user_id' => $user->id,
+    ]);
+
+    FileItem::factory()->count(3)->create([
+        'tenant_id' => $tenant->id,
+        'user_id' => $user->id,
+        'parent_id' => $folder->id,
+    ]);
+
+    $folder->delete();
+
+    expect(FileItem::where('tenant_id', $tenant->id)->count())->toBe(0)
+        ->and(FileItem::withTrashed()->where('tenant_id', $tenant->id)->count())->toBe(4);
+});
+
+it('identifies image mime types', function () {
+    $image = FileItem::factory()->make(['mime_type' => 'image/png']);
+    $pdf = FileItem::factory()->make(['mime_type' => 'application/pdf']);
+
+    expect($image->isImage())->toBeTrue()
+        ->and($pdf->isImage())->toBeFalse();
+});

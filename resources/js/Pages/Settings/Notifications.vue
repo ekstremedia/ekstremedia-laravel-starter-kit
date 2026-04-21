@@ -14,6 +14,7 @@ const props = defineProps<{
         notification_chat_messages: boolean;
         notification_account_updates: boolean;
         notification_system_alerts: boolean;
+        notification_storage_alerts: boolean;
     };
 }>();
 
@@ -25,6 +26,7 @@ const form = useForm({
     notification_chat_messages: props.preferences.notification_chat_messages,
     notification_account_updates: props.preferences.notification_account_updates,
     notification_system_alerts: props.preferences.notification_system_alerts,
+    notification_storage_alerts: props.preferences.notification_storage_alerts,
 });
 
 const sectionsRef = ref<HTMLElement>();
@@ -115,6 +117,14 @@ function submit() {
                             <span class="text-sm">{{ t('notifications.settings.system_alerts') }}</span>
                         </div>
                         <ToggleSwitch v-model="form.notification_system_alerts" />
+                    </label>
+
+                    <label class="flex items-center justify-between gap-3 cursor-pointer">
+                        <div class="flex items-center gap-2">
+                            <i class="pi pi-database text-sm text-indigo-500"></i>
+                            <span class="text-sm">{{ t('notifications.settings.storage_alerts') }}</span>
+                        </div>
+                        <ToggleSwitch v-model="form.notification_storage_alerts" />
                     </label>
                 </div>
 

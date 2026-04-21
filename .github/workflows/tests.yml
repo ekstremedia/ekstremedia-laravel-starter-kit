@@ -98,7 +98,7 @@ jobs:
           DB_PASSWORD: secret
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
-        run: php artisan test --compact
+        run: php artisan test --parallel --compact
 
   frontend:
     name: Frontend (Vitest + tsc)

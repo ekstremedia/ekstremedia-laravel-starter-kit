@@ -52,6 +52,15 @@ services:
     ports:
       - "${MAILPIT_HOST_PORT:-8126}:8025"
 
+  # Headless document converter. App POSTs office/PDF files and gets back a
+  # PDF; we render the first page to an image via Imagick/Spatie.
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+    command:
+      - "gotenberg"
+      - "--log-level=error"
+
 volumes:
   postgres-data:
   redis-data:

@@ -42,3 +42,7 @@ cr.md
 
 # Media uploads (dev)
 /storage/media-library
+
+# Local docker-compose overrides (per-machine, not shared)
+/docker-compose.override.yml
+/compose.override.yml

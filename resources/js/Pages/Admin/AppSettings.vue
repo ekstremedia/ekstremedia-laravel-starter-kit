@@ -22,6 +22,8 @@ interface Settings {
     maintenance_message: string | null;
     announcement_banner: string | null;
     announcement_severity: 'info' | 'warn' | 'danger' | 'success';
+    files_feature_enabled: boolean;
+    max_share_days: number;
 }
 
 const props = defineProps<{ settings: Settings; roles: string[] }>();
@@ -133,6 +135,34 @@ function save() {
             <div class="min-w-0 flex-1">
                 <label class="text-xs text-gray-500 uppercase tracking-wide">{{ t('admin.settings.severity') }}</label>
                 <Select v-model="form.announcement_severity" :options="severityOptions" optionLabel="label" optionValue="value" class="w-full md:w-60" />
+            </div>
+        </section>
+
+        <!-- File system -->
+        <section class="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-2xl p-6 space-y-4">
+            <h2 class="font-semibold flex items-center gap-2"><i class="pi pi-database text-indigo-500"></i> {{ t('admin.settings.files_heading') }}</h2>
+
+            <div class="flex items-center justify-between gap-4">
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium">{{ t('admin.settings.files_feature_enabled') }}</p>
+                    <p class="text-xs text-gray-500">{{ t('admin.settings.files_feature_enabled_desc') }}</p>
+                </div>
+                <ToggleSwitch v-model="form.files_feature_enabled" />
+            </div>
+
+            <div class="flex items-center justify-between gap-4">
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium">{{ t('admin.settings.max_share_days') }}</p>
+                    <p class="text-xs text-gray-500">{{ t('admin.settings.max_share_days_desc') }}</p>
+                </div>
+                <InputText
+                    :modelValue="String(form.max_share_days)"
+                    @update:modelValue="(v) => { const n = Number(v); form.max_share_days = Number.isFinite(n) ? Math.min(30, Math.max(1, Math.trunc(n))) : 1; }"
+                    type="number"
+                    min="1"
+                    max="30"
+                    class="w-24"
+                />
             </div>
         </section>
 

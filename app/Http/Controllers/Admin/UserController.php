@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\StoreUserRequest;
 use App\Http\Requests\Admin\UpdateUserRequest;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\UserSetting;
 use App\Notifications\AccountBannedNotification;
 use App\Notifications\AdminTestNotification;
 use App\Notifications\CustomerMemberAddedNotification;
@@ -26,9 +27,17 @@ class UserController extends Controller
     public function index(Request $request): Response
     {
         $search = $request->string('search')->toString();
+        $sort = $request->string('sort')->toString() ?: 'id';
+        $direction = $request->string('direction')->toString() === 'asc' ? 'asc' : 'desc';
+
+        // Only allow sorting on a known allowlist; defaults to id desc.
+        $allowedSort = ['id', 'first_name', 'last_name', 'email', 'storage_used_bytes'];
+        if (! in_array($sort, $allowedSort, true)) {
+            $sort = 'id';
+        }
 
         $users = User::query()
-            ->with(['roles:id,name', 'media'])
+            ->with(['roles:id,name', 'media', 'setting'])
             ->when($search !== '', function ($q) use ($search) {
                 $driver = $q->getModel()->getConnection()->getDriverName();
                 $op = $driver === 'pgsql' ? 'ilike' : 'like';
@@ -46,20 +55,55 @@ class UserController extends Controller
                     }
                 });
             })
-            ->orderBy('id', 'desc')
+            ->orderBy($sort, $direction)
             ->paginate(15)
             ->withQueryString();
 
         $users->getCollection()->transform(function (User $user) {
             $user->setAttribute('avatar_thumb_url', $user->avatarUrl('thumb'));
+            // `setting` is eager-loaded above — reach through it directly so
+            // each row doesn't hit firstOrCreate (N+1 across a 15-row page).
+            $resolved = $user->setting
+                ? array_merge(UserSetting::$defaults, $user->setting->settings ?? [])
+                : UserSetting::$defaults;
+            $user->setAttribute('storage_quota_bytes', $resolved['storage_quota_bytes'] ?? null);
 
             return $user;
         });
 
         return Inertia::render('Admin/Users/Index', [
             'users' => $users,
-            'filters' => ['search' => $search],
+            'filters' => ['search' => $search, 'sort' => $sort, 'direction' => $direction],
         ]);
+    }
+
+    public function setQuota(Request $request, User $user): RedirectResponse
+    {
+        // `nullable` allows unlimited; `0` is valid (disables uploads).
+        $data = $request->validate([
+            'storage_quota_bytes' => 'nullable|integer|min:0',
+            'files_enabled' => 'sometimes|boolean',
+        ]);
+
+        $patch = [];
+        if (array_key_exists('storage_quota_bytes', $data)) {
+            $patch['storage_quota_bytes'] = $data['storage_quota_bytes'];
+            // Reset alert tracking when quota moves, otherwise users who
+            // already crossed 95/100 % under the old cap would silently stop
+            // receiving alerts (the stored threshold would shadow the new one).
+            $patch['storage_last_alerted_threshold'] = null;
+        }
+        if (array_key_exists('files_enabled', $data)) {
+            $patch['files_enabled'] = (bool) $data['files_enabled'];
+        }
+
+        if ($patch === []) {
+            return back();
+        }
+
+        $user->settings()->merge($patch);
+
+        return back()->with('success', __('admin.users.quota_updated'));
     }
 
     public function create(): Response

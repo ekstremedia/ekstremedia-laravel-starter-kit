@@ -5,6 +5,7 @@ import InputText from 'primevue/inputtext';
 import Select from 'primevue/select';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
+import ToggleSwitch from 'primevue/toggleswitch';
 import ConfirmDialog from 'primevue/confirmdialog';
 import { useConfirm } from 'primevue/useconfirm';
 import { useI18n } from 'vue-i18n';
@@ -19,6 +20,7 @@ interface CustomerData {
     slug: string;
     name: string;
     status: 'active' | 'suspended';
+    files_feature_enabled: boolean;
     users: Member[];
 }
 
@@ -32,6 +34,7 @@ const statusOptions = [
 const form = useForm({
     name: props.customer.name,
     status: props.customer.status,
+    files_feature_enabled: props.customer.files_feature_enabled,
 });
 
 function save() {
@@ -88,6 +91,16 @@ function detach(member: Member) {
                     <label class="block text-sm mb-1">{{ t('common.status') }}</label>
                     <Select v-model="form.status" :options="statusOptions" optionLabel="label" optionValue="value" class="w-full" />
                     <p class="text-xs text-gray-500 mt-1">{{ t('admin.customers.suspended_hint') }}</p>
+                </div>
+                <div class="flex items-start justify-between gap-4 pt-2">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-medium">
+                            <i class="pi pi-database mr-1 text-indigo-500" />
+                            {{ t('admin.customers.files_enabled') }}
+                        </p>
+                        <p class="text-xs text-gray-500">{{ t('admin.customers.files_enabled_hint') }}</p>
+                    </div>
+                    <ToggleSwitch v-model="form.files_feature_enabled" />
                 </div>
                 <div>
                     <Button type="submit" :label="t('common.save')" icon="pi pi-check" :loading="form.processing" />

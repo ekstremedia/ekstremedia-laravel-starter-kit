@@ -2,9 +2,11 @@
 
 use App\Http\Middleware\EnforceAppSettings;
 use App\Http\Middleware\EnsureChatEnabled;
+use App\Http\Middleware\EnsureStorageAvailable;
 use App\Http\Middleware\EnsureUserIsNotBanned;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\InitializeTenancyByPath;
+use App\Http\Middleware\SetLocaleFromUser;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -38,6 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
+            SetLocaleFromUser::class,
             HandleInertiaRequests::class,
             EnsureUserIsNotBanned::class,
             EnforceAppSettings::class,
@@ -48,6 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
             'chat.enabled' => EnsureChatEnabled::class,
+            'storage.available' => EnsureStorageAvailable::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
