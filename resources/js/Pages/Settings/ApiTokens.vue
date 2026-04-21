@@ -63,7 +63,9 @@ async function copyToClipboard(value: string) {
 
 function relativeTime(iso: string | null): string {
     if (!iso) return t('settings.tokens.never_used');
-    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    const timestamp = new Date(iso).getTime();
+    if (Number.isNaN(timestamp)) return t('settings.tokens.never_used');
+    const diff = Math.floor((Date.now() - timestamp) / 1000);
     if (diff < 60) return t('settings.tokens.seconds_ago', { n: diff });
     if (diff < 3600) return t('settings.tokens.minutes_ago', { n: Math.floor(diff / 60) });
     if (diff < 86400) return t('settings.tokens.hours_ago', { n: Math.floor(diff / 3600) });

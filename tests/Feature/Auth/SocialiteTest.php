@@ -3,6 +3,7 @@
 use App\Models\User;
 use Database\Seeders\RoleAndPermissionSeeder;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\InvalidStateException;
 
 beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
@@ -78,6 +79,26 @@ it('signs a returning OAuth user straight in by (provider, provider_id)', functi
     $this->get('/auth/google/callback?code=x')->assertRedirect();
 
     expect(auth()->id())->toBe($user->id);
+});
+
+it('bounces back to login with a friendly flash when the oauth state is invalid', function () {
+    Socialite::shouldReceive('driver->user')->andThrow(new InvalidStateException);
+
+    $response = $this->from('/login')->get('/auth/google/callback?code=x');
+
+    $response->assertRedirect('/login');
+    $response->assertSessionHasErrors(['oauth']);
+    expect(auth()->check())->toBeFalse();
+});
+
+it('bounces back to login when the oauth provider throws anything else', function () {
+    Socialite::shouldReceive('driver->user')->andThrow(new RuntimeException('provider down'));
+
+    $response = $this->from('/login')->get('/auth/google/callback?code=x');
+
+    $response->assertRedirect('/login');
+    $response->assertSessionHasErrors(['oauth']);
+    expect(auth()->check())->toBeFalse();
 });
 
 function fakeOauthUser(string $email, string $id, string $name): Laravel\Socialite\Contracts\User

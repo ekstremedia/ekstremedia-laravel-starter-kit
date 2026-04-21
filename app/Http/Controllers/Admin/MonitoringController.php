@@ -54,7 +54,12 @@ class MonitoringController extends Controller
                 ->paginate(25)
                 ->withQueryString();
 
-            $users = User::orderBy('email')->get(['id', 'email', 'first_name', 'last_name']);
+            // Cap the dropdown so a 100k-user install doesn't hydrate every
+            // row on page load. If the user the admin wants isn't in the top
+            // slice they can still filter by activity's causer_id directly.
+            $users = User::orderBy('email')
+                ->limit(500)
+                ->get(['id', 'email', 'first_name', 'last_name']);
             // Distinct() on activity_log would full-scan the table every time
             // the page renders. The set of log_names / events barely changes,
             // so a short cache is a big hit on larger installations.

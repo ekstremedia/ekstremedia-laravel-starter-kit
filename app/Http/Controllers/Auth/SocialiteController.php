@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\InvalidStateException;
 use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirectResponse;
+use Throwable;
 
 /**
  * OAuth login bridge (Google / GitHub / ...).
@@ -40,8 +43,24 @@ class SocialiteController extends Controller
     {
         $this->assertProviderAllowed($provider);
 
-        /** @var SocialiteUser $oauthUser */
-        $oauthUser = Socialite::driver($provider)->user();
+        // Any exception here would surface as a 500 — instead bounce back to
+        // login with a friendly flash. InvalidStateException (stale/forged
+        // `state` param) is common enough to merit its own message; anything
+        // else is bucketed under "provider unreachable".
+        try {
+            /** @var SocialiteUser $oauthUser */
+            $oauthUser = Socialite::driver($provider)->user();
+        } catch (InvalidStateException) {
+            return redirect()->route('login')->withErrors([
+                'oauth' => 'Your sign-in session expired. Please try again.',
+            ]);
+        } catch (Throwable $e) {
+            Log::warning('Socialite callback failed', ['provider' => $provider, 'exception' => $e]);
+
+            return redirect()->route('login')->withErrors([
+                'oauth' => 'Unable to sign in with '.$provider.'. Please try again.',
+            ]);
+        }
 
         $user = $this->resolveUser($provider, $oauthUser);
 
