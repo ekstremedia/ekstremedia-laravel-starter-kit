@@ -168,6 +168,7 @@ function validateAndProcessFiles(fileList: FileList | File[]): UploadingFile[] {
     const fileArray = Array.from(fileList);
     const validFiles: UploadingFile[] = [];
     const rejected: { name: string; size: number; reason: string }[] = [];
+    const singleOnly = props.multiple === false;
 
     for (const file of fileArray) {
         if (file.size > props.maxFileSize * 1024 * 1024) {
@@ -175,6 +176,14 @@ function validateAndProcessFiles(fileList: FileList | File[]): UploadingFile[] {
                 name: file.name,
                 size: file.size,
                 reason: t('upload.fileTooLarge', { size: props.maxFileSize }),
+            });
+            continue;
+        }
+        if (singleOnly && validFiles.length >= 1) {
+            rejected.push({
+                name: file.name,
+                size: file.size,
+                reason: t('upload.onlyOneFile'),
             });
             continue;
         }
@@ -188,8 +197,9 @@ function validateAndProcessFiles(fileList: FileList | File[]): UploadingFile[] {
         });
     }
 
-    // Update rejected files state
-    rejectedFiles.value = rejected;
+    // Update rejected files state — append so warnings remain visible even
+    // if validation is called mid-upload (e.g. user drops more files).
+    rejectedFiles.value = [...rejectedFiles.value, ...rejected];
 
     return validFiles;
 }
@@ -228,6 +238,13 @@ async function startUpload() {
 
             // Use Inertia router.post with progress tracking
             await new Promise<void>((resolve) => {
+                let settled = false;
+                const settle = () => {
+                    if (!settled) {
+                        settled = true;
+                        resolve();
+                    }
+                };
                 router.post(
                     props.uploadUrl,
                     {
@@ -249,7 +266,7 @@ async function startUpload() {
                             uploadFile.status = 'complete';
                             uploadFile.progress = 100;
                             emit('file-uploaded', uploadFile.name);
-                            resolve();
+                            settle();
                         },
                         onError: (errors) => {
                             const fallback = t('upload.failed');
@@ -257,7 +274,17 @@ async function startUpload() {
                             uploadFile.status = 'error';
                             uploadFile.error = errorMsg;
                             emit('error', errorMsg ?? fallback);
-                            resolve(); // Continue to next file even on error
+                            settle(); // Continue to next file even on error
+                        },
+                        onCancel: () => {
+                            const msg = t('upload.cancelled');
+                            uploadFile.status = 'error';
+                            uploadFile.error = msg;
+                            emit('error', msg);
+                            settle();
+                        },
+                        onFinish: () => {
+                            settle();
                         },
                     },
                 );

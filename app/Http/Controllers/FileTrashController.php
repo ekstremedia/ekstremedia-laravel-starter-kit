@@ -36,7 +36,7 @@ class FileTrashController extends Controller
 
         return Inertia::render('Files/Trash', [
             'items' => FileItemResource::collection($items),
-            'retention_days' => 30,
+            'retention_days' => (int) config('files.trash_retention_days', 30),
         ]);
     }
 
@@ -45,6 +45,7 @@ class FileTrashController extends Controller
         $tenant = $this->currentTenant($request);
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
+        abort_unless($user->can('delete files'), 403, __('files.permission_denied'));
 
         $item = FileItem::onlyTrashed()->findOrFail($id);
         $this->authorizeOwn($item, $user->id, $tenant->id);
@@ -127,6 +128,14 @@ class FileTrashController extends Controller
                     ->where('user_id', $user->id)
                     ->chunkById(100, function ($items): void {
                         foreach ($items as $item) {
+                            // A previous iteration may have cascade-removed this
+                            // row — skip if it's gone.
+                            if (! FileItem::onlyTrashed()->whereKey($item->id)->exists()) {
+                                continue;
+                            }
+                            if ($item->isFolder()) {
+                                $this->cascadeForceDelete($item);
+                            }
                             $item->forceDelete();
                         }
                     });

@@ -298,7 +298,7 @@ class StorageUsageService
             return;
         }
 
-        if ($current !== $last) {
+        if ($last === null || $current > (int) $last) {
             $user->notify(new ApproachingStorageLimitNotification(
                 thresholdPercent: $current,
                 usedBytes: $used,

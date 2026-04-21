@@ -18,7 +18,6 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class FileItemController extends Controller
 {
@@ -48,7 +47,9 @@ class FileItemController extends Controller
         if ($search = $request->string('q')->toString()) {
             // Case-insensitive prefix search, escaping LIKE wildcards.
             $escaped = addcslashes($search, '%_\\');
-            $query->where('name', 'ilike', "%{$escaped}%");
+            $driver = DB::connection()->getDriverName();
+            $op = $driver === 'pgsql' ? 'ilike' : 'like';
+            $query->where('name', $op, "%{$escaped}%");
         }
 
         $items = $query->orderByRaw("case when type = 'folder' then 0 else 1 end")
@@ -116,7 +117,7 @@ class FileItemController extends Controller
 
         $request->validate([
             'files' => 'required|array|min:1',
-            'files.*' => 'file|max:51200',
+            'files.*' => 'file|max:'.config('files.max_upload_kilobytes', 51200),
             'parent_id' => ['nullable', 'integer', $this->existsFileItemRule()],
         ]);
 
@@ -132,7 +133,7 @@ class FileItemController extends Controller
         $created = 0;
         $previewTargets = [];
         $videoTargets = [];
-        DB::transaction(function () use ($request, $tenant, $user, $parentId, &$created, &$previewTargets, &$videoTargets): void {
+        DB::connection((string) config('tenancy.database.central_connection'))->transaction(function () use ($request, $tenant, $user, $parentId, &$created, &$previewTargets, &$videoTargets): void {
             foreach ($request->file('files', []) as $file) {
                 $name = $this->uniqueName($tenant->id, $user->id, $parentId, $file->getClientOriginalName());
                 // getSize() can return false on partial uploads — fall back to
@@ -196,7 +197,7 @@ class FileItemController extends Controller
         abort_unless($user->can('rename files'), 403, __('files.permission_denied'));
 
         $data = $request->validate([
-            'name' => 'sometimes|string|max:255',
+            'name' => 'sometimes|string|min:1|max:255',
             'parent_id' => ['sometimes', 'nullable', 'integer', $this->existsFileItemRule()],
         ]);
 
@@ -341,7 +342,7 @@ class FileItemController extends Controller
     private function authorizeOwn(FileItem $item, int $userId, int $tenantId): void
     {
         if ($item->user_id !== $userId || $item->tenant_id !== $tenantId) {
-            throw new AccessDeniedHttpException;
+            abort(403, __('files.permission_denied'));
         }
     }
 

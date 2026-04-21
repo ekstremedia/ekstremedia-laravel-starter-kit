@@ -97,7 +97,7 @@ const originalTooltip = computed(() => {
     if (!item) return '';
     let tip = t('lightbox.loadOriginalTooltip');
     if (item.zoomResolution && item.originalResolution) {
-        tip += `\n${t('lightbox.currentResolution')}: ${item.zoomResolution}\n${t('lightbox.originalResolution')}: ${item.originalResolution}`;
+        tip += `\n${t('lightbox.currentResolution', { resolution: item.zoomResolution })}\n${t('lightbox.originalResolution', { resolution: item.originalResolution })}`;
     }
     return tip;
 });
@@ -139,7 +139,7 @@ const displaySrc = computed(() => {
 });
 
 const displaySrcset = computed(() => {
-    if (!currentItem.value || isZoomed.value) return '';
+    if (!currentItem.value || isZoomed.value || originalActive.value) return '';
     return currentItem.value.srcset ?? '';
 });
 
@@ -572,6 +572,8 @@ defineExpose({
                             <template v-if="canHaveTransparency">
                                 <button
                                     @click.stop="imageBackground = 'transparent'"
+                                    :aria-label="t('lightbox.background_transparent')"
+                                    :title="t('lightbox.background_transparent')"
                                     class="rounded-lg p-2 transition-colors"
                                     :class="
                                         imageBackground === 'transparent' ? 'bg-purple-500/50 text-white' : 'bg-white/10 text-white hover:bg-white/20'
@@ -581,6 +583,8 @@ defineExpose({
                                 </button>
                                 <button
                                     @click.stop="imageBackground = 'black'"
+                                    :aria-label="t('lightbox.background_black')"
+                                    :title="t('lightbox.background_black')"
                                     class="rounded-lg p-2 transition-colors"
                                     :class="imageBackground === 'black' ? 'bg-purple-500/50 text-white' : 'bg-white/10 text-white hover:bg-white/20'"
                                 >
@@ -588,6 +592,8 @@ defineExpose({
                                 </button>
                                 <button
                                     @click.stop="imageBackground = 'white'"
+                                    :aria-label="t('lightbox.background_white')"
+                                    :title="t('lightbox.background_white')"
                                     class="rounded-lg p-2 transition-colors"
                                     :class="imageBackground === 'white' ? 'bg-purple-500/50 text-white' : 'bg-white/10 text-white hover:bg-white/20'"
                                 >
@@ -610,14 +616,24 @@ defineExpose({
                                 {{ t('lightbox.loadOriginal') }}
                             </button>
 
-                            <button @click.stop="toggleFullscreen" class="rounded-lg bg-white/10 p-2 text-white transition-colors hover:bg-white/20">
+                            <button
+                                @click.stop="toggleFullscreen"
+                                :aria-label="t('lightbox.fullscreen')"
+                                :title="t('lightbox.fullscreen')"
+                                class="rounded-lg bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
+                            >
                                 <Maximize class="h-5 w-5" />
                             </button>
 
                             <!-- Slot for extra header actions (EXIF, download, etc.) -->
                             <slot name="header-actions" :item="currentItem" :index="currentIndex" />
 
-                            <button class="rounded-lg bg-white/10 p-2 text-white transition-colors hover:bg-white/20" @click.stop="close">
+                            <button
+                                :aria-label="t('lightbox.close')"
+                                :title="t('lightbox.close')"
+                                class="rounded-lg bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
+                                @click.stop="close"
+                            >
                                 <X class="h-5 w-5" />
                             </button>
                         </div>
@@ -633,6 +649,8 @@ defineExpose({
                 >
                     <button
                         v-if="currentIndex > 0 && !isZoomed"
+                        :aria-label="t('lightbox.previous')"
+                        :title="t('lightbox.previous')"
                         class="absolute top-1/2 left-4 z-20 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white transition-colors hover:bg-black/70"
                         @click.stop="prev"
                     >
@@ -647,6 +665,8 @@ defineExpose({
                 >
                     <button
                         v-if="currentIndex < items.length - 1 && !isZoomed"
+                        :aria-label="t('lightbox.next')"
+                        :title="t('lightbox.next')"
                         class="absolute top-1/2 right-4 z-20 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white transition-colors hover:bg-black/70"
                         @click.stop="next"
                     >

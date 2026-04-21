@@ -107,20 +107,33 @@ class GenerateDocumentPreview implements ShouldQueue
     {
         $url = rtrim((string) config('files.gotenberg_url'), '/').'/forms/libreoffice/convert';
 
-        try {
-            $response = $http->timeout(60)
-                ->attach('files', file_get_contents($path), $filename)
-                ->post($url);
-        } catch (\Throwable $e) {
-            Log::warning('Gotenberg unreachable.', ['error' => $e->getMessage()]);
+        $handle = @fopen($path, 'r');
+        if ($handle === false) {
+            Log::warning('Unable to open file for Gotenberg upload.', ['path' => $path]);
 
             return null;
         }
 
-        if (! $response->ok()) {
-            Log::warning('Gotenberg returned non-200.', ['status' => $response->status()]);
+        try {
+            try {
+                $response = $http->timeout(60)
+                    ->attach('files', $handle, $filename)
+                    ->post($url);
+            } catch (\Throwable $e) {
+                Log::warning('Gotenberg unreachable.', ['error' => $e->getMessage()]);
 
-            return null;
+                return null;
+            }
+
+            if (! $response->ok()) {
+                Log::warning('Gotenberg returned non-200.', ['status' => $response->status()]);
+
+                return null;
+            }
+        } finally {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
         }
 
         $tmp = sys_get_temp_dir().'/gotenberg-'.uniqid('', true).'.pdf';

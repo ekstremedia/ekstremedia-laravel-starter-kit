@@ -184,7 +184,7 @@ function canImpersonate(u: UserRow) {
     >
         <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-dark-900">
             <h2 id="quota-dialog-title" class="mb-4 text-lg font-semibold text-slate-800 dark:text-slate-100">
-                {{ t('admin.storage.set_quota') }} — {{ quotaDialogUser.first_name }} {{ quotaDialogUser.last_name }}
+                {{ t('admin.storage.set_quota_for_user', { name: quotaDialogUser.first_name + ' ' + quotaDialogUser.last_name }) }}
             </h2>
             <div class="space-y-3 text-sm">
                 <label class="flex items-center gap-2">
@@ -197,7 +197,7 @@ function canImpersonate(u: UserRow) {
                 </label>
                 <label class="flex items-center gap-2">
                     <input type="radio" v-model="quotaPreset" value="gb" />
-                    <span class="flex-1">{{ t('admin.storage.quota_label') }} (GB)</span>
+                    <span class="flex-1">{{ t('admin.storage.quota_label_gb') }}</span>
                     <input
                         v-model.number="quotaGb"
                         type="number"

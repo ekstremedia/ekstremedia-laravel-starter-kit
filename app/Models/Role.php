@@ -11,11 +11,8 @@ use Spatie\Permission\Models\Role as SpatieRole;
  */
 class Role extends SpatieRole
 {
-    protected $connection;
-
-    public function __construct(array $attributes = [])
+    public function getConnectionName(): ?string
     {
-        parent::__construct($attributes);
-        $this->connection = (string) config('tenancy.database.central_connection', 'central');
+        return (string) config('tenancy.database.central_connection', 'central');
     }
 }

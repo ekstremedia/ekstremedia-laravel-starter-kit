@@ -61,7 +61,7 @@ class ApproachingStorageLimitNotification extends Notification implements Should
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{title: string, message: string, icon: string, threshold: int, tenant_id: int|string|null}
      */
     public function toArray(object $notifiable): array
     {

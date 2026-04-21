@@ -16,7 +16,7 @@ use Illuminate\Support\Str;
 class FileItemFactory extends Factory
 {
     /**
-     * @return array<string, mixed>
+     * @return array{tenant_id: mixed, user_id: mixed, parent_id: int|null, type: string, name: string, mime_type: string, size: int}
      */
     public function definition(): array
     {

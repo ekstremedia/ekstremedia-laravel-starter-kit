@@ -270,7 +270,7 @@ class User extends Authenticatable implements HasLocalePreference, HasMedia, Mus
     /**
      * Get the attributes that should be cast.
      *
-     * @return array<string, string>
+     * @return array{email_verified_at: string, banned_at: string, last_login_at: string, password: string, storage_used_bytes: string}
      */
     protected function casts(): array
     {

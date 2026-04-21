@@ -73,10 +73,10 @@ class FileItemUpdated implements ShouldBroadcast
             'has_doc_preview' => $doc !== null,
             'thumbnail_url' => $media && $media->hasGeneratedConversion('thumb')
                 ? $media->getUrl('thumb')
-                : ($videoPoster?->getUrl() ?? $doc?->getUrl() ?? $media?->getUrl()),
+                : ($videoPoster?->getUrl() ?? $doc?->getUrl() ?? ($this->item->isImage() ? $media?->getUrl() : null)),
             'preview_url' => $media && $media->hasGeneratedConversion('medium')
                 ? $media->getUrl('medium')
-                : ($videoPoster?->getUrl() ?? $doc?->getUrl() ?? $media?->getUrl()),
+                : ($videoPoster?->getUrl() ?? $doc?->getUrl() ?? ($this->item->isImage() ? $media?->getUrl() : null)),
             'original_url' => $media?->getUrl(),
             'video_web_url' => $videoWeb ? $videoWeb->getUrl() : ($webCompatible ? $media->getUrl() : null),
             'video_poster_url' => $videoPoster?->getUrl(),

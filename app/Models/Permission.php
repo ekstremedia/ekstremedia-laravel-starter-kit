@@ -14,11 +14,8 @@ use Spatie\Permission\Models\Permission as SpatiePermission;
  */
 class Permission extends SpatiePermission
 {
-    protected $connection;
-
-    public function __construct(array $attributes = [])
+    public function getConnectionName(): ?string
     {
-        parent::__construct($attributes);
-        $this->connection = (string) config('tenancy.database.central_connection', 'central');
+        return (string) config('tenancy.database.central_connection', 'central');
     }
 }

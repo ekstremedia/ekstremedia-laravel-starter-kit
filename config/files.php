@@ -7,10 +7,15 @@
  *     gotenberg_url: string,
  *     preview_mime_types: array<int, string>,
  *     trash_retention_days: int,
+ *     max_upload_kilobytes: int,
  * }
  */
 return [
     'gotenberg_url' => env('GOTENBERG_URL', 'http://gotenberg:3000'),
+
+    // Per-file upload size limit applied to files.* validation. Expressed
+    // in kilobytes to match Laravel's `max:` validation units.
+    'max_upload_kilobytes' => max(1, (int) env('FILES_MAX_UPLOAD_KB', 51200)),
 
     // Mime types for which we attempt an office→PDF→image preview. Images
     // skip this pipeline — they already have their own medialibrary conversions.

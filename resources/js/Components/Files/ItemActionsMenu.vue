@@ -64,16 +64,18 @@ const triggerClass = computed(() => props.variant === 'inline'
 </script>
 
 <template>
-    <button
-        type="button"
-        :class="triggerClass"
-        :title="t('common.actions')"
-        :aria-label="t('common.actions')"
-        @click.stop="toggle"
-    >
-        <i class="pi pi-ellipsis-v" />
-    </button>
-    <Menu ref="menuRef" :model="items" :popup="true" />
+    <span class="inline-flex">
+        <button
+            type="button"
+            :class="triggerClass"
+            :title="t('common.actions')"
+            :aria-label="t('common.actions')"
+            @click.stop="toggle"
+        >
+            <i class="pi pi-ellipsis-v" />
+        </button>
+        <Menu ref="menuRef" :model="items" :popup="true" />
+    </span>
 </template>
 
 <style>

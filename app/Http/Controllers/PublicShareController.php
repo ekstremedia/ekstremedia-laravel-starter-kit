@@ -38,11 +38,13 @@ class PublicShareController extends Controller
             ]);
         }
 
-        $share->increment('view_count');
-        $share->update(['last_viewed_at' => now()]);
-
         /** @var FileItem $item */
         $item = $share->fileItem()->with('media')->firstOrFail();
+
+        $share->forceFill([
+            'view_count' => $share->view_count + 1,
+            'last_viewed_at' => now(),
+        ])->save();
 
         return Inertia::render('Share/Show', [
             'item' => (new FileItemResource($item))->toArray($request),

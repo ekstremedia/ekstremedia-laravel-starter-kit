@@ -130,12 +130,12 @@ class GenerateVideoPreview implements ShouldQueue
 
     private function generateWebMp4(FileItem $item, string $videoPath): void
     {
-        [$width, $height, $codec] = $this->probeVideoStream($videoPath);
+        [$width, $height, $codec, $audioCodec] = $this->probeVideoStream($videoPath);
 
         // Already-web-ready sources skip transcoding — they stream straight
         // from the original file via the download route. We still set a flag
         // so the UI stops showing the processing spinner.
-        if ($this->isWebCompatible($codec, $width, $height, $videoPath)) {
+        if ($this->isWebCompatible($codec, $audioCodec, $width, $height, $videoPath)) {
             $media = $item->getFirstMedia('file');
             if ($media) {
                 $media->setCustomProperty('web_compatible', true);
@@ -154,7 +154,7 @@ class GenerateVideoPreview implements ShouldQueue
         $scale = $this->scaleFilter($width, $height);
 
         $cmd = sprintf(
-            '%s -y -i %s -vf %s -c:v libx264 -preset medium -crf 23 -profile:v high -level 4.1 -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart %s 2>&1',
+            '%s -hide_banner -loglevel error -nostdin -y -i %s -vf %s -c:v libx264 -preset medium -crf 23 -profile:v high -level 4.1 -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart %s 2>&1',
             escapeshellarg($ffmpegBin),
             escapeshellarg($videoPath),
             escapeshellarg($scale),
@@ -194,7 +194,7 @@ class GenerateVideoPreview implements ShouldQueue
     }
 
     /**
-     * @return array{0:int,1:int,2:string} [width, height, codec]
+     * @return array{0:int,1:int,2:string,3:?string} [width, height, videoCodec, audioCodec]
      */
     private function probeVideoStream(string $path): array
     {
@@ -205,22 +205,29 @@ class GenerateVideoPreview implements ShouldQueue
 
         $stream = $probe->streams($path)->videos()->first();
         if (! $stream) {
-            return [0, 0, ''];
+            return [0, 0, '', null];
         }
+
+        $audioCodecRaw = $probe->streams($path)->audios()->first()?->get('codec_name');
+        $audioCodec = $audioCodecRaw !== null ? strtolower((string) $audioCodecRaw) : null;
 
         return [
             (int) $stream->get('width', 0),
             (int) $stream->get('height', 0),
             strtolower((string) $stream->get('codec_name', '')),
+            $audioCodec,
         ];
     }
 
-    private function isWebCompatible(string $codec, int $width, int $height, string $path): bool
+    private function isWebCompatible(string $codec, ?string $audioCodec, int $width, int $height, string $path): bool
     {
         if (! in_array($codec, self::WEB_CODECS, true)) {
             return false;
         }
         if ($width > self::MAX_WIDTH || $height > self::MAX_HEIGHT) {
+            return false;
+        }
+        if ($audioCodec !== null && $audioCodec !== '' && ! in_array($audioCodec, ['aac', 'mp3'], true)) {
             return false;
         }
         $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));

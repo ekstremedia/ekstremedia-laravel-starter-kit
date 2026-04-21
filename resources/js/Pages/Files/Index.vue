@@ -304,6 +304,7 @@ function onDragOverFolder(item: FileItem, event: DragEvent) {
 
 function onDropOnFolder(target: FileItem | null, event: DragEvent) {
     event.preventDefault();
+    event.stopPropagation();
     dragOverId.value = null;
     externalDragOver.value = false;
     externalDragCounter = 0;
@@ -863,7 +864,8 @@ const usageLabel = computed(() => {
                         <span class="mb-1 block">{{ t('files.share_password_optional') }}</span>
                         <input
                             v-model="sharePassword"
-                            type="text"
+                            type="password"
+                            autocomplete="new-password"
                             :placeholder="t('files.share_password_placeholder')"
                             class="w-full rounded border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-dark-700 dark:bg-dark-800 dark:text-slate-100"
                         />
