@@ -644,18 +644,26 @@ const usageLabel = computed(() => {
                             <span>{{ t('files.preview_processing') }}</span>
                         </div>
                     </div>
-                    <div class="flex items-center justify-between gap-2 px-2 py-1.5 text-xs">
-                        <input
-                            v-if="renamingId === item.id"
-                            :ref="(el) => registerRenameInput(item.id, el)"
-                            v-model="renameValue"
-                            type="text"
-                            class="flex-1 rounded border border-indigo-300 bg-white px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-indigo-600 dark:bg-dark-900"
-                            @click.stop
-                            @keyup.enter="submitRename(item)"
-                            @blur="submitRename(item)"
-                        />
-                        <span v-else class="truncate text-slate-700 dark:text-slate-200" :title="item.name">{{ item.name }}</span>
+                    <div class="px-2 py-1.5 text-xs">
+                        <div class="flex items-center justify-between gap-2">
+                            <input
+                                v-if="renamingId === item.id"
+                                :ref="(el) => registerRenameInput(item.id, el)"
+                                v-model="renameValue"
+                                type="text"
+                                class="flex-1 rounded border border-indigo-300 bg-white px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-indigo-600 dark:bg-dark-900"
+                                @click.stop
+                                @keyup.enter="submitRename(item)"
+                                @blur="submitRename(item)"
+                            />
+                            <span v-else class="truncate text-slate-700 dark:text-slate-200" :title="item.name">{{ item.name }}</span>
+                        </div>
+                        <!-- Metadata: size for files, nothing for folders (kept &nbsp; so
+                             the row height stays constant across a mixed grid). -->
+                        <div class="mt-0.5 truncate text-[11px] text-slate-400 dark:text-dark-400">
+                            <template v-if="item.type === 'file'">{{ formatBytes(item.size) }}</template>
+                            <template v-else>&nbsp;</template>
+                        </div>
                     </div>
                     <!-- Actions overlay — single cog that opens a menu. -->
                     <div class="absolute right-1 top-1 opacity-0 transition group-hover:opacity-100">
