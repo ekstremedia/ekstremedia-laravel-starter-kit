@@ -14,6 +14,12 @@ fi
 php artisan migrate --force
 php artisan db:seed --force
 
+# storage:link maps /public/storage -> /storage/app/public, which is how the
+# Medialibrary-managed avatar / chat / file URLs resolve on a fresh clone.
+# Re-run unconditionally: the command is a no-op when the symlink already
+# points at the right target.
+php artisan storage:link --force || true
+
 # Clear and cache config
 php artisan config:clear
 php artisan route:clear
