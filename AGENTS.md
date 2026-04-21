@@ -198,6 +198,10 @@ Per-user folders + previews + quotas at `/files`, behind three feature flags (se
 
 `make init` → bootstrap `.env`. `make build` → start containers. `make rebuild` → full reset with `migrate:fresh --seed`.
 
+### Per-machine overrides
+
+`docker-compose.override.yml` is gitignored and auto-loaded by `docker compose`. Copy `docker-compose.override.yml.example` to opt in — useful on macOS + OrbStack to publish the app container under a stable hostname (e.g. `ekstremedia-kit.local`) via the `dev.orbstack.domains` label. A `.local` suffix resolves via macOS mDNS without additional setup; custom TLDs like `.test` need OrbStack's system DNS integration enabled. Match `APP_URL` / `VITE_DEV_SERVER_HOST` / `VITE_REVERB_HOST` in `.env` to whatever hostname you pick.
+
 Dev login: `DEV_EASY_LOGIN_ENABLED=true` shows shortcut on login page (local/test only).
 
 Websockets: Reverb runs in Supervisor. `VITE_REVERB_HOST` = public hostname for browser WS connection.

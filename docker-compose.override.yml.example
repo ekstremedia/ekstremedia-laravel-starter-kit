@@ -1,0 +1,21 @@
+# Per-machine docker-compose override. Copy to docker-compose.override.yml
+# (gitignored) to apply. docker compose auto-loads override files alongside
+# docker-compose.yml without extra flags.
+#
+# Use case: OrbStack on macOS.
+#   The `dev.orbstack.domains` label makes OrbStack publish the container
+#   under the given hostname, resolving to the container's current IP via
+#   OrbStack's DNS + macOS mDNS. No /etc/hosts entry, survives IP churn
+#   across restarts.
+#
+#   Use a `.local` suffix so macOS mDNS resolves it out-of-the-box. Custom
+#   TLDs like `.test` would require OrbStack's system DNS integration to be
+#   enabled (Settings → Network), which is an extra step.
+#
+#   After copying, remember to match APP_URL / VITE_DEV_SERVER_HOST /
+#   VITE_REVERB_HOST in .env to the chosen hostname.
+
+services:
+  app:
+    labels:
+      dev.orbstack.domains: ekstremedia-kit.local
