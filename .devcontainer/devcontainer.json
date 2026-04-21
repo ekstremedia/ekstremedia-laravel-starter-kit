@@ -1,0 +1,30 @@
+{
+    "name": "Ekstremedia Laravel Starter Kit",
+    "dockerComposeFile": ["../docker-compose.yml"],
+    "service": "app",
+    "workspaceFolder": "/var/www/html",
+    "shutdownAction": "stopCompose",
+    "forwardPorts": [8120, 8126, 8080, 5173],
+    "postCreateCommand": "composer install && npm install && (php artisan key:generate --no-interaction || true) && php artisan migrate --seed --no-interaction",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "bmewburn.vscode-intelephense-client",
+                "vue.volar",
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode",
+                "editorconfig.editorconfig",
+                "bradlc.vscode-tailwindcss",
+                "laravel.vscode-laravel",
+                "onecentlin.laravel-blade"
+            ],
+            "settings": {
+                "editor.formatOnSave": true,
+                "editor.defaultFormatter": "esbenp.prettier-vscode",
+                "php.suggest.basic": false,
+                "intelephense.environment.phpVersion": "8.4.0"
+            }
+        }
+    },
+    "remoteUser": "root"
+}

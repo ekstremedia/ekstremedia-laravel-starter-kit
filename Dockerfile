@@ -88,5 +88,11 @@ RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
 EXPOSE 80
 
+# Container healthcheck — uses the public /up route, which now pings the
+# database and Redis via the DiagnosingHealth listener. Gives orchestrators
+# (docker-compose, k8s, Swarm, Nomad) a real readiness signal.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl --fail --silent --max-time 4 http://127.0.0.1/up || exit 1
+
 ENTRYPOINT ["entrypoint.sh"]
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

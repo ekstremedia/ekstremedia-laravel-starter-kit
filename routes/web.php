@@ -20,6 +20,7 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CustomerLandingController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationPreferenceController;
+use App\Http\Controllers\PersonalAccessTokenController;
 use App\Http\Controllers\PublicShareController;
 use App\Http\Controllers\SettingsController;
 use Illuminate\Http\Request;
@@ -80,6 +81,11 @@ Route::middleware('auth')->group(function () {
         // Notification preferences
         Route::get('/settings/notifications', [NotificationPreferenceController::class, 'index'])->name('settings.notifications');
         Route::put('/settings/notifications', [NotificationPreferenceController::class, 'update'])->name('settings.notifications.update');
+
+        // Personal API tokens (Sanctum). User-owned; self-service create + revoke.
+        Route::get('/settings/tokens', [PersonalAccessTokenController::class, 'index'])->name('settings.tokens.index');
+        Route::post('/settings/tokens', [PersonalAccessTokenController::class, 'store'])->name('settings.tokens.store');
+        Route::delete('/settings/tokens/{id}', [PersonalAccessTokenController::class, 'destroy'])->whereNumber('id')->name('settings.tokens.destroy');
 
         // Chat (only when CHAT_ENABLED=true)
         Route::middleware('chat.enabled')->group(function () {

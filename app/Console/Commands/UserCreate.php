@@ -1,0 +1,52 @@
+<?php
+
+namespace App\Console\Commands;
+
+use App\Models\User;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Hash;
+
+class UserCreate extends Command
+{
+    protected $signature = 'user:create
+        {email : Login email, must be unique}
+        {--first-name=Admin : First name}
+        {--last-name=User : Last name}
+        {--password= : Leave empty to auto-generate}
+        {--role=Admin : Role to assign (Admin, Editor, User)}
+        {--verified : Mark email as verified immediately}';
+
+    protected $description = 'Create a user from the CLI (useful when the web flow is unavailable).';
+
+    public function handle(): int
+    {
+        $email = (string) $this->argument('email');
+
+        if (User::where('email', $email)->exists()) {
+            $this->error("A user with email {$email} already exists.");
+
+            return self::FAILURE;
+        }
+
+        $password = (string) ($this->option('password') ?? bin2hex(random_bytes(8)));
+
+        $user = new User;
+        $user->forceFill([
+            'first_name' => (string) $this->option('first-name'),
+            'last_name' => (string) $this->option('last-name'),
+            'email' => $email,
+            'password' => Hash::make($password),
+            'email_verified_at' => $this->option('verified') ? now() : null,
+        ])->save();
+
+        $user->assignRole((string) $this->option('role'));
+
+        $this->info("Created user {$user->id} <{$email}> with role {$this->option('role')}.");
+        if (! $this->option('password')) {
+            $this->warn("Temporary password: {$password}");
+            $this->warn('Share it securely. The user should change it immediately after first login.');
+        }
+
+        return self::SUCCESS;
+    }
+}

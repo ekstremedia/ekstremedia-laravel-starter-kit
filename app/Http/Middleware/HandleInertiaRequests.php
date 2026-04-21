@@ -77,6 +77,8 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
                 'status' => fn () => $request->session()->get('status'),
+                // Plain-text Sanctum token; surfaced exactly once after creation.
+                'new_token' => fn () => $request->session()->get('new_token'),
             ],
             'app_settings' => fn () => $this->appSettings(),
             'tenancy' => [
