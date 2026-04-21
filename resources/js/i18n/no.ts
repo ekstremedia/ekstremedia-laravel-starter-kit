@@ -747,6 +747,7 @@ export default {
         share_failed: 'Kunne ikke opprette delingslenke. Prøv igjen.',
         days: 'dager',
         video_processing: 'Forbereder …',
+        preview_processing: 'Genererer forhåndsvisning …',
         video_play: 'Spill av video',
         view_grid: 'Rutenett',
         view_list: 'Liste',

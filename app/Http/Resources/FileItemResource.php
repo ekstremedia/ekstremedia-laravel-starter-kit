@@ -41,15 +41,12 @@ class FileItemResource extends JsonResource
             && in_array((string) $this->mime_type, $docPreviewMimes, true)
             && $docPreview === null;
 
-        // Image thumbnail is "processing" until Spatie generates the `thumb`
-        // conversion. Conversions run on the queue, so the initial Inertia
-        // render can land before they're ready.
-        $imageThumbProcessing = ! $this->isFolder()
-            && $this->isImage()
-            && $media !== null
-            && ! $media->hasGeneratedConversion('thumb');
-
-        $previewProcessing = $videoProcessing || $docPreviewProcessing || $imageThumbProcessing;
+        // Images are never considered "processing" — the original URL is an
+        // immediately usable fallback (see thumbnail_url below), and nothing
+        // dispatches FileItemUpdated when Spatie's queued `thumb` conversion
+        // finishes, so flagging images as processing would leave the shimmer
+        // stuck forever.
+        $previewProcessing = $videoProcessing || $docPreviewProcessing;
 
         return [
             'id' => $this->id,

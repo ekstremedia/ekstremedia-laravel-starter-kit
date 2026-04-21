@@ -54,8 +54,8 @@ class FileItemUpdated implements ShouldBroadcast
 
         $docPreviewMimes = config('files.preview_mime_types', []);
         $docPreviewProcessing = in_array((string) $this->item->mime_type, $docPreviewMimes, true) && $doc === null;
-        $imageThumbProcessing = $this->item->isImage() && $media !== null && ! $media->hasGeneratedConversion('thumb');
-        $previewProcessing = $videoProcessing || $docPreviewProcessing || $imageThumbProcessing;
+        // Images intentionally omitted — see FileItemResource for the why.
+        $previewProcessing = $videoProcessing || $docPreviewProcessing;
 
         return [
             'id' => $this->item->id,

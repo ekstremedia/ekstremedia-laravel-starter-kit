@@ -747,6 +747,7 @@ export default {
         share_failed: 'Could not create share link. Please try again.',
         days: 'days',
         video_processing: 'Preparing…',
+        preview_processing: 'Generating preview…',
         video_play: 'Play video',
         view_grid: 'Grid view',
         view_list: 'List view',
