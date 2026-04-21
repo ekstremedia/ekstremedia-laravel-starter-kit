@@ -77,6 +77,7 @@ return [
         'twofa_reset' => '2FA has been reset for this user.',
         'test_notification_sent' => 'Test notification sent.',
         'customer_attached' => 'Added :email to :name.',
+        'customers_attached' => 'Added :email to :names.',
         'customer_detached' => 'Removed :email from :name.',
     ],
 ];

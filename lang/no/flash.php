@@ -77,6 +77,7 @@ return [
         'twofa_reset' => 'Tofaktorautentisering er tilbakestilt for denne brukeren.',
         'test_notification_sent' => 'Testvarsel sendt.',
         'customer_attached' => 'La til :email i :name.',
+        'customers_attached' => 'La til :email i :names.',
         'customer_detached' => 'Fjernet :email fra :name.',
     ],
 ];

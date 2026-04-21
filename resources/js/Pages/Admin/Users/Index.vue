@@ -127,7 +127,6 @@ function canImpersonate(u: UserRow) {
         @search-submit="doSearch"
     >
         <DataTable :value="users.data" stripedRows removableSort scrollable class="border-0">
-            <Column field="id" :header="t('common.id')" style="width: 5rem" sortable />
             <Column header="" style="width: 4rem">
                 <template #body="{ data }">
                     <Link :href="`/admin/users/${data.id}`" class="inline-block">

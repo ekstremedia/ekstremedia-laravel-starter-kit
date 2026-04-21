@@ -12,6 +12,7 @@ use App\Notifications\AccountBannedNotification;
 use App\Notifications\AdminTestNotification;
 use App\Notifications\CustomerMemberAddedNotification;
 use App\Notifications\CustomerMemberRemovedNotification;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -369,30 +370,51 @@ class UserController extends Controller
     public function attachCustomer(Request $request, User $user): RedirectResponse
     {
         $data = $request->validate([
-            'customer_id' => [
-                'required',
+            'customer_ids' => ['required', 'array', 'min:1'],
+            'customer_ids.*' => [
                 Rule::exists('tenants', 'id')->where(fn ($query) => $query->where('status', 'active')),
             ],
             'notify' => ['boolean'],
         ]);
 
-        $customer = Tenant::query()
+        /** @var Collection<int, Tenant> $customers */
+        $customers = Tenant::query()
             ->where('status', 'active')
-            ->findOrFail($data['customer_id']);
+            ->whereIn('id', $data['customer_ids'])
+            ->get();
 
-        $user->customers()->syncWithoutDetaching([$customer->id]);
+        $existingIds = $user->customers()->pluck('tenants.id')->all();
+        $newCustomers = $customers->reject(fn (Tenant $c) => in_array($c->id, $existingIds, true));
 
-        if ($data['notify'] ?? false) {
-            $user->notify(new CustomerMemberAddedNotification($customer));
+        $user->customers()->syncWithoutDetaching($customers->pluck('id')->all());
+
+        $newNames = [];
+        foreach ($newCustomers as $customer) {
+            /** @var Tenant $customer */
+            $newNames[] = $customer->name;
+
+            if ($data['notify'] ?? false) {
+                $user->notify(new CustomerMemberAddedNotification($customer));
+            }
+
+            activity('user')
+                ->performedOn($user)
+                ->withProperties(['customer' => $customer->name, 'notify' => $data['notify'] ?? false])
+                ->event('customer_attached')
+                ->log("Added {$user->email} to {$customer->name}");
         }
 
-        activity('user')
-            ->performedOn($user)
-            ->withProperties(['customer' => $customer->name, 'notify' => $data['notify'] ?? false])
-            ->event('customer_attached')
-            ->log("Added {$user->email} to {$customer->name}");
+        if ($newNames === []) {
+            return back();
+        }
 
-        return back()->with('success', __('flash.users.customer_attached', ['email' => $user->email, 'name' => $customer->name]));
+        $names = implode(', ', $newNames);
+
+        if (count($newNames) === 1) {
+            return back()->with('success', __('flash.users.customer_attached', ['email' => $user->email, 'name' => $names]));
+        }
+
+        return back()->with('success', __('flash.users.customers_attached', ['email' => $user->email, 'names' => $names]));
     }
 
     public function detachCustomer(Request $request, User $user, Tenant $customer): RedirectResponse

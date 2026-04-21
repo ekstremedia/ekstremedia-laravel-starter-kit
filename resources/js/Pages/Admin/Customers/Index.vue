@@ -89,7 +89,6 @@ function statusSeverity(s: string) {
             :globalFilterFields="['name', 'slug']"
             class="border-0"
         >
-            <Column field="id" :header="t('common.id')" style="width: 5rem" sortable />
             <Column field="name" :header="t('common.name')" sortable>
                 <template #body="{ data }">
                     <Link

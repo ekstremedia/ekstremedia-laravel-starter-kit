@@ -6,7 +6,6 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 import InputText from 'primevue/inputtext';
 import Password from 'primevue/password';
 import MultiSelect from 'primevue/multiselect';
-import Select from 'primevue/select';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
 import Dialog from 'primevue/dialog';
@@ -46,7 +45,7 @@ function submit() {
 // ── Customer membership management ──────────────────────────────
 const confirm = useConfirm();
 const addCustomerDialog = ref(false);
-const selectedCustomerId = ref<number | null>(null);
+const selectedCustomerIds = ref<number[]>([]);
 const notifyOnAdd = ref(true);
 const notifyOnRemove = ref(true);
 const removeDialog = ref(false);
@@ -60,16 +59,16 @@ const availableCustomers = () => {
 };
 
 function openAddDialog() {
-    selectedCustomerId.value = null;
+    selectedCustomerIds.value = [];
     notifyOnAdd.value = true;
     addCustomerDialog.value = true;
 }
 
 function confirmAdd() {
-    if (!selectedCustomerId.value) return;
+    if (!selectedCustomerIds.value.length) return;
     addingCustomer.value = true;
     router.post(`/admin/users/${props.user.id}/customers`, {
-        customer_id: selectedCustomerId.value,
+        customer_ids: selectedCustomerIds.value,
         notify: notifyOnAdd.value,
     }, {
         preserveScroll: true,
@@ -109,12 +108,15 @@ function confirmRemove() {
         <div class="space-y-4">
             <div>
                 <label class="block text-sm mb-1">{{ t('admin.customers.title') }}</label>
-                <Select
-                    v-model="selectedCustomerId"
+                <MultiSelect
+                    v-model="selectedCustomerIds"
                     :options="availableCustomers()"
                     optionLabel="name"
                     optionValue="id"
                     :placeholder="t('admin.users.select_customer')"
+                    :filter="true"
+                    filterPlaceholder="Search…"
+                    display="chip"
                     class="w-full"
                 />
             </div>
@@ -125,7 +127,7 @@ function confirmRemove() {
         </div>
         <template #footer>
             <Button :label="t('common.cancel')" severity="secondary" @click="addCustomerDialog = false" />
-            <Button :label="t('common.add')" icon="pi pi-plus" :disabled="!selectedCustomerId" :loading="addingCustomer" @click="confirmAdd" />
+            <Button :label="t('common.add')" icon="pi pi-plus" :disabled="!selectedCustomerIds.length" :loading="addingCustomer" @click="confirmAdd" />
         </template>
     </Dialog>
 
