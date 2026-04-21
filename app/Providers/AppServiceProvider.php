@@ -3,7 +3,12 @@
 namespace App\Providers;
 
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Events\DiagnosingHealth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -21,6 +26,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Catch N+1 queries at their source. We intentionally leave
+        // preventSilentlyDiscardingAttributes + preventAccessingMissingAttributes
+        // disabled — they surface too many legitimate patterns (partial
+        // selects, dynamic attributes) that would derail existing code.
+        // Production stays permissive regardless, so a stray unknown attribute
+        // never takes the site down in the field.
+        Model::preventLazyLoading(! $this->app->isProduction());
+
         // Authenticated users visiting guest-only pages (/login, /register, ...)
         // land on the tenant landing page, which dispatches them into their
         // workspace (or renders the picker for admins / multi-tenant users).
@@ -32,6 +45,18 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::define('viewLogViewer', function ($user = null) {
             return $user !== null && $user->hasRole('Admin');
+        });
+
+        // Laravel's default /up route dispatches DiagnosingHealth before it
+        // returns 200 — failing a listener flips the response to 500. Hook
+        // in a DB ping (and Redis when Redis is the cache/queue driver) so
+        // /up is a real dependency probe, not just "PHP booted".
+        Event::listen(function (DiagnosingHealth $event): void {
+            DB::connection()->getPdo();
+
+            if (in_array('redis', [(string) config('cache.default'), (string) config('queue.default'), (string) config('session.driver')], true)) {
+                Redis::connection()->ping();
+            }
         });
     }
 }

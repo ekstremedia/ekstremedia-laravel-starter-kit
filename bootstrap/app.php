@@ -6,6 +6,8 @@ use App\Http\Middleware\EnsureStorageAvailable;
 use App\Http\Middleware\EnsureUserIsNotBanned;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\InitializeTenancyByPath;
+use App\Http\Middleware\RequestId;
+use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocaleFromUser;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -39,6 +41,13 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Runs before route matching so 404s / redirects also get the headers
+        // and correlation id.
+        $middleware->prepend([
+            RequestId::class,
+            SecurityHeaders::class,
+        ]);
+
         $middleware->web(append: [
             SetLocaleFromUser::class,
             HandleInertiaRequests::class,

@@ -77,11 +77,18 @@ class FortifyServiceProvider extends ServiceProvider
             return $user;
         });
 
-        // Rate limiting
+        // Two throttles guard /login:
+        //   1) email+IP keeps a single browser from brute-forcing one account,
+        //   2) IP-only catches a single host spraying attempts across many
+        //      addresses during credential stuffing.
         RateLimiter::for('login', function (Request $request) {
-            $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
+            $email = Str::transliterate(Str::lower((string) $request->input(Fortify::username())));
+            $ip = (string) $request->ip();
 
-            return Limit::perMinute(5)->by($throttleKey);
+            return [
+                Limit::perMinute(5)->by($email.'|'.$ip),
+                Limit::perMinute(20)->by($ip),
+            ];
         });
 
         RateLimiter::for('two-factor', function (Request $request) {
