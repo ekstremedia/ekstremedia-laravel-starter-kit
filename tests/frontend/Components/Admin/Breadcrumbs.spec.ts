@@ -40,4 +40,14 @@ describe('Breadcrumbs', () => {
         expect(links[0].attributes('href')).toBe('/admin');
         expect(wrapper.text()).toContain('Users');
     });
+
+    it('exposes a localized aria-label on the nav', () => {
+        const wrapper = mount(Breadcrumbs, {
+            props: { items: [{ label: 'Admin', href: '/admin' }, { label: 'Users' }] },
+        });
+
+        // The setup.ts i18n mock returns the key — so the aria-label collapses
+        // to the key string, proving t(...) was used instead of a literal.
+        expect(wrapper.get('nav').attributes('aria-label')).toBe('common.breadcrumb');
+    });
 });

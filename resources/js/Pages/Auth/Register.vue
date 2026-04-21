@@ -12,6 +12,16 @@ const { t } = useI18n();
 const page = usePage<PageProps>();
 const oauthProviders = computed(() => page.props.oauth?.providers ?? []);
 
+const providerIcons: Record<string, string> = { google: 'pi-google', github: 'pi-github' };
+function providerIcon(name: string): string {
+    return providerIcons[name] ?? 'pi-sign-in';
+}
+function providerLabel(name: string, fallback: string): string {
+    const key = `auth.oauth.${name}`;
+    const translated = t(key);
+    return translated === key ? fallback : translated;
+}
+
 const form = useForm({
     first_name: '',
     last_name: '',
@@ -124,8 +134,8 @@ function submit() {
                         :href="`/auth/${p.name}/redirect`"
                         class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 dark:border-dark-700 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors"
                     >
-                        <i :class="['pi', `pi-${p.name === 'github' ? 'github' : 'google'}`, 'text-base']"></i>
-                        <span>{{ p.label }}</span>
+                        <i :class="['pi', providerIcon(p.name), 'text-base']"></i>
+                        <span>{{ providerLabel(p.name, p.label) }}</span>
                     </a>
                 </div>
             </div>

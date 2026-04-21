@@ -48,6 +48,10 @@ export default {
         no_account: "Don't have an account?",
         have_account: 'Already have an account?',
         or_continue_with: 'or continue with',
+        oauth: {
+            google: 'Google',
+            github: 'GitHub',
+        },
         verify_title: 'Verify your email',
         verify_subtitle: 'We\'ve sent a verification link to your email address. Please check your inbox and click the link to verify your account.',
         verify_resend: 'Resend verification email',
@@ -145,6 +149,7 @@ export default {
         close: 'Close',
         view: 'View',
         view_all: 'View all',
+        breadcrumb: 'Breadcrumb',
     },
     notifications: {
         title: 'Notifications',
@@ -424,6 +429,7 @@ export default {
         },
         monitoring: {
             title: 'Logs & Monitoring',
+            head_title: 'Logs & Monitoring · Admin',
             description: 'Activity audit, application logs, queue health, and server metrics — in one place.',
             tab_activity: 'Activity',
             tab_logs: 'Application logs',
@@ -512,6 +518,7 @@ export default {
         },
         backups: {
             title: 'Backups',
+            head_title: 'Backups · Admin',
             subtitle: 'Scheduled daily · database + files · powered by spatie/laravel-backup.',
             schedule: 'Scheduled daily at 02:00 · cleanup 01:30 · monitored 06:00.',
             stored_to: 'Stored to',

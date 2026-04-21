@@ -48,6 +48,10 @@ export default {
         no_account: 'Har du ikke en konto?',
         have_account: 'Har du allerede en konto?',
         or_continue_with: 'eller fortsett med',
+        oauth: {
+            google: 'Google',
+            github: 'GitHub',
+        },
         verify_title: 'Bekreft e-posten din',
         verify_subtitle: 'Vi har sendt en bekreftelseslenke til e-postadressen din. Vennligst sjekk innboksen din og klikk på lenken for å bekrefte kontoen din.',
         verify_resend: 'Send bekreftelseslenke på nytt',
@@ -145,6 +149,7 @@ export default {
         close: 'Lukk',
         view: 'Vis',
         view_all: 'Vis alle',
+        breadcrumb: 'Brødsmulesti',
     },
     notifications: {
         title: 'Varsler',
@@ -424,6 +429,7 @@ export default {
         },
         monitoring: {
             title: 'Logger og overvåking',
+            head_title: 'Logger og overvåking · Admin',
             description: 'Aktivitetsrevisjon, applikasjonslogger, køhelse og servermålinger — samlet på ett sted.',
             tab_activity: 'Aktivitet',
             tab_logs: 'Applikasjonslogger',
@@ -512,6 +518,7 @@ export default {
         },
         backups: {
             title: 'Sikkerhetskopier',
+            head_title: 'Sikkerhetskopier · Admin',
             subtitle: 'Planlagt daglig · database + filer · drevet av spatie/laravel-backup.',
             schedule: 'Planlagt daglig kl. 02:00 · opprydding 01:30 · overvåkning 06:00.',
             stored_to: 'Lagres til',

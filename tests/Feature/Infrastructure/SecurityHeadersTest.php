@@ -5,7 +5,7 @@ it('applies baseline hardening headers to every web response', function () {
 
     $response->assertOk();
     $response->assertHeader('X-Content-Type-Options', 'nosniff');
-    $response->assertHeader('X-Frame-Options', 'DENY');
+    $response->assertHeader('X-Frame-Options', 'SAMEORIGIN');
     $response->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
 
     expect($response->headers->get('Permissions-Policy'))

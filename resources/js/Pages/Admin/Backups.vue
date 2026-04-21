@@ -100,9 +100,10 @@ function submitRestore() {
 </script>
 
 <template>
-    <Head title="Backups · Admin" />
+    <div>
+        <Head :title="t('admin.backups.head_title')" />
 
-    <PageHeader :title="t('admin.backups.title')" :description="t('admin.backups.subtitle')">
+        <PageHeader :title="t('admin.backups.title')" :description="t('admin.backups.subtitle')">
         <template #actions>
             <Button :label="t('admin.backups.run_now')" icon="pi pi-play" @click="runBackup" />
             <Button :label="t('admin.backups.clean')" icon="pi pi-trash" severity="secondary" @click="runClean" />
@@ -285,4 +286,5 @@ function submitRestore() {
             />
         </template>
     </Dialog>
+    </div>
 </template>

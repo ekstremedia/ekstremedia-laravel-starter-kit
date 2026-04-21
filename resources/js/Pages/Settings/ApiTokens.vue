@@ -2,6 +2,8 @@
 import { Head, useForm, usePage, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import ConfirmDialog from 'primevue/confirmdialog';
+import { useConfirm } from 'primevue/useconfirm';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
@@ -19,6 +21,7 @@ const props = defineProps<{ tokens: Token[] }>();
 
 const { t } = useI18n();
 const page = usePage<PageProps & { flash: { new_token?: string } }>();
+const confirm = useConfirm();
 
 // Flash-only: surface the plain-text token once, then let the next page
 // visit clear it. The server never exposes it again.
@@ -34,8 +37,13 @@ function create() {
 }
 
 function revoke(token: Token) {
-    if (!confirm(t('settings.tokens.confirm_revoke', { name: token.name }))) return;
-    router.delete(`/settings/tokens/${token.id}`, { preserveScroll: true });
+    confirm.require({
+        group: 'api-tokens',
+        header: t('common.confirm'),
+        message: t('settings.tokens.confirm_revoke', { name: token.name }),
+        acceptClass: 'p-button-danger',
+        accept: () => router.delete(`/settings/tokens/${token.id}`, { preserveScroll: true }),
+    });
 }
 
 const copied = ref(false);
@@ -59,6 +67,7 @@ function relativeTime(iso: string | null): string {
     <Head :title="t('settings.tokens.title')" />
 
     <AppLayout>
+        <ConfirmDialog group="api-tokens" />
         <section class="max-w-3xl mx-auto py-10 px-4 space-y-8">
             <header>
                 <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ t('settings.tokens.title') }}</h1>

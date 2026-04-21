@@ -38,9 +38,14 @@ vi.mock('@inertiajs/vue3', async () => {
 // PrimeVue components lean on an app-level config plugin that we don't
 // register in unit tests. Stub the ones our components import so mounting
 // doesn't explode with "Cannot read properties of undefined (reading 'config')".
-const passthroughComponent = (name: string, template: string) => ({
-    default: { name, inheritAttrs: true, template },
-});
+//
+// vi.hoisted keeps the helper reachable from the vi.mock factories, which
+// Vitest hoists above ordinary const declarations during module evaluation.
+const passthroughComponent = vi.hoisted(
+    () => (name: string, template: string) => ({
+        default: { name, inheritAttrs: true, template },
+    }),
+);
 vi.mock('primevue/inputtext', () => ({
     default: {
         name: 'InputText',
@@ -54,6 +59,10 @@ vi.mock('primevue/inputtext', () => ({
 }));
 vi.mock('primevue/iconfield', () => passthroughComponent('IconField', `<div class="p-iconfield"><slot /></div>`));
 vi.mock('primevue/inputicon', () => passthroughComponent('InputIcon', `<span class="p-inputicon"><slot /></span>`));
+vi.mock('primevue/confirmdialog', () => passthroughComponent('ConfirmDialog', `<div data-testid="confirm-dialog" />`));
+vi.mock('primevue/useconfirm', () => ({
+    useConfirm: () => ({ require: vi.fn(), close: vi.fn() }),
+}));
 vi.mock('primevue/dialog', () => ({
     default: {
         name: 'Dialog',

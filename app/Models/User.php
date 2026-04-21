@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use Lab404\Impersonate\Models\Impersonate;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
@@ -27,6 +28,11 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\Permission\Traits\HasRoles;
 
+/**
+ * @property Carbon|null $email_verified_at
+ * @property Carbon|null $banned_at
+ * @property Carbon|null $last_login_at
+ */
 #[Fillable(['first_name', 'last_name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements HasLocalePreference, HasMedia, MustVerifyEmail
@@ -271,7 +277,7 @@ class User extends Authenticatable implements HasLocalePreference, HasMedia, Mus
     /**
      * Get the attributes that should be cast.
      *
-     * @return array{email_verified_at: string, banned_at: string, last_login_at: string, password: string, storage_used_bytes: string}
+     * @return array<string, string>
      */
     protected function casts(): array
     {

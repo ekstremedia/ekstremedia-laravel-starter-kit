@@ -23,6 +23,7 @@ use App\Http\Controllers\NotificationPreferenceController;
 use App\Http\Controllers\PersonalAccessTokenController;
 use App\Http\Controllers\PublicShareController;
 use App\Http\Controllers\SettingsController;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -54,14 +55,12 @@ if (app()->isLocal() || app()->runningUnitTests()) {
 // provider isn't enabled, so we register the routes unconditionally — that
 // way OAuth callbacks keep resolving even when the feature is toggled at
 // runtime without a route-cache rebuild.
-Route::middleware('web')->group(function () {
-    Route::get('/auth/{provider}/redirect', [SocialiteController::class, 'redirect'])
-        ->whereIn('provider', ['google', 'github'])
-        ->name('oauth.redirect');
-    Route::get('/auth/{provider}/callback', [SocialiteController::class, 'callback'])
-        ->whereIn('provider', ['google', 'github'])
-        ->name('oauth.callback');
-});
+Route::get('/auth/{provider}/redirect', [SocialiteController::class, 'redirect'])
+    ->whereIn('provider', ['google', 'github'])
+    ->name('oauth.redirect');
+Route::get('/auth/{provider}/callback', [SocialiteController::class, 'callback'])
+    ->whereIn('provider', ['google', 'github'])
+    ->name('oauth.callback');
 
 // Authenticated routes (user-level, customer-agnostic)
 Route::middleware('auth')->group(function () {
@@ -134,8 +133,13 @@ Route::middleware(['auth', 'verified', 'role:Admin'])
         Route::delete('permissions/{permission}', [PermissionController::class, 'destroy'])->name('permissions.destroy');
 
         Route::get('monitoring', [MonitoringController::class, 'index'])->name('monitoring.index');
-        Route::get('activity', fn (Request $request) => redirect()->route('admin.monitoring.index', ['tab' => 'activity'] + $request->query()))
-            ->name('activity.index');
+        Route::get(
+            'activity',
+            fn (Request $request): RedirectResponse => redirect()->route(
+                'admin.monitoring.index',
+                ['tab' => 'activity'] + $request->query(),
+            )
+        )->name('activity.index');
 
         Route::post('health/queue', [HealthController::class, 'dispatchPing'])->name('health.queue');
         Route::post('health/broadcast', [HealthController::class, 'broadcastPing'])->name('health.broadcast');

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\PersonalAccessToken;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Events\DiagnosingHealth;
@@ -10,6 +11,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -18,7 +20,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // personal_access_tokens lives on the central schema — point Sanctum
+        // at our pinned subclass before any token query runs, or tenant-scoped
+        // requests will try to read the table from the active tenant schema.
+        Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
     }
 
     /**
@@ -51,7 +56,7 @@ class AppServiceProvider extends ServiceProvider
         // returns 200 — failing a listener flips the response to 500. Hook
         // in a DB ping (and Redis when Redis is the cache/queue driver) so
         // /up is a real dependency probe, not just "PHP booted".
-        Event::listen(function (DiagnosingHealth $event): void {
+        Event::listen(DiagnosingHealth::class, function (): void {
             DB::connection()->getPdo();
 
             if (in_array('redis', [(string) config('cache.default'), (string) config('queue.default'), (string) config('session.driver')], true)) {

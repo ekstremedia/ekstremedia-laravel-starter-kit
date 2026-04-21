@@ -23,8 +23,12 @@ class SecurityHeaders
         $response = $next($request);
 
         // These headers are safe to set unconditionally.
+        // SAMEORIGIN (not DENY) because /admin/monitoring embeds the
+        // same-origin log-viewer, Horizon, and Pulse dashboards in iframes;
+        // SAMEORIGIN still blocks cross-origin embedding which is the actual
+        // attack we care about.
         $response->headers->set('X-Content-Type-Options', 'nosniff', false);
-        $response->headers->set('X-Frame-Options', 'DENY', false);
+        $response->headers->set('X-Frame-Options', 'SAMEORIGIN', false);
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin', false);
         $response->headers->set(
             'Permissions-Policy',

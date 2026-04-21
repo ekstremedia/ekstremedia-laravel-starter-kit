@@ -20,6 +20,15 @@ use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirectResponse
  */
 class SocialiteController extends Controller
 {
+    /**
+     * Providers whose successful OAuth response implies the email is
+     * verified. Google and GitHub both refuse to release an email to an
+     * app unless the user has confirmed ownership. Anything outside this
+     * whitelist (even if enabled in config/socialite.php) is treated as
+     * unverified and will never adopt an existing local account by email.
+     */
+    private const PROVIDERS_WITH_VERIFIED_EMAILS = ['google', 'github'];
+
     public function redirect(string $provider): SymfonyRedirectResponse
     {
         $this->assertProviderAllowed($provider);
@@ -47,12 +56,14 @@ class SocialiteController extends Controller
      *
      * Matching rules:
      *   1) an existing user with the same (provider, provider_id) wins;
-     *   2) else, a user with the provider email is adopted and linked;
+     *   2) else, when the provider is on our verified-email whitelist,
+     *      a user with the same email is adopted and linked;
      *   3) else, a brand-new account is created with a random password.
      *
-     * The provider only links when its email is verified — otherwise a
-     * malicious user could claim an account by spoofing an unverified email
-     * on a fresh OAuth app.
+     * Step 2 is strictly gated on PROVIDERS_WITH_VERIFIED_EMAILS. Without
+     * that check, a malicious user could register a brand-new OAuth account
+     * using someone else's email on a provider that doesn't enforce email
+     * verification, and walk straight into the victim's local session.
      */
     private function resolveUser(string $provider, SocialiteUser $oauthUser): User
     {
@@ -73,7 +84,7 @@ class SocialiteController extends Controller
             return $user;
         }
 
-        if ($email !== null) {
+        if ($email !== null && in_array($provider, self::PROVIDERS_WITH_VERIFIED_EMAILS, true)) {
             $existing = User::where('email', $email)->first();
             if ($existing !== null) {
                 $existing->forceFill([

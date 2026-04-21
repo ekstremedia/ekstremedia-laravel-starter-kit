@@ -32,7 +32,9 @@ class RequestId
 
         /** @var Response $response */
         $response = $next($request);
-        $response->headers->set(self::HEADER, $id, false);
+        // Replace any upstream / intermediate X-Request-Id — the id we resolved
+        // is the authoritative one for this hop.
+        $response->headers->set(self::HEADER, $id);
 
         return $response;
     }

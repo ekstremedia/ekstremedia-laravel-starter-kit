@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -50,7 +49,7 @@ class PersonalAccessTokenController extends Controller
         return back()->with('new_token', $token->plainTextToken);
     }
 
-    public function destroy(Request $request, int $id): RedirectResponse|JsonResponse
+    public function destroy(int $id): RedirectResponse
     {
         $token = auth()->user()->tokens()->where('id', $id)->firstOrFail();
         $token->delete();

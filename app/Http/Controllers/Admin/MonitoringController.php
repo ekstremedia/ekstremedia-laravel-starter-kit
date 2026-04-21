@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Activitylog\Models\Activity;
@@ -22,6 +23,14 @@ class MonitoringController extends Controller
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
         ]);
+
+        // $request->validate() only returns keys that were present. Backfill
+        // nulls so the Vue page's v-model bindings (filters.date_from, ...)
+        // never hit `undefined` on first render.
+        $filters = array_merge(
+            ['user_id' => null, 'log_name' => null, 'event' => null, 'date_from' => null, 'date_to' => null],
+            $filters,
+        );
 
         $tab = $request->string('tab')->toString();
         if (! in_array($tab, self::VALID_TABS, true)) {
@@ -46,8 +55,11 @@ class MonitoringController extends Controller
                 ->withQueryString();
 
             $users = User::orderBy('email')->get(['id', 'email', 'first_name', 'last_name']);
-            $logNames = Activity::query()->select('log_name')->distinct()->whereNotNull('log_name')->pluck('log_name');
-            $events = Activity::query()->select('event')->distinct()->whereNotNull('event')->pluck('event');
+            // Distinct() on activity_log would full-scan the table every time
+            // the page renders. The set of log_names / events barely changes,
+            // so a short cache is a big hit on larger installations.
+            $logNames = Cache::remember('monitoring.activity.log_names', 300, fn () => Activity::query()->select('log_name')->distinct()->whereNotNull('log_name')->pluck('log_name')->values()->all());
+            $events = Cache::remember('monitoring.activity.events', 300, fn () => Activity::query()->select('event')->distinct()->whereNotNull('event')->pluck('event')->values()->all());
         }
 
         return Inertia::render('Admin/Monitoring', [

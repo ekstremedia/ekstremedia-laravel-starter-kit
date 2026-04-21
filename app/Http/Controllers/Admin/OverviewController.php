@@ -32,8 +32,10 @@ class OverviewController extends Controller
     private function collect(): array
     {
         $now = CarbonImmutable::now();
-        $thirtyDaysAgo = $now->subDays(30)->startOfDay();
-        $sevenDaysAgo = $now->subDays(7)->startOfDay();
+        // 29 + today = 30 buckets. subDays(30) plus an inclusive loop would
+        // overshoot to 31.
+        $thirtyDaysAgo = $now->subDays(29)->startOfDay();
+        $sevenDaysAgo = $now->subDays(6)->startOfDay();
 
         return [
             'generated_at' => $now->toIso8601String(),
@@ -56,10 +58,15 @@ class OverviewController extends Controller
             ->orderBy('d')
             ->pluck('c', 'd');
 
+        $central = (string) config('tenancy.database.central_connection', config('database.default'));
+
         return [
             'total' => User::count(),
             'unverified' => User::whereNull('email_verified_at')->count(),
-            'banned' => Schema::hasColumn('users', 'banned_at')
+            // Schema::hasColumn defaults to the active connection — pin it so
+            // tenant-scoped requests don't mis-report 0 banned users when the
+            // tenant schema legitimately lacks the column.
+            'banned' => Schema::connection($central)->hasColumn('users', 'banned_at')
                 ? User::whereNotNull('banned_at')->count()
                 : 0,
             'new_last_7d' => User::where('created_at', '>=', $sevenDaysAgo)->count(),

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
+import { useI18n } from 'vue-i18n';
 
 interface Crumb {
     label: string;
@@ -7,10 +8,11 @@ interface Crumb {
 }
 
 defineProps<{ items: Crumb[] }>();
+const { t } = useI18n();
 </script>
 
 <template>
-    <nav v-if="items.length" aria-label="Breadcrumb" class="mb-4">
+    <nav v-if="items.length" :aria-label="t('common.breadcrumb')" class="mb-4">
         <ol class="flex flex-wrap items-center gap-1.5 text-xs text-gray-500 dark:text-dark-400">
             <template v-for="(crumb, i) in items" :key="i">
                 <li class="inline-flex items-center">

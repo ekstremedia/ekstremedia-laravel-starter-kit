@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use Illuminate\Console\Command;
+use Spatie\Permission\Models\Role;
 
 class UserGrantRole extends Command
 {
@@ -21,6 +22,15 @@ class UserGrantRole extends Command
         }
 
         $role = (string) $this->argument('role');
+
+        // Spatie throws RoleDoesNotExist from assignRole / removeRole and the
+        // stack trace is ugly in a CLI. Check up front so we match the
+        // "no user with that email" ergonomics above.
+        if (! Role::where('name', $role)->where('guard_name', 'web')->exists()) {
+            $this->error("No role named {$role}.");
+
+            return self::FAILURE;
+        }
 
         if ($this->option('revoke')) {
             $user->removeRole($role);

@@ -132,9 +132,10 @@ const iframeUrl = computed(() => {
 </script>
 
 <template>
-    <Head title="Logs & Monitoring · Admin" />
+    <div>
+        <Head :title="t('admin.monitoring.head_title')" />
 
-    <PageHeader :title="t('admin.monitoring.title')" :description="t('admin.monitoring.description')" />
+        <PageHeader :title="t('admin.monitoring.title')" :description="t('admin.monitoring.description')" />
 
     <!-- Tab rail -->
     <div class="mb-4 border-b border-gray-200 dark:border-dark-800">
@@ -226,5 +227,6 @@ const iframeUrl = computed(() => {
             style="height: calc(100vh - 16rem); min-height: 520px;"
             loading="lazy"
         />
+    </div>
     </div>
 </template>

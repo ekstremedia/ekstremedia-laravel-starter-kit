@@ -136,9 +136,13 @@ class BackupController extends Controller
         $stagingRoot = (string) config('backup.testing.restore_root', storage_path('app/backup-restores'));
         $stagingDir = $stagingRoot.'/'.now()->format('Ymd_His').'_'.Str::random(6);
 
-        if (! is_dir($stagingDir) && ! mkdir($stagingDir, 0755, true) && ! is_dir($stagingDir)) {
+        // 0700: the extracted tree contains the raw DB dump (password hashes,
+        // 2FA secrets, Sanctum hashes). Locking it to the web user keeps it
+        // unreadable by other accounts on a shared host.
+        if (! is_dir($stagingDir) && ! mkdir($stagingDir, 0o700, true) && ! is_dir($stagingDir)) {
             abort(500, 'Unable to create staging directory.');
         }
+        @chmod($stagingDir, 0o700);
 
         $tmpZip = $stagingDir.'/backup.zip';
 
@@ -178,6 +182,10 @@ class BackupController extends Controller
         } finally {
             $zip->close();
         }
+
+        // Drop the intermediate zip — the extracted tree is the useful bit
+        // and keeping both doubles the on-disk footprint per restore.
+        @unlink($tmpZip);
 
         activity('backup')
             ->event('restore_prepared')

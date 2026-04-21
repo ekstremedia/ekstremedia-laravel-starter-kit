@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Spatie\Activitylog\Models\Activity;
 
@@ -34,7 +33,21 @@ class UserExport extends Command
 
         $out = (string) ($this->option('out') ?? '');
         if ($out !== '') {
-            file_put_contents($out, $json);
+            // GDPR exports are pure PII. Lock the file, verify the write, and
+            // clamp permissions to owner-only so a world-readable dump doesn't
+            // end up on a shared host.
+            $written = @file_put_contents($out, $json, LOCK_EX);
+            if ($written === false) {
+                $this->error("Failed to write export to {$out}.");
+
+                return self::FAILURE;
+            }
+            if (! @chmod($out, 0o600)) {
+                @unlink($out);
+                $this->error("Failed to set 0600 permissions on {$out}; export aborted.");
+
+                return self::FAILURE;
+            }
             $this->info("Wrote export for {$user->email} to {$out}.");
         } else {
             $this->line($json);
@@ -57,8 +70,8 @@ class UserExport extends Command
                 'email' => $user->email,
                 'created_at' => $user->created_at?->toIso8601String(),
                 'updated_at' => $user->updated_at?->toIso8601String(),
-                'email_verified_at' => $user->email_verified_at ? Carbon::parse($user->email_verified_at)->toIso8601String() : null,
-                'last_login_at' => $user->last_login_at ? Carbon::parse($user->last_login_at)->toIso8601String() : null,
+                'email_verified_at' => $user->email_verified_at?->toIso8601String(),
+                'last_login_at' => $user->last_login_at?->toIso8601String(),
             ],
             'roles' => $user->roles()->pluck('name'),
             'permissions' => $user->getAllPermissions()->pluck('name'),
