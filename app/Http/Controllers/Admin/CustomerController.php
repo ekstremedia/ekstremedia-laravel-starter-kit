@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AppSetting;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -103,15 +104,26 @@ class CustomerController extends Controller
                     'full_name' => $user->fullName(),
                 ])->values(),
             ],
+            'global_files_feature_enabled' => (bool) AppSetting::current()->files_feature_enabled,
         ]);
     }
 
     public function update(Request $request, Tenant $customer): RedirectResponse
     {
+        $globalFilesEnabled = (bool) AppSetting::current()->files_feature_enabled;
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'status' => ['required', Rule::in(['active', 'suspended'])],
-            'files_feature_enabled' => ['sometimes', 'boolean'],
+            'files_feature_enabled' => [
+                'sometimes',
+                'boolean',
+                function (string $attribute, mixed $value, \Closure $fail) use ($globalFilesEnabled): void {
+                    if ($value && ! $globalFilesEnabled) {
+                        $fail('Files feature is disabled globally in App Settings — enable it there first.');
+                    }
+                },
+            ],
         ]);
 
         $customer->update($data);

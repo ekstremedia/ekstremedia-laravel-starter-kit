@@ -24,7 +24,7 @@ interface CustomerData {
     users: Member[];
 }
 
-const props = defineProps<{ customer: CustomerData }>();
+const props = defineProps<{ customer: CustomerData; global_files_feature_enabled: boolean }>();
 
 const statusOptions = [
     { label: 'Active', value: 'active' },
@@ -99,9 +99,22 @@ function detach(member: Member) {
                             {{ t('admin.customers.files_enabled') }}
                         </p>
                         <p class="text-xs text-gray-500">{{ t('admin.customers.files_enabled_hint') }}</p>
+                        <i18n-t
+                            v-if="!global_files_feature_enabled"
+                            keypath="admin.customers.files_global_disabled_hint"
+                            tag="p"
+                            class="text-xs text-amber-600 dark:text-amber-400 mt-1"
+                        >
+                            <template #appSettings>
+                                <Link href="/admin/settings" class="underline hover:text-amber-700 dark:hover:text-amber-300">
+                                    {{ t('admin.customers.app_settings_link') }}
+                                </Link>
+                            </template>
+                        </i18n-t>
                     </div>
-                    <ToggleSwitch v-model="form.files_feature_enabled" />
+                    <ToggleSwitch v-model="form.files_feature_enabled" :disabled="!global_files_feature_enabled" />
                 </div>
+                <p v-if="form.errors.files_feature_enabled" class="text-xs text-red-500 -mt-2">{{ form.errors.files_feature_enabled }}</p>
                 <div>
                     <Button type="submit" :label="t('common.save')" icon="pi pi-check" :loading="form.processing" />
                 </div>
