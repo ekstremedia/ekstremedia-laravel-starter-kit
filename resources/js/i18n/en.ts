@@ -47,6 +47,7 @@ export default {
         forgot_password: 'Forgot password?',
         no_account: "Don't have an account?",
         have_account: 'Already have an account?',
+        or_continue_with: 'or continue with',
         verify_title: 'Verify your email',
         verify_subtitle: 'We\'ve sent a verification link to your email address. Please check your inbox and click the link to verify your account.',
         verify_resend: 'Resend verification email',

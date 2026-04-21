@@ -47,6 +47,7 @@ export default {
         forgot_password: 'Glemt passord?',
         no_account: 'Har du ikke en konto?',
         have_account: 'Har du allerede en konto?',
+        or_continue_with: 'eller fortsett med',
         verify_title: 'Bekreft e-posten din',
         verify_subtitle: 'Vi har sendt en bekreftelseslenke til e-postadressen din. Vennligst sjekk innboksen din og klikk på lenken for å bekrefte kontoen din.',
         verify_resend: 'Send bekreftelseslenke på nytt',

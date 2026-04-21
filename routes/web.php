@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\StorageDashboardController;
 use App\Http\Controllers\Admin\SystemInfoController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\DevLoginController;
+use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CustomerLandingController;
 use App\Http\Controllers\NotificationController;
@@ -47,6 +48,19 @@ if (app()->isLocal() || app()->runningUnitTests()) {
         Route::post('/login/dev', [DevLoginController::class, 'store'])->name('login.dev');
     });
 }
+
+// Socialite OAuth entry points. The controller itself aborts 404 when the
+// provider isn't enabled, so we register the routes unconditionally — that
+// way OAuth callbacks keep resolving even when the feature is toggled at
+// runtime without a route-cache rebuild.
+Route::middleware('web')->group(function () {
+    Route::get('/auth/{provider}/redirect', [SocialiteController::class, 'redirect'])
+        ->whereIn('provider', ['google', 'github'])
+        ->name('oauth.redirect');
+    Route::get('/auth/{provider}/callback', [SocialiteController::class, 'callback'])
+        ->whereIn('provider', ['google', 'github'])
+        ->name('oauth.callback');
+});
 
 // Authenticated routes (user-level, customer-agnostic)
 Route::middleware('auth')->group(function () {

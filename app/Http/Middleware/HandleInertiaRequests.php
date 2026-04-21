@@ -85,6 +85,12 @@ class HandleInertiaRequests extends Middleware
             'chat' => [
                 'enabled' => (bool) config('chat.enabled'),
             ],
+            // Which OAuth providers to render "Sign in with …" buttons for.
+            // Empty array when the whole feature is gated off, so the Vue
+            // template's v-if collapses cleanly.
+            'oauth' => [
+                'providers' => $this->enabledOauthProviders(),
+            ],
             'customer' => fn () => $this->currentCustomer(),
             // The navbar customer switcher needs the user's memberships, so
             // share a compact list. Capped at 50 — past that, admins should
@@ -146,6 +152,26 @@ class HandleInertiaRequests extends Middleware
                 'slug' => $customer->slug,
                 'name' => $customer->name,
             ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * OAuth providers to expose on the login page, each with its human label.
+     *
+     * @return array<int, array{name: string, label: string}>
+     */
+    private function enabledOauthProviders(): array
+    {
+        if (! config('socialite.enabled')) {
+            return [];
+        }
+
+        $labels = ['google' => 'Google', 'github' => 'GitHub'];
+
+        return collect((array) config('socialite.providers', []))
+            ->filter(fn (bool $on): bool => $on)
+            ->map(fn (bool $_, string $name) => ['name' => $name, 'label' => $labels[$name] ?? ucfirst($name)])
             ->values()
             ->all();
     }

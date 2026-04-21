@@ -60,6 +60,9 @@ export interface PageProps extends InertiaPageProps {
     chat: {
         enabled: boolean;
     };
+    oauth?: {
+        providers: Array<{ name: string; label: string }>;
+    };
     customer: Customer | null;
     customers: Customer[];
 }

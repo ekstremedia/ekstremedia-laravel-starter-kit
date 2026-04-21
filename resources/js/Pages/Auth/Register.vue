@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { Head, useForm, Link } from '@inertiajs/vue3';
+import { Head, useForm, Link, usePage } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { gsap } from 'gsap';
 import AuthLayout from '@/Layouts/AuthLayout.vue';
 import TextInput from '@/Components/TextInput.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import type { PageProps } from '@/types';
 
 const { t } = useI18n();
+const page = usePage<PageProps>();
+const oauthProviders = computed(() => page.props.oauth?.providers ?? []);
 
 const form = useForm({
     first_name: '',
@@ -102,6 +105,30 @@ function submit() {
                     </PrimaryButton>
                 </div>
             </form>
+
+            <div v-if="oauthProviders.length > 0" class="mt-6">
+                <div class="relative">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-gray-200 dark:border-dark-700"></div>
+                    </div>
+                    <div class="relative flex justify-center text-xs uppercase tracking-wider">
+                        <span class="bg-white dark:bg-dark-900 px-2 text-gray-400">
+                            {{ t('auth.or_continue_with') }}
+                        </span>
+                    </div>
+                </div>
+                <div class="mt-4 grid gap-2" :class="oauthProviders.length > 1 ? 'grid-cols-2' : 'grid-cols-1'">
+                    <a
+                        v-for="p in oauthProviders"
+                        :key="p.name"
+                        :href="`/auth/${p.name}/redirect`"
+                        class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 dark:border-dark-700 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors"
+                    >
+                        <i :class="['pi', `pi-${p.name === 'github' ? 'github' : 'google'}`, 'text-base']"></i>
+                        <span>{{ p.label }}</span>
+                    </a>
+                </div>
+            </div>
 
             <!-- Login link -->
             <p class="mt-6 text-center text-sm text-gray-600 dark:text-dark-400">
