@@ -7,14 +7,12 @@ import type { Customer, PageProps } from '@/types';
 /**
  * Customer / tenant chip in the navbar.
  *
- *   - 0 memberships                → hidden (no bare chip on the welcome page)
- *   - 1 membership, not scoped in  → Link straight to /c/{slug}/dashboard,
- *                                    so the chip on / or /profile actually
- *                                    takes the user somewhere
- *   - 1 membership, already scoped → disabled badge showing the customer's
- *                                    name — the user is already there
- *   - N memberships                → button + dropdown; highlights the
- *                                    current one
+ *   - 0 memberships → hidden (no bare chip on the welcome page)
+ *   - 1 membership  → always a Link to /c/{slug}/dashboard. Clicking when
+ *                     already scoped is a no-op navigation, which is
+ *                     preferable to a dead disabled badge — users tap the
+ *                     chip expecting *something* to happen.
+ *   - N memberships → button + dropdown; highlights the current one
  *
  * Clicking any customer routes to `/c/{slug}/dashboard`, which triggers
  * InitializeTenancyByPath to swap the schema server-side.
@@ -44,14 +42,10 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
 const visible = computed(() => Boolean(page.props.tenancy?.enabled) && list.value.length > 0);
 const hasMany = computed(() => list.value.length > 1);
 
-// When the user has exactly one membership and isn't currently scoped to it
-// (e.g. they're on /, /profile, or the picker), make the chip a direct link
-// into that customer rather than a disabled "Pick a customer" badge.
+// When the user has exactly one membership, always render the chip as a
+// real Link rather than a disabled badge — see the file docstring.
 const soleCustomer = computed<Customer | null>(() =>
     list.value.length === 1 ? list.value[0] : null,
-);
-const shouldLinkToSole = computed<boolean>(
-    () => soleCustomer.value !== null && current.value?.id !== soleCustomer.value.id,
 );
 
 function urlFor(c: Customer): string {
@@ -70,10 +64,10 @@ const triggerLabel = computed<string>(() => {
 
 <template>
     <div v-if="visible" ref="rootRef" class="relative">
-        <!-- Solo-membership shortcut: render as a real link so the navbar
-             actually gets the user somewhere. -->
+        <!-- Solo-membership shortcut: always a real link, even when already
+             scoped — see the file docstring. -->
         <Link
-            v-if="shouldLinkToSole && soleCustomer"
+            v-if="soleCustomer"
             :href="urlFor(soleCustomer)"
             class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-dark-700 dark:bg-dark-900 dark:text-slate-200 dark:hover:bg-dark-800"
         >
@@ -81,7 +75,7 @@ const triggerLabel = computed<string>(() => {
             <span class="max-w-[10rem] truncate">{{ soleCustomer.name }}</span>
         </Link>
 
-        <!-- Multi-membership switcher or a static "you're already here" badge. -->
+        <!-- Multi-membership switcher. -->
         <button
             v-else
             type="button"

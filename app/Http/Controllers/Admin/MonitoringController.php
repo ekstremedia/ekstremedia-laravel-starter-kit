@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use Closure;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
@@ -17,7 +19,19 @@ class MonitoringController extends Controller
     public function index(Request $request): Response
     {
         $filters = $request->validate([
-            'user_id' => ['nullable', 'integer', 'exists:users,id'],
+            // Closure rule rather than `exists:users,id` so the check goes
+            // through App\Models\User (pinned to the central connection).
+            // The string rule would use the default connection, which can
+            // be the tenant connection in some contexts.
+            'user_id' => [
+                'nullable',
+                'integer',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if ($value !== null && ! User::whereKey($value)->exists()) {
+                        $fail(__('validation.exists', ['attribute' => $attribute]));
+                    }
+                },
+            ],
             'log_name' => ['nullable', 'string', 'max:100'],
             'event' => ['nullable', 'string', 'max:100'],
             'date_from' => ['nullable', 'date'],
@@ -76,6 +90,18 @@ class MonitoringController extends Controller
             'events' => $events,
             'endpoints' => $this->iframeEndpoints(),
         ]);
+    }
+
+    /**
+     * Legacy redirect for the old /admin/activity URL. Kept as a controller
+     * method (rather than an inline route closure) so routes can be cached.
+     */
+    public function activityRedirect(Request $request): RedirectResponse
+    {
+        return redirect()->route(
+            'admin.monitoring.index',
+            ['tab' => 'activity'] + $request->query(),
+        );
     }
 
     /**

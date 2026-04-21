@@ -111,7 +111,10 @@ class BackupController extends Controller
 
         $storage = Storage::disk($data['disk']);
 
-        activity('backup')->event('download')->withProperties($data)->log('Backup downloaded');
+        // Logged as "requested" rather than "downloaded" — the stream may
+        // still fail mid-flight (missing file, corrupted zip, client hangup),
+        // and the audit trail should reflect intent, not a false success.
+        activity('backup')->event('download_requested')->withProperties($data)->log('Backup download requested');
 
         $filename = basename($data['path']);
 
@@ -206,7 +209,7 @@ class BackupController extends Controller
 
             return $destination
                 ->backups()
-                ->contains(fn (Backup $backup): bool => hash_equals($backup->path(), $path));
+                ->contains(fn (Backup $backup): bool => $backup->path() === $path);
         } catch (\Throwable) {
             return false;
         }

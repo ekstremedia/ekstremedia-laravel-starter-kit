@@ -86,7 +86,15 @@ class SocialiteController extends Controller
      */
     private function resolveUser(string $provider, SocialiteUser $oauthUser): User
     {
-        $email = $oauthUser->getEmail();
+        // Providers can return the email with arbitrary casing (Google has
+        // been seen returning "Alice@Example.com" for a user the local DB
+        // stores as "alice@example.com"). Normalize so the adopt-by-email
+        // branch below doesn't miss — and the eventual INSERT doesn't trip
+        // the users.email unique constraint with a case-variant duplicate.
+        $rawEmail = $oauthUser->getEmail();
+        $email = $rawEmail !== null && trim($rawEmail) !== ''
+            ? Str::lower(trim($rawEmail))
+            : null;
         $providerId = (string) $oauthUser->getId();
 
         $user = User::query()

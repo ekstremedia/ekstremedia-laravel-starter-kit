@@ -93,7 +93,10 @@ function submitRestore() {
         },
         {
             preserveScroll: true,
-            onFinish: cancelRestore,
+            // onSuccess (not onFinish) so validation errors keep the dialog
+            // open — otherwise the modal closes on server error and the
+            // admin has to reopen + retype the filename with no visual cue.
+            onSuccess: cancelRestore,
         },
     );
 }

@@ -44,13 +44,16 @@ describe('CustomerSwitcher', () => {
         expect(wrapper.find('button').exists()).toBe(false);
     });
 
-    it('renders a disabled chip for a single customer when the user is already inside it', () => {
+    it('renders a real link for a single customer even when the user is already inside it', () => {
+        // A disabled "you're already here" badge was confusing — clicks on
+        // the navbar chip now always navigate somewhere.
         setPage([{ id: 1, slug: 'acme', name: 'Acme' }], { id: 1, slug: 'acme', name: 'Acme' });
         const wrapper = mount(CustomerSwitcher);
-        const btn = wrapper.get('button');
 
-        expect(btn.text()).toContain('Acme');
-        expect(btn.attributes('disabled')).toBeDefined();
+        expect(wrapper.find('button').exists()).toBe(false);
+        const link = wrapper.get('a');
+        expect(link.attributes('href')).toBe('/c/acme/dashboard');
+        expect(link.text()).toContain('Acme');
     });
 
     it('renders a link to the sole membership when no customer is active yet', () => {

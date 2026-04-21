@@ -89,9 +89,9 @@ function destroy(r: Role) {
             <Column :header="t('common.actions')" style="width: 10rem">
                 <template #body="{ data }">
                     <Link :href="`/admin/roles/${data.id}/edit`">
-                        <Button icon="pi pi-pencil" size="small" severity="secondary" class="mr-2" :title="t('common.edit')" />
+                        <Button icon="pi pi-pencil" size="small" severity="secondary" class="mr-2" :title="t('common.edit')" :aria-label="t('common.edit')" />
                     </Link>
-                    <Button icon="pi pi-trash" size="small" severity="danger" :title="t('common.delete')" @click="destroy(data)" />
+                    <Button icon="pi pi-trash" size="small" severity="danger" :title="t('common.delete')" :aria-label="t('common.delete')" @click="destroy(data)" />
                 </template>
             </Column>
         </DataTable>

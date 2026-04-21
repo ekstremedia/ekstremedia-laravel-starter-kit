@@ -1,45 +1,32 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
 
 /**
- * Remove legacy `files_enabled: false` entries that leaked into user_settings
- * before the default was flipped to true.
+ * Originally this migration cleared `files_enabled: false` from every
+ * user_settings row to unstick the "Files nav hidden for admins" bug. That
+ * logic was unsafe: the SettingsController and Admin\UserController::setQuota
+ * both let a user/admin legitimately opt out with `files_enabled: false`, and
+ * the blanket delete would silently re-enable file access for those opt-outs.
  *
- * No user-facing UI has ever written to this key, so any stored value is the
- * old default being frozen in by UserSetting::merge() (now fixed). Wiping the
- * key from the JSON blob lets the fresh default take over for every affected
- * row. Explicit opt-outs from tests that merge `files_enabled: true` are left
- * alone — we only drop the false variant.
+ * The actual root cause — UserSetting::merge() baking the current defaults
+ * into the row — is fixed in the model. That fix stops new leakage going
+ * forward. Existing rows with `files_enabled: false` are now ambiguous
+ * (legacy leak vs. deliberate opt-out), so this migration leaves them alone.
+ *
+ * The file is kept rather than deleted so environments that already ran the
+ * old version don't end up with a "missing" migration record; the up() body
+ * is now a no-op.
  */
 return new class extends Migration
 {
     public function up(): void
     {
-        // Portable path: load, rewrite, save. Keeps the migration working on
-        // sqlite (used by the test suite) where JSONB operators don't exist.
-        DB::table('user_settings')
-            ->select('id', 'settings')
-            ->orderBy('id')
-            ->chunkById(500, function ($rows): void {
-                foreach ($rows as $row) {
-                    $decoded = json_decode((string) $row->settings, true) ?: [];
-                    if (! is_array($decoded) || ! array_key_exists('files_enabled', $decoded)) {
-                        continue;
-                    }
-                    if ($decoded['files_enabled'] === false) {
-                        unset($decoded['files_enabled']);
-                        DB::table('user_settings')
-                            ->where('id', $row->id)
-                            ->update(['settings' => json_encode($decoded)]);
-                    }
-                }
-            });
+        // Intentionally empty — see class docblock.
     }
 
     public function down(): void
     {
-        // Irreversible — the old default was a bug. Nothing to restore.
+        // Nothing to undo.
     }
 };

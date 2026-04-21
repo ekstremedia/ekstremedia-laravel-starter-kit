@@ -25,6 +25,17 @@ class UserSetting extends Model
 {
     protected $fillable = ['user_id', 'settings'];
 
+    /**
+     * Pin every read/write to the central tenancy connection. Without this,
+     * stancl/tenancy swaps the default connection to the active tenant on
+     * InitializeTenancyByPath requests, and merge()/save() would then write
+     * user_settings into the wrong schema.
+     */
+    public function getConnectionName(): ?string
+    {
+        return config('tenancy.database.central_connection');
+    }
+
     protected $casts = [
         'settings' => 'array',
     ];

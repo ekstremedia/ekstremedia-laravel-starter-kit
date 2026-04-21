@@ -8,7 +8,7 @@ import TextInput from '@/Components/TextInput.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import type { PageProps } from '@/types';
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const page = usePage<PageProps>();
 const oauthProviders = computed(() => page.props.oauth?.providers ?? []);
 
@@ -18,8 +18,7 @@ function providerIcon(name: string): string {
 }
 function providerLabel(name: string, fallback: string): string {
     const key = `auth.oauth.${name}`;
-    const translated = t(key);
-    return translated === key ? fallback : translated;
+    return te(key) ? t(key) : fallback;
 }
 
 const form = useForm({

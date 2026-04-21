@@ -24,8 +24,6 @@ use App\Http\Controllers\NotificationPreferenceController;
 use App\Http\Controllers\PersonalAccessTokenController;
 use App\Http\Controllers\PublicShareController;
 use App\Http\Controllers\SettingsController;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -144,13 +142,7 @@ Route::middleware(['auth', 'verified', 'role:Admin'])
         Route::delete('permissions/{permission}', [PermissionController::class, 'destroy'])->name('permissions.destroy');
 
         Route::get('monitoring', [MonitoringController::class, 'index'])->name('monitoring.index');
-        Route::get(
-            'activity',
-            fn (Request $request): RedirectResponse => redirect()->route(
-                'admin.monitoring.index',
-                ['tab' => 'activity'] + $request->query(),
-            )
-        )->name('activity.index');
+        Route::get('activity', [MonitoringController::class, 'activityRedirect'])->name('activity.index');
 
         Route::post('health/queue', [HealthController::class, 'dispatchPing'])->name('health.queue');
         Route::post('health/broadcast', [HealthController::class, 'broadcastPing'])->name('health.broadcast');
