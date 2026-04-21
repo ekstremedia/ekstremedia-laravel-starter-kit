@@ -235,7 +235,6 @@ export default {
             users: 'Brukere',
             roles: 'Roller',
             permissions: 'Tillatelser',
-            activity_log: 'Aktivitetslogg',
             mail_settings: 'E-postinnstillinger',
             app_settings: 'Appinnstillinger',
             storage: 'Lagring',

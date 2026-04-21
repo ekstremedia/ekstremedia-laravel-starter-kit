@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
 import { Link, usePage, router } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import Toast from 'primevue/toast';
 import Tooltip from 'primevue/tooltip';
 import DarkModeToggle from '@/Components/DarkModeToggle.vue';
@@ -93,17 +93,21 @@ const userMenuOpen = ref(false);
 // Collapsible sidebar — local UI preference persisted via localStorage only.
 // Intentionally decoupled from useSettings() to avoid a re-sync flash when the
 // debounced server patch response re-hydrates page props.
+//
+// We default to `false` on setup (the SSR-safe value) and only read
+// localStorage after mount, otherwise the SSR pass — which has no window —
+// renders an expanded sidebar while a client that prefers collapsed would
+// hydrate to collapsed, causing a layout flash.
 const SIDEBAR_STORAGE_KEY = 'admin_sidebar_collapsed';
-const sidebarCollapsed = ref<boolean>(readSidebarPref());
+const sidebarCollapsed = ref<boolean>(false);
 
-function readSidebarPref(): boolean {
-    if (typeof window === 'undefined') return false;
+onMounted(() => {
     try {
-        return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1';
+        sidebarCollapsed.value = window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1';
     } catch {
-        return false;
+        // localStorage unavailable — stay expanded.
     }
-}
+});
 
 function toggleSidebar() {
     sidebarCollapsed.value = !sidebarCollapsed.value;

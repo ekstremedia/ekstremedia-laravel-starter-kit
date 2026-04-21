@@ -89,8 +89,8 @@ function saveQuota() {
 
 function destroy(u: UserRow) {
     confirm.require({
-        message: `Delete ${u.email}?`,
-        header: 'Confirm delete',
+        message: t('admin.users.confirm_delete', { email: u.email }),
+        header: t('common.confirm'),
         icon: 'pi pi-exclamation-triangle',
         acceptClass: 'p-button-danger',
         accept: () => router.delete(`/admin/users/${u.id}`),

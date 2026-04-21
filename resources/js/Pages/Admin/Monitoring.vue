@@ -38,7 +38,9 @@ interface PaginatedActivities {
 
 interface Props {
     tab: 'activity' | 'logs' | 'pulse' | 'horizon';
-    activities: PaginatedActivities;
+    // Activity-only payload. Nullable / empty on iframe tabs where the server
+    // skips the DB queries to save a round-trip.
+    activities?: PaginatedActivities | null;
     filters: {
         user_id?: number | null;
         log_name?: string | null;
@@ -46,12 +48,32 @@ interface Props {
         date_from?: string | null;
         date_to?: string | null;
     };
-    users: Causer[];
-    logNames: string[];
-    events: string[];
+    users?: Causer[];
+    logNames?: string[];
+    events?: string[];
     endpoints: { logs: string; pulse: string; horizon: string };
 }
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+    activities: null,
+    users: () => [],
+    logNames: () => [],
+    events: () => [],
+});
+
+function parseLocalDate(value?: string | null): Date | null {
+    if (!value) return null;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return null;
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+function formatLocalDate(value: Date | null): string | undefined {
+    if (!value) return undefined;
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, '0');
+    const d = String(value.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
 
 const activeTab = ref<Props['tab']>(props.tab);
 
@@ -68,8 +90,8 @@ const f = ref({
     user_id: props.filters.user_id ?? null,
     log_name: props.filters.log_name ?? null,
     event: props.filters.event ?? null,
-    date_from: props.filters.date_from ? new Date(props.filters.date_from) : null as Date | null,
-    date_to: props.filters.date_to ? new Date(props.filters.date_to) : null as Date | null,
+    date_from: parseLocalDate(props.filters.date_from),
+    date_to: parseLocalDate(props.filters.date_to),
 });
 
 function apply() {
@@ -80,8 +102,8 @@ function apply() {
             user_id: f.value.user_id || undefined,
             log_name: f.value.log_name || undefined,
             event: f.value.event || undefined,
-            date_from: f.value.date_from ? f.value.date_from.toISOString().slice(0, 10) : undefined,
-            date_to: f.value.date_to ? f.value.date_to.toISOString().slice(0, 10) : undefined,
+            date_from: formatLocalDate(f.value.date_from),
+            date_to: formatLocalDate(f.value.date_to),
         },
         { preserveState: true, replace: true },
     );
@@ -149,8 +171,8 @@ const iframeUrl = computed(() => {
             </div>
         </div>
 
-        <DataTableShell hide-search :count="activities.total ?? activities.data.length" :count-label="t('admin.activity.title').toLowerCase()">
-            <DataTable :value="activities.data" stripedRows removableSort scrollable class="border-0">
+        <DataTableShell hide-search :count="activities?.total ?? activities?.data.length ?? 0" :count-label="t('admin.activity.title').toLowerCase()">
+            <DataTable :value="activities?.data ?? []" stripedRows removableSort scrollable class="border-0">
                 <Column field="created_at" :header="t('admin.activity.when')" style="width: 12rem" sortable>
                     <template #body="{ data }">{{ formatDateTime(data.created_at) }}</template>
                 </Column>
@@ -175,7 +197,7 @@ const iframeUrl = computed(() => {
             </DataTable>
         </DataTableShell>
 
-        <PaginationLinks :links="activities.links" />
+        <PaginationLinks :links="activities?.links ?? null" />
     </div>
 
     <!-- Embedded dashboards -->

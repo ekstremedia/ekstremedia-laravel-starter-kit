@@ -92,9 +92,16 @@ class OverviewController extends Controller
 
     private function queueMetrics(): array
     {
+        // Jobs / failed_jobs live on the central connection — pin the queries
+        // there so tenant-scoped requests don't read the wrong schema and
+        // report zero.
+        $connection = (string) config('tenancy.database.central_connection', config('database.default'));
+        $schema = Schema::connection($connection);
+        $db = DB::connection($connection);
+
         return [
-            'pending' => Schema::hasTable('jobs') ? DB::table('jobs')->count() : 0,
-            'failed' => Schema::hasTable('failed_jobs') ? DB::table('failed_jobs')->count() : 0,
+            'pending' => $schema->hasTable('jobs') ? $db->table('jobs')->count() : 0,
+            'failed' => $schema->hasTable('failed_jobs') ? $db->table('failed_jobs')->count() : 0,
         ];
     }
 
@@ -162,7 +169,7 @@ class OverviewController extends Controller
      * @param  Collection<string,int>  $data
      * @return array<int, array{date: string, count: int}>
      */
-    private function fillDailySeries($data, CarbonImmutable $from, CarbonImmutable $to): array
+    private function fillDailySeries(Collection $data, CarbonImmutable $from, CarbonImmutable $to): array
     {
         $out = [];
         $cursor = $from->startOfDay();

@@ -235,7 +235,6 @@ export default {
             users: 'Users',
             roles: 'Roles',
             permissions: 'Permissions',
-            activity_log: 'Activity Log',
             mail_settings: 'Mail Settings',
             app_settings: 'App Settings',
             storage: 'Storage',

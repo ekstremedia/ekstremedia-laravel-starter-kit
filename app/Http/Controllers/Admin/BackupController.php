@@ -107,9 +107,9 @@ class BackupController extends Controller
 
         $disks = (array) config('backup.backup.destination.disks', []);
         abort_unless(in_array($data['disk'], $disks, true), 404);
+        abort_unless($this->isKnownBackup($data['disk'], $data['path']), 404);
 
         $storage = Storage::disk($data['disk']);
-        abort_unless($storage->exists($data['path']), 404);
 
         activity('backup')->event('download')->withProperties($data)->log('Backup downloaded');
 
@@ -129,26 +129,55 @@ class BackupController extends Controller
         $disks = (array) config('backup.backup.destination.disks', []);
         abort_unless(in_array($data['disk'], $disks, true), 404);
         abort_unless(basename($data['path']) === $data['confirm'], 422, 'Filename confirmation does not match.');
+        abort_unless($this->isKnownBackup($data['disk'], $data['path']), 404);
 
         $storage = Storage::disk($data['disk']);
-        abort_unless($storage->exists($data['path']), 404);
 
-        $stagingDir = storage_path('app/backup-restores/'.now()->format('Ymd_His').'_'.Str::random(6));
+        $stagingRoot = (string) config('backup.testing.restore_root', storage_path('app/backup-restores'));
+        $stagingDir = $stagingRoot.'/'.now()->format('Ymd_His').'_'.Str::random(6);
 
         if (! is_dir($stagingDir) && ! mkdir($stagingDir, 0755, true) && ! is_dir($stagingDir)) {
             abort(500, 'Unable to create staging directory.');
         }
 
         $tmpZip = $stagingDir.'/backup.zip';
-        file_put_contents($tmpZip, $storage->get($data['path']));
+
+        // Stream the archive to disk rather than loading it entirely into
+        // memory — backups can easily exceed PHP's memory_limit.
+        $source = $storage->readStream($data['path']);
+        abort_unless(is_resource($source), 500, 'Unable to read backup archive.');
+
+        $destination = fopen($tmpZip, 'wb');
+        if (! is_resource($destination)) {
+            fclose($source);
+            abort(500, 'Unable to create temporary backup archive.');
+        }
+
+        try {
+            $copied = stream_copy_to_stream($source, $destination);
+            if ($copied === false) {
+                abort(500, 'Failed to copy backup archive to staging.');
+            }
+        } finally {
+            fclose($source);
+            fclose($destination);
+        }
 
         $zip = new \ZipArchive;
         $opened = $zip->open($tmpZip);
         if ($opened !== true) {
             abort(500, 'Unable to open backup archive (error '.$opened.').');
         }
-        $zip->extractTo($stagingDir);
-        $zip->close();
+
+        try {
+            $this->assertSafeZipEntries($zip);
+
+            if (! $zip->extractTo($stagingDir)) {
+                abort(500, 'Unable to extract backup archive.');
+            }
+        } finally {
+            $zip->close();
+        }
 
         activity('backup')
             ->event('restore_prepared')
@@ -156,5 +185,43 @@ class BackupController extends Controller
             ->log('Backup prepared for restore');
 
         return back()->with('success', 'Backup extracted to '.$stagingDir.'. Finish the restore from the CLI — see the info panel for instructions.');
+    }
+
+    /**
+     * Confirm the requested path corresponds to a Spatie-managed backup on the
+     * given disk, not an arbitrary file uploaded into the destination.
+     */
+    private function isKnownBackup(string $disk, string $path): bool
+    {
+        try {
+            $destination = BackupDestination::create($disk, (string) config('backup.backup.name'));
+
+            return $destination
+                ->backups()
+                ->contains(fn (Backup $backup): bool => hash_equals($backup->path(), $path));
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Reject ZIP entries that would escape the staging directory — absolute
+     * paths, Windows drive letters, or any parent-directory segment. Protects
+     * against classic Zip-Slip path traversal on untrusted archives.
+     */
+    private function assertSafeZipEntries(\ZipArchive $zip): void
+    {
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $entry = $zip->getNameIndex($i);
+            abort_if($entry === false, 500, 'Unable to inspect backup archive.');
+
+            $normalized = str_replace('\\', '/', (string) $entry);
+            $segments = array_filter(explode('/', $normalized), fn (string $s): bool => $s !== '' && $s !== '.');
+
+            $isAbsolute = str_starts_with($normalized, '/') || preg_match('/^[A-Za-z]:\//', $normalized) === 1;
+            $escapes = in_array('..', $segments, true);
+
+            abort_if($isAbsolute || $escapes, 422, 'Backup archive contains an unsafe path.');
+        }
     }
 }

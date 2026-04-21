@@ -129,8 +129,11 @@ function submitRestore() {
 
     <!-- Info / how it works -->
     <section class="mb-6 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 overflow-hidden">
-        <header
-            class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-dark-800 cursor-pointer"
+        <button
+            type="button"
+            class="w-full flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-dark-800 cursor-pointer text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            :aria-expanded="infoOpen"
+            aria-controls="backup-info-panel"
             @click="infoOpen = !infoOpen"
         >
             <div class="flex items-center gap-2">
@@ -138,8 +141,8 @@ function submitRestore() {
                 <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.backups.how_it_works') }}</h2>
             </div>
             <i :class="['pi text-xs', infoOpen ? 'pi-chevron-up' : 'pi-chevron-down']"></i>
-        </header>
-        <div v-if="infoOpen" class="px-5 py-5 grid gap-6 md:grid-cols-2 text-sm">
+        </button>
+        <div v-if="infoOpen" id="backup-info-panel" class="px-5 py-5 grid gap-6 md:grid-cols-2 text-sm">
             <div>
                 <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400 mb-2">
                     {{ t('admin.backups.info_whats_included') }}
@@ -226,9 +229,15 @@ function submitRestore() {
             </Column>
             <Column :header="t('common.actions')" style="width: 14rem">
                 <template #body="{ data }">
-                    <a :href="downloadUrl(data)">
-                        <Button icon="pi pi-download" size="small" severity="secondary" class="mr-2" :title="t('admin.backups.download')" />
-                    </a>
+                    <Button
+                        as="a"
+                        :href="downloadUrl(data)"
+                        icon="pi pi-download"
+                        size="small"
+                        severity="secondary"
+                        class="mr-2"
+                        :title="t('admin.backups.download')"
+                    />
                     <Button
                         icon="pi pi-replay"
                         size="small"

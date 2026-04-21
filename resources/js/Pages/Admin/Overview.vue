@@ -51,12 +51,26 @@ async function refresh() {
     }
 }
 
+let darkObserver: MutationObserver | null = null;
+
+function syncDarkMode() {
+    if (typeof document === 'undefined') return;
+    isDark.value = document.documentElement.classList.contains('dark');
+}
+
 onMounted(() => {
     // Live refresh every 30s. Keep the cadence low to avoid load on local dev setups.
     pollHandle = setInterval(refresh, 30_000);
+
+    // Chart colors need to re-evaluate when the user flips dark mode, so watch
+    // the root class list rather than caching a one-shot boolean.
+    syncDarkMode();
+    darkObserver = new MutationObserver(syncDarkMode);
+    darkObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 });
 onBeforeUnmount(() => {
     if (pollHandle) clearInterval(pollHandle);
+    darkObserver?.disconnect();
 });
 
 function formatBytes(n: number | null | undefined): string {
@@ -92,10 +106,7 @@ function causerLabel(a: RecentActivity): string {
     return name || a.causer.email || `#${a.causer.id}`;
 }
 
-const isDark = computed(() => {
-    if (typeof document === 'undefined') return false;
-    return document.documentElement.classList.contains('dark');
-});
+const isDark = ref(false);
 
 const usersChart = computed(() => ({
     options: {
