@@ -172,7 +172,7 @@ const iframeUrl = computed(() => {
             </div>
         </div>
 
-        <DataTableShell hide-search :count="activities?.total ?? activities?.data.length ?? 0" :count-label="t('admin.activity.title').toLowerCase()">
+        <DataTableShell hide-search :count="activities?.total ?? activities?.data?.length ?? 0" :count-label="t('admin.activity.title').toLowerCase()">
             <DataTable :value="activities?.data ?? []" stripedRows removableSort scrollable class="border-0">
                 <Column field="created_at" :header="t('admin.activity.when')" style="width: 12rem" sortable>
                     <template #body="{ data }">{{ formatDateTime(data.created_at) }}</template>

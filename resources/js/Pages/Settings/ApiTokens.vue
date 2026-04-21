@@ -47,10 +47,18 @@ function revoke(token: Token) {
 }
 
 const copied = ref(false);
-function copyToClipboard(value: string) {
-    navigator.clipboard?.writeText(value);
-    copied.value = true;
-    setTimeout(() => (copied.value = false), 1500);
+async function copyToClipboard(value: string) {
+    if (!navigator.clipboard) return;
+    try {
+        await navigator.clipboard.writeText(value);
+        // Only flip the UI into its success state after the write actually
+        // resolves — failed permission prompts would otherwise surface a
+        // green "Copied!" when nothing was copied.
+        copied.value = true;
+        setTimeout(() => (copied.value = false), 1500);
+    } catch {
+        // Swallow: user denied clipboard permission, etc. No success state.
+    }
 }
 
 function relativeTime(iso: string | null): string {

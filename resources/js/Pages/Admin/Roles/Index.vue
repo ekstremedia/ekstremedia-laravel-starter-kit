@@ -31,6 +31,7 @@ function onSearchInput(v: string) {
 
 function destroy(r: Role) {
     confirm.require({
+        group: 'admin-roles',
         message: t('admin.roles.confirm_delete', { name: r.name }),
         header: t('common.confirm'),
         icon: 'pi pi-exclamation-triangle',
@@ -41,8 +42,8 @@ function destroy(r: Role) {
 </script>
 
 <template>
-    <Head title="Roles · Admin" />
-    <ConfirmDialog />
+    <Head :title="t('admin.roles.head_title')" />
+    <ConfirmDialog group="admin-roles" />
 
     <PageHeader :title="t('admin.roles.title')">
         <template #actions>

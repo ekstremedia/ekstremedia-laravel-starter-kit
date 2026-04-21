@@ -89,6 +89,7 @@ function saveQuota() {
 
 function destroy(u: UserRow) {
     confirm.require({
+        group: 'admin-users',
         message: t('admin.users.confirm_delete', { email: u.email }),
         header: t('common.confirm'),
         icon: 'pi pi-exclamation-triangle',
@@ -107,8 +108,8 @@ function canImpersonate(u: UserRow) {
 </script>
 
 <template>
-    <Head title="Users · Admin" />
-    <ConfirmDialog />
+    <Head :title="t('admin.users.head_title')" />
+    <ConfirmDialog group="admin-users" />
 
     <PageHeader :title="t('admin.users.title')">
         <template #actions>

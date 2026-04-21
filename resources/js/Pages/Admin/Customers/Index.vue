@@ -47,6 +47,7 @@ function onSearchInput(v: string) {
 
 function destroy(customer: CustomerRow) {
     confirm.require({
+        group: 'admin-customers',
         message: t('admin.customers.confirm_delete', { name: customer.name }),
         header: t('common.confirm'),
         icon: 'pi pi-exclamation-triangle',
@@ -61,8 +62,8 @@ function statusSeverity(s: string) {
 </script>
 
 <template>
-    <Head title="Customers · Admin" />
-    <ConfirmDialog />
+    <Head :title="t('admin.customers.head_title')" />
+    <ConfirmDialog group="admin-customers" />
 
     <PageHeader :title="t('admin.customers.title')" :description="t('admin.customers.desc')">
         <template #actions>

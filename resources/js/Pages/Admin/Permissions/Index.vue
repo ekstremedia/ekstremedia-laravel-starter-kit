@@ -36,6 +36,7 @@ function create() {
 
 function destroy(p: Permission) {
     confirm.require({
+        group: 'admin-permissions',
         message: t('admin.permissions.confirm_delete', { name: p.name }),
         header: t('common.confirm'),
         icon: 'pi pi-exclamation-triangle',
@@ -46,8 +47,8 @@ function destroy(p: Permission) {
 </script>
 
 <template>
-    <Head title="Permissions · Admin" />
-    <ConfirmDialog />
+    <Head :title="t('admin.permissions.head_title')" />
+    <ConfirmDialog group="admin-permissions" />
 
     <PageHeader :title="t('admin.permissions.title')" />
 

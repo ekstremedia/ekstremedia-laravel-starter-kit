@@ -103,6 +103,8 @@ class SocialiteController extends Controller
 
         // forceFill so the provider_* columns bypass the strict $fillable list
         // on the User model — they're controller-resolved, never user-input.
+        $trustsEmail = $email !== null && in_array($provider, self::PROVIDERS_WITH_VERIFIED_EMAILS, true);
+
         $new = new User;
         $new->forceFill([
             'first_name' => $first,
@@ -112,7 +114,9 @@ class SocialiteController extends Controller
             'provider' => $provider,
             'provider_id' => $providerId,
             'provider_avatar_url' => $oauthUser->getAvatar(),
-            'email_verified_at' => $email !== null ? now() : null,
+            // Only auto-verify when the provider is on the trust list. Untrusted
+            // providers land in /email/verify like a password signup would.
+            'email_verified_at' => $trustsEmail ? now() : null,
             'last_login_at' => now(),
         ])->save();
 

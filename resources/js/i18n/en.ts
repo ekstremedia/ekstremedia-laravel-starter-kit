@@ -309,6 +309,7 @@ export default {
         },
         dashboard: {
             title: 'Dashboard',
+            head_title: 'Admin · Dashboard',
             updated: 'Updated {when}',
             just_now: 'just now',
             seconds_ago: '{n}s ago',
@@ -342,6 +343,7 @@ export default {
         },
         users: {
             title: 'Users',
+            head_title: 'Users · Admin',
             new_user: 'New user',
             edit_user: 'Edit user',
             search_placeholder: 'Search name or email',
@@ -397,6 +399,7 @@ export default {
         },
         roles: {
             title: 'Roles',
+            head_title: 'Roles · Admin',
             new_role: 'New role',
             edit_role: 'Edit role',
             filter: 'Filter roles',
@@ -407,6 +410,7 @@ export default {
         },
         permissions: {
             title: 'Permissions',
+            head_title: 'Permissions · Admin',
             new_permission: 'new permission name',
             filter: 'Filter permissions',
             guard: 'Guard',
@@ -440,6 +444,7 @@ export default {
         },
         customers: {
             title: 'Customers',
+            head_title: 'Customers · Admin',
             desc: 'Each customer is an isolated Postgres schema. Users must be members to enter one.',
             new_customer: 'New customer',
             filter: 'Filter by name or slug',

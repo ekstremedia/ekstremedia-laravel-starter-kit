@@ -309,6 +309,7 @@ export default {
         },
         dashboard: {
             title: 'Dashbord',
+            head_title: 'Admin · Dashbord',
             updated: 'Oppdatert {when}',
             just_now: 'akkurat nå',
             seconds_ago: '{n}s siden',
@@ -342,6 +343,7 @@ export default {
         },
         users: {
             title: 'Brukere',
+            head_title: 'Brukere · Admin',
             new_user: 'Ny bruker',
             edit_user: 'Rediger bruker',
             search_placeholder: 'Søk etter navn eller e-post',
@@ -397,6 +399,7 @@ export default {
         },
         roles: {
             title: 'Roller',
+            head_title: 'Roller · Admin',
             new_role: 'Ny rolle',
             edit_role: 'Rediger rolle',
             filter: 'Filtrer roller',
@@ -407,6 +410,7 @@ export default {
         },
         permissions: {
             title: 'Tillatelser',
+            head_title: 'Tillatelser · Admin',
             new_permission: 'nytt tillatelsesnavn',
             filter: 'Filtrer tillatelser',
             guard: 'Vakt',
@@ -440,6 +444,7 @@ export default {
         },
         customers: {
             title: 'Kunder',
+            head_title: 'Kunder · Admin',
             desc: 'Hver kunde er et isolert Postgres-skjema. Brukere må være medlemmer for å komme inn.',
             new_customer: 'Ny kunde',
             filter: 'Filtrer etter navn eller slug',

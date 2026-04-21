@@ -74,7 +74,10 @@ onBeforeUnmount(() => {
 });
 
 function formatBytes(n: number | null | undefined): string {
-    if (!n || n <= 0) return '—';
+    // `!n` would treat a legitimate 0 as "missing". Distinguish so the
+    // dashboard can honestly report "0 B" storage used on fresh installs.
+    if (n == null || n < 0) return '—';
+    if (n === 0) return '0 B';
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
     let i = 0;
     let v = n;
@@ -249,7 +252,7 @@ const generatedAt = computed(() => relativeTime(metrics.value.generated_at));
 </script>
 
 <template>
-    <Head title="Admin · Dashboard" />
+    <Head :title="t('admin.dashboard.head_title')" />
 
     <PageHeader :title="t('admin.dashboard.title')">
         <template #actions>

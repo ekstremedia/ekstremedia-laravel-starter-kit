@@ -9,6 +9,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -129,7 +130,11 @@ class OverviewController extends Controller
                 'last_at' => $newest?->date()->toIso8601String(),
                 'last_size_bytes' => $newest ? (int) $newest->sizeInBytes() : null,
             ];
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            // Log once per failure — silent swallowing hid disk / auth issues
+            // that should actually page an operator.
+            Log::warning('Backup metrics probe failed.', ['exception' => $e->getMessage()]);
+
             return ['last_at' => null, 'last_size_bytes' => null, 'count' => 0];
         }
     }

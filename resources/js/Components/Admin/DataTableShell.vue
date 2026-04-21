@@ -45,6 +45,7 @@ function onEnter() {
                 <InputText
                     :value="searchValue ?? ''"
                     :placeholder="searchPlaceholder"
+                    :aria-label="searchPlaceholder"
                     @input="onInput"
                     @keydown.enter="onEnter"
                     class="min-w-[14rem]"

@@ -44,9 +44,11 @@ class UserSetting extends Model
         'notification_account_updates' => true,
         'notification_system_alerts' => true,
         'notification_storage_alerts' => true,
-        // Personal file-system opt-in. Even if the tenant feature flag is on,
-        // a user only sees /files when this is true. Admin-controlled.
-        'files_enabled' => false,
+        // Per-user opt-OUT for the personal file system. Defaults to true so
+        // anyone who's a member of a customer with files_feature_enabled
+        // sees /files automatically. Power users can flip this off via the
+        // settings API; most never will.
+        'files_enabled' => true,
         // null = unlimited, 0 = hard-disabled, otherwise byte cap.
         'storage_quota_bytes' => null,
         // Highest threshold (80/95/100) we've already notified about, so we

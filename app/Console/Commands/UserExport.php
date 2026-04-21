@@ -29,7 +29,12 @@ class UserExport extends Command
             return self::FAILURE;
         }
 
-        $json = (string) json_encode($this->payload($user), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        // JSON_THROW_ON_ERROR turns malformed UTF-8 / invalid floats etc. into
+        // a real exception instead of silently writing an empty file.
+        $json = json_encode(
+            $this->payload($user),
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
+        );
 
         $out = (string) ($this->option('out') ?? '');
         if ($out !== '') {

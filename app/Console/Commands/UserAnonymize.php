@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -42,27 +43,33 @@ class UserAnonymize extends Command
 
         $token = Str::lower(Str::random(16));
 
-        $user->forceFill([
-            'first_name' => 'Redacted',
-            'last_name' => $token,
-            'email' => "anonymized+{$token}@example.invalid",
-            'password' => Hash::make(Str::random(40)),
-            'two_factor_secret' => null,
-            'two_factor_recovery_codes' => null,
-            'two_factor_confirmed_at' => null,
-            'remember_token' => null,
-            'provider' => null,
-            'provider_id' => null,
-            'provider_avatar_url' => null,
-            'banned_at' => now(),
-            'banned_reason' => 'anonymized',
-        ])->save();
+        // Wrap in a transaction so a mid-flight failure (DB hiccup, token
+        // delete exception, activity log write, ...) rolls the user row back
+        // to its pre-anonymization state — partial PII scrubs would be the
+        // worst of both worlds.
+        DB::transaction(function () use ($user, $token): void {
+            $user->forceFill([
+                'first_name' => 'Redacted',
+                'last_name' => $token,
+                'email' => "anonymized+{$token}@example.invalid",
+                'password' => Hash::make(Str::random(40)),
+                'two_factor_secret' => null,
+                'two_factor_recovery_codes' => null,
+                'two_factor_confirmed_at' => null,
+                'remember_token' => null,
+                'provider' => null,
+                'provider_id' => null,
+                'provider_avatar_url' => null,
+                'banned_at' => now(),
+                'banned_reason' => 'anonymized',
+            ])->save();
 
-        // Invalidate API tokens so the anonymized identity can't continue to
-        // authenticate with a previously-issued Sanctum bearer token.
-        $user->tokens()->delete();
+            // Invalidate API tokens so the anonymized identity can't continue
+            // to authenticate with a previously-issued Sanctum bearer token.
+            $user->tokens()->delete();
 
-        activity('user')->event('anonymized')->performedOn($user)->log('User record anonymized');
+            activity('user')->event('anonymized')->performedOn($user)->log('User record anonymized');
+        });
 
         $this->info("Anonymized user {$user->id}. New placeholder email: {$user->email}");
 

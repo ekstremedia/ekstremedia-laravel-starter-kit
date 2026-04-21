@@ -10,20 +10,21 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table): void {
             // Nullable so the password-based flow keeps working untouched.
-            // Indexed by (provider, provider_id) because the callback looks up
-            // the user from the OAuth provider's id, not the email.
+            // The (provider, provider_id) pair must be UNIQUE — otherwise
+            // two local accounts could both claim the same OAuth identity
+            // (one racing the callback of the other).
             $table->string('provider')->nullable()->after('remember_token');
             $table->string('provider_id')->nullable()->after('provider');
             $table->string('provider_avatar_url')->nullable()->after('provider_id');
 
-            $table->index(['provider', 'provider_id']);
+            $table->unique(['provider', 'provider_id']);
         });
     }
 
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table): void {
-            $table->dropIndex(['provider', 'provider_id']);
+            $table->dropUnique(['provider', 'provider_id']);
             $table->dropColumn(['provider', 'provider_id', 'provider_avatar_url']);
         });
     }
