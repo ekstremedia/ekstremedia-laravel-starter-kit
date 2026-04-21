@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\SystemInfoController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\DevLoginController;
 use App\Http\Controllers\Auth\SocialiteController;
+use App\Http\Controllers\AvatarController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CustomerLandingController;
 use App\Http\Controllers\NotificationController;
@@ -71,6 +72,16 @@ Route::middleware('auth')->group(function () {
     // take precedence when a customer is active.
     Route::middleware('verified')->group(function () {
         Route::get('/profile', fn () => Inertia::render('Profile'))->name('profile.central');
+        // Avatar endpoints are also registered centrally when tenancy is on —
+        // otherwise admins visiting the central /profile page (no active
+        // customer) hit a 404 on upload, because the customer.php copy only
+        // exists under /c/{customer}/… in that mode. In single-tenant mode
+        // routes/customer.php already registers these at root, so we don't
+        // duplicate.
+        if (config('tenancy.enabled')) {
+            Route::post('/profile/avatar', [AvatarController::class, 'store'])->name('profile.avatar.central.store');
+            Route::delete('/profile/avatar', [AvatarController::class, 'destroy'])->name('profile.avatar.central.destroy');
+        }
         Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.central.index');
         Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.central.read');
         Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.central.readAll');

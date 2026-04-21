@@ -74,10 +74,17 @@ class UserSetting extends Model
 
     /**
      * Merge a partial array of settings into the existing ones.
+     *
+     * IMPORTANT: we store only what's been explicitly set, not the full
+     * resolved() view. Storing the full resolved set would freeze whichever
+     * defaults were in force at that moment into the row, which means any
+     * later change to $defaults would silently fail to propagate to existing
+     * users (exactly the "Files nav hidden" bug from the starter kit's early
+     * life). resolved() still applies the current defaults on read.
      */
     public function merge(array $partial): void
     {
-        $this->settings = array_merge($this->resolved(), $partial);
+        $this->settings = array_merge($this->settings ?? [], $partial);
         $this->save();
     }
 }
