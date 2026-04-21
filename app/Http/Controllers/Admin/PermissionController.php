@@ -36,7 +36,7 @@ class PermissionController extends Controller
             ->event('created')
             ->log("Created permission {$permission->name}");
 
-        return back()->with('success', 'Permission created.');
+        return back()->with('success', __('flash.permissions.created'));
     }
 
     public function destroy(Permission $permission): RedirectResponse
@@ -49,6 +49,6 @@ class PermissionController extends Controller
             ->event('deleted')
             ->log("Deleted permission {$name}");
 
-        return back()->with('success', 'Permission deleted.');
+        return back()->with('success', __('flash.permissions.deleted'));
     }
 }

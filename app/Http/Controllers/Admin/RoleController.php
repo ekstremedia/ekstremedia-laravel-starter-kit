@@ -53,7 +53,7 @@ class RoleController extends Controller
             ->event('created')
             ->log("Created role {$role->name}");
 
-        return redirect()->route('admin.roles.index')->with('success', 'Role created.');
+        return redirect()->route('admin.roles.index')->with('success', __('flash.roles.created'));
     }
 
     public function edit(Role $role): Response
@@ -94,7 +94,7 @@ class RoleController extends Controller
             ->event('updated')
             ->log("Updated role {$role->name}");
 
-        return redirect()->route('admin.roles.index')->with('success', 'Role updated.');
+        return redirect()->route('admin.roles.index')->with('success', __('flash.roles.updated'));
     }
 
     public function destroy(Role $role): RedirectResponse
@@ -108,6 +108,6 @@ class RoleController extends Controller
             ->event('deleted')
             ->log("Deleted role {$name}");
 
-        return redirect()->route('admin.roles.index')->with('success', 'Role deleted.');
+        return redirect()->route('admin.roles.index')->with('success', __('flash.roles.deleted'));
     }
 }

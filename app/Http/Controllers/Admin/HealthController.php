@@ -37,7 +37,7 @@ class HealthController extends Controller
         $nonce = (string) Str::uuid();
         PingJob::dispatch($nonce);
 
-        return back()->with('success', "Queued ping job (nonce: {$nonce}).");
+        return back()->with('success', __('flash.health.queue_ping', ['nonce' => $nonce]));
     }
 
     public function broadcastPing(): RedirectResponse
@@ -45,7 +45,7 @@ class HealthController extends Controller
         $nonce = (string) Str::uuid();
         event(new PingEvent($nonce, now()->toIso8601String()));
 
-        return back()->with('success', "Broadcast ping event (nonce: {$nonce}).");
+        return back()->with('success', __('flash.health.broadcast_ping', ['nonce' => $nonce]));
     }
 
     public function queueLast(): JsonResponse

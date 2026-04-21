@@ -86,7 +86,7 @@ class BackupController extends Controller
 
         activity('backup')->event('run')->log('Manual backup queued');
 
-        return back()->with('success', 'Backup queued.');
+        return back()->with('success', __('flash.backups.queued'));
     }
 
     public function clean(): RedirectResponse
@@ -95,7 +95,7 @@ class BackupController extends Controller
 
         activity('backup')->event('clean')->log('Manual backup cleanup queued');
 
-        return back()->with('success', 'Backup cleanup queued.');
+        return back()->with('success', __('flash.backups.cleanup_queued'));
     }
 
     public function download(Request $request): StreamedResponse
@@ -192,7 +192,7 @@ class BackupController extends Controller
             ->withProperties(['path' => $data['path'], 'staging' => $stagingDir])
             ->log('Backup prepared for restore');
 
-        return back()->with('success', 'Backup extracted to '.$stagingDir.'. Finish the restore from the CLI — see the info panel for instructions.');
+        return back()->with('success', __('flash.backups.restore_staged', ['path' => $stagingDir]));
     }
 
     /**

@@ -87,7 +87,7 @@ class MailSettingsController extends Controller
             ->event('updated')
             ->log('Updated mail settings');
 
-        return back()->with('success', 'Mail settings saved.');
+        return back()->with('success', __('flash.mail_settings.saved'));
     }
 
     public function test(Request $request): RedirectResponse
@@ -102,6 +102,6 @@ class MailSettingsController extends Controller
             return back()->with('error', 'Mail test failed. Check server logs.');
         }
 
-        return back()->with('success', 'Test mail queued to '.$request->user()->email);
+        return back()->with('success', __('flash.mail_settings.test_queued', ['email' => $request->user()->email]));
     }
 }

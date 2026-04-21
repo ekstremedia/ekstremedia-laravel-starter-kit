@@ -80,7 +80,7 @@ class CustomerController extends Controller
 
         return redirect()
             ->route('admin.customers.edit', $customer)
-            ->with('success', "Customer \"{$customer->name}\" created.");
+            ->with('success', __('flash.customers.created', ['name' => $customer->name]));
     }
 
     public function edit(Tenant $customer): Response
@@ -116,7 +116,7 @@ class CustomerController extends Controller
 
         $customer->update($data);
 
-        return back()->with('success', 'Customer updated.');
+        return back()->with('success', __('flash.customers.updated'));
     }
 
     public function destroy(Tenant $customer): RedirectResponse
@@ -128,7 +128,7 @@ class CustomerController extends Controller
 
         return redirect()
             ->route('admin.customers.index')
-            ->with('success', "Customer \"{$name}\" deleted.");
+            ->with('success', __('flash.customers.deleted', ['name' => $name]));
     }
 
     public function attachMember(Request $request, Tenant $customer): RedirectResponse
@@ -141,13 +141,13 @@ class CustomerController extends Controller
 
         $customer->users()->syncWithoutDetaching([$user->id]);
 
-        return back()->with('success', "Added {$user->email} to {$customer->name}.");
+        return back()->with('success', __('flash.customers.member_added', ['email' => $user->email, 'name' => $customer->name]));
     }
 
     public function detachMember(Tenant $customer, User $user): RedirectResponse
     {
         $customer->users()->detach($user->id);
 
-        return back()->with('success', "Removed {$user->email} from {$customer->name}.");
+        return back()->with('success', __('flash.customers.member_removed', ['email' => $user->email, 'name' => $customer->name]));
     }
 }

@@ -133,7 +133,7 @@ class UserController extends Controller
             ->event('created')
             ->log("Created user {$user->email}");
 
-        return redirect()->route('admin.users.index')->with('success', 'User created.');
+        return redirect()->route('admin.users.index')->with('success', __('flash.users.created'));
     }
 
     public function show(User $user): Response
@@ -223,7 +223,7 @@ class UserController extends Controller
                 ->log("Admin marked {$user->email} as verified");
         }
 
-        return back()->with('success', 'Email marked as verified.');
+        return back()->with('success', __('flash.users.verified'));
     }
 
     public function unverify(User $user): RedirectResponse
@@ -235,7 +235,7 @@ class UserController extends Controller
                 ->log("Admin cleared verification for {$user->email}");
         }
 
-        return back()->with('success', 'Email verification cleared.');
+        return back()->with('success', __('flash.users.unverified'));
     }
 
     public function ban(Request $request, User $user): RedirectResponse
@@ -260,7 +260,7 @@ class UserController extends Controller
             ->event('banned')
             ->log("Banned {$user->email}");
 
-        return back()->with('success', 'User banned.');
+        return back()->with('success', __('flash.users.banned'));
     }
 
     public function unban(User $user): RedirectResponse
@@ -270,7 +270,7 @@ class UserController extends Controller
         activity('user')->performedOn($user)->event('unbanned')
             ->log("Unbanned {$user->email}");
 
-        return back()->with('success', 'User unbanned.');
+        return back()->with('success', __('flash.users.unbanned'));
     }
 
     public function resendVerification(User $user): RedirectResponse
@@ -284,7 +284,7 @@ class UserController extends Controller
         activity('user')->performedOn($user)->event('verification_resent')
             ->log("Resent verification email to {$user->email}");
 
-        return back()->with('success', 'Verification email sent.');
+        return back()->with('success', __('flash.users.verification_resent'));
     }
 
     public function reset2fa(User $user): RedirectResponse
@@ -298,7 +298,7 @@ class UserController extends Controller
         activity('user')->performedOn($user)->event('two_factor_reset')
             ->log("Reset 2FA for {$user->email}");
 
-        return back()->with('success', '2FA has been reset for this user.');
+        return back()->with('success', __('flash.users.twofa_reset'));
     }
 
     public function sendPasswordReset(User $user): RedirectResponse
@@ -327,7 +327,7 @@ class UserController extends Controller
         activity('user')->performedOn($user)->event('test_notification_sent')
             ->log("Sent test notification to {$user->email}");
 
-        return back()->with('success', 'Test notification sent.');
+        return back()->with('success', __('flash.users.test_notification_sent'));
     }
 
     public function update(UpdateUserRequest $request, User $user): RedirectResponse
@@ -363,7 +363,7 @@ class UserController extends Controller
                 ->log("Admin updated user {$user->email}");
         }
 
-        return redirect()->route('admin.users.index')->with('success', 'User updated.');
+        return redirect()->route('admin.users.index')->with('success', __('flash.users.updated'));
     }
 
     public function attachCustomer(Request $request, User $user): RedirectResponse
@@ -392,7 +392,7 @@ class UserController extends Controller
             ->event('customer_attached')
             ->log("Added {$user->email} to {$customer->name}");
 
-        return back()->with('success', "Added {$user->email} to {$customer->name}.");
+        return back()->with('success', __('flash.users.customer_attached', ['email' => $user->email, 'name' => $customer->name]));
     }
 
     public function detachCustomer(Request $request, User $user, Tenant $customer): RedirectResponse
@@ -418,7 +418,7 @@ class UserController extends Controller
             ->event('customer_detached')
             ->log("Removed {$user->email} from {$customerName}");
 
-        return back()->with('success', "Removed {$user->email} from {$customerName}.");
+        return back()->with('success', __('flash.users.customer_detached', ['email' => $user->email, 'name' => $customerName]));
     }
 
     public function destroy(Request $request, User $user): RedirectResponse
@@ -436,6 +436,6 @@ class UserController extends Controller
             ->event('deleted')
             ->log("Deleted user {$email}");
 
-        return redirect()->route('admin.users.index')->with('success', 'User deleted.');
+        return redirect()->route('admin.users.index')->with('success', __('flash.users.deleted'));
     }
 }

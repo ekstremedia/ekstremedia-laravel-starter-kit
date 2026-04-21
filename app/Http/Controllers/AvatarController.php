@@ -23,13 +23,13 @@ class AvatarController extends Controller
             return back()->with('error', 'Upload failed: '.$e->getMessage());
         }
 
-        return back()->with('success', 'Profile photo updated.');
+        return back()->with('success', __('flash.avatar.updated'));
     }
 
     public function destroy(Request $request): RedirectResponse
     {
         $request->user()->clearMediaCollection('avatar');
 
-        return back()->with('success', 'Profile photo removed.');
+        return back()->with('success', __('flash.avatar.removed'));
     }
 }

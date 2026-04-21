@@ -23,7 +23,7 @@ class EmailTemplateController extends Controller
         $template->update($data);
         $template->compile();
 
-        return back()->with('success', "Template \"{$template->name}\" updated.");
+        return back()->with('success', __('flash.email_templates.updated', ['name' => $template->name]));
     }
 
     public function preview(Request $request, EmailTemplate $template): JsonResponse
@@ -49,7 +49,7 @@ class EmailTemplateController extends Controller
 
         Mail::to($data['email'])->send(new TemplateMail($subject, $html));
 
-        return back()->with('success', "Test email sent to {$data['email']}.");
+        return back()->with('success', __('flash.email_templates.test_sent', ['email' => $data['email']]));
     }
 
     /**

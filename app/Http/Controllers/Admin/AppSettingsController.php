@@ -57,6 +57,6 @@ class AppSettingsController extends Controller
             ->event('updated')
             ->log('Updated app settings');
 
-        return back()->with('success', 'Settings saved.');
+        return back()->with('success', __('flash.app_settings.saved'));
     }
 }

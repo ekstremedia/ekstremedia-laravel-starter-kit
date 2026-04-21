@@ -38,6 +38,6 @@ class NotificationPreferenceController extends Controller
 
         $request->user()->settings()->merge($validated);
 
-        return back()->with('success', __('Notification preferences saved.'));
+        return back()->with('success', __('flash.notification_prefs.saved'));
     }
 }
