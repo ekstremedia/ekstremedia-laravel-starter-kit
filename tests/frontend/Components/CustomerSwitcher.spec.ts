@@ -44,13 +44,25 @@ describe('CustomerSwitcher', () => {
         expect(wrapper.find('button').exists()).toBe(false);
     });
 
-    it('renders a disabled chip for a single customer', () => {
+    it('renders a disabled chip for a single customer when the user is already inside it', () => {
         setPage([{ id: 1, slug: 'acme', name: 'Acme' }], { id: 1, slug: 'acme', name: 'Acme' });
         const wrapper = mount(CustomerSwitcher);
         const btn = wrapper.get('button');
 
         expect(btn.text()).toContain('Acme');
         expect(btn.attributes('disabled')).toBeDefined();
+    });
+
+    it('renders a link to the sole membership when no customer is active yet', () => {
+        setPage([{ id: 1, slug: 'acme', name: 'Acme' }], null);
+        const wrapper = mount(CustomerSwitcher);
+
+        // A link — not a disabled "Pick a customer" button — so the welcome
+        // page actually gets the user somewhere.
+        expect(wrapper.find('button').exists()).toBe(false);
+        const link = wrapper.get('a');
+        expect(link.attributes('href')).toBe('/c/acme/dashboard');
+        expect(link.text()).toContain('Acme');
     });
 
     it('opens the dropdown when there are multiple customers', async () => {

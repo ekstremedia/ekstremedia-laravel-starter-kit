@@ -6,11 +6,13 @@ import type { Customer, PageProps } from '@/types';
 
 /**
  * Customer / tenant chip in the navbar.
- *  - 0 customers → hidden
- *  - 1 customer  → static badge showing the name (no dropdown)
- *  - N customers → button + dropdown to switch; current customer is highlighted
  *
- * Clicking a customer routes to `/c/{slug}/dashboard` which triggers
+ *   - 0 memberships → hidden entirely (prevents a bare chip on the welcome page)
+ *   - 1 membership, not inside it → Link straight to that customer's dashboard
+ *   - 1 membership, inside it      → static badge showing the name
+ *   - N memberships                → button + dropdown; highlights the current one
+ *
+ * Clicking any customer routes to `/c/{slug}/dashboard`, which triggers
  * InitializeTenancyByPath to swap the schema server-side.
  */
 const { t } = useI18n();
@@ -35,28 +37,56 @@ function onDocClick(e: MouseEvent) {
 onMounted(() => document.addEventListener('click', onDocClick));
 onUnmounted(() => document.removeEventListener('click', onDocClick));
 
-// Show nothing at all when tenancy is off, or the user has no memberships
-// (prevents a bare chip on the welcome page).
 const visible = computed(() => Boolean(page.props.tenancy?.enabled) && list.value.length > 0);
 const hasMany = computed(() => list.value.length > 1);
+
+// When the user has exactly one membership and isn't currently scoped to it
+// (e.g. they're on /, /profile, or the picker), make the chip a direct link
+// into that customer rather than a disabled "Pick a customer" badge.
+const soleCustomer = computed<Customer | null>(() =>
+    list.value.length === 1 ? list.value[0] : null,
+);
+const shouldLinkToSole = computed<boolean>(
+    () => soleCustomer.value !== null && current.value?.id !== soleCustomer.value.id,
+);
 
 function urlFor(c: Customer): string {
     return `/c/${c.slug}/dashboard`;
 }
+
+// Label for the trigger button: the active customer if we have one, otherwise
+// the sole membership's name, falling back to the prompt when there are many
+// and none are active yet.
+const triggerLabel = computed<string>(() => {
+    if (current.value) return current.value.name;
+    if (soleCustomer.value) return soleCustomer.value.name;
+    return t('nav.pick_customer');
+});
 </script>
 
 <template>
     <div v-if="visible" ref="rootRef" class="relative">
+        <!-- Solo-membership shortcut: render as a real link so the navbar
+             actually gets the user somewhere. -->
+        <Link
+            v-if="shouldLinkToSole && soleCustomer"
+            :href="urlFor(soleCustomer)"
+            class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-dark-700 dark:bg-dark-900 dark:text-slate-200 dark:hover:bg-dark-800"
+        >
+            <i class="pi pi-building text-indigo-500" />
+            <span class="max-w-[10rem] truncate">{{ soleCustomer.name }}</span>
+        </Link>
+
+        <!-- Multi-membership switcher or a static "you're already here" badge. -->
         <button
+            v-else
             type="button"
             :disabled="!hasMany"
             class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-default disabled:opacity-90 dark:border-dark-700 dark:bg-dark-900 dark:text-slate-200 dark:hover:bg-dark-800"
             @click="toggle"
         >
             <i class="pi pi-building text-indigo-500" />
-            <span class="max-w-[10rem] truncate">
-                {{ current?.name ?? t('nav.pick_customer') }}
-            </span>
+            <span class="max-w-[10rem] truncate">{{ triggerLabel }}</span>
             <i v-if="hasMany" class="pi pi-chevron-down text-xs text-slate-400" />
         </button>
 
