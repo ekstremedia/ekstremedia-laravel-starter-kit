@@ -9,8 +9,10 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Activitylog\Models\Activity;
 
-class ActivityLogController extends Controller
+class MonitoringController extends Controller
 {
+    private const VALID_TABS = ['activity', 'logs', 'pulse', 'horizon'];
+
     public function index(Request $request): Response
     {
         $filters = $request->validate([
@@ -20,6 +22,11 @@ class ActivityLogController extends Controller
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
         ]);
+
+        $tab = $request->string('tab')->toString();
+        if (! in_array($tab, self::VALID_TABS, true)) {
+            $tab = 'activity';
+        }
 
         $activities = Activity::query()
             ->with('causer:id,first_name,last_name,email')
@@ -32,12 +39,18 @@ class ActivityLogController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        return Inertia::render('Admin/ActivityLog/Index', [
+        return Inertia::render('Admin/Monitoring', [
+            'tab' => $tab,
             'activities' => $activities,
             'filters' => $filters,
             'users' => User::orderBy('email')->get(['id', 'email', 'first_name', 'last_name']),
             'logNames' => Activity::query()->select('log_name')->distinct()->whereNotNull('log_name')->pluck('log_name'),
             'events' => Activity::query()->select('event')->distinct()->whereNotNull('event')->pluck('event'),
+            'endpoints' => [
+                'logs' => '/log-viewer',
+                'pulse' => '/pulse',
+                'horizon' => '/horizon',
+            ],
         ]);
     }
 }

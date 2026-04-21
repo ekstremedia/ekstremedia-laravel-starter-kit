@@ -13,7 +13,7 @@ $adminRoutes = [
     ['GET', '/admin/users/create'],
     ['GET', '/admin/roles'],
     ['GET', '/admin/permissions'],
-    ['GET', '/admin/activity'],
+    ['GET', '/admin/monitoring'],
     ['GET', '/admin/mail'],
     ['GET', '/admin/system'],
 ];

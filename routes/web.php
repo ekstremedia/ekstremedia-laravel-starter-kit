@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\AppSettingsController;
 use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\CustomerController;
@@ -8,6 +7,8 @@ use App\Http\Controllers\Admin\EmailTemplateController;
 use App\Http\Controllers\Admin\HealthController;
 use App\Http\Controllers\Admin\ImpersonateController;
 use App\Http\Controllers\Admin\MailSettingsController;
+use App\Http\Controllers\Admin\MonitoringController;
+use App\Http\Controllers\Admin\OverviewController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\StorageDashboardController;
@@ -20,6 +21,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationPreferenceController;
 use App\Http\Controllers\PublicShareController;
 use App\Http\Controllers\SettingsController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -91,7 +93,8 @@ Route::middleware(['auth', 'verified', 'role:Admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
-        Route::get('/', fn () => Inertia::render('Admin/Overview'))->name('overview');
+        Route::get('/', [OverviewController::class, 'index'])->name('overview');
+        Route::get('overview/metrics', [OverviewController::class, 'metrics'])->name('overview.metrics');
 
         Route::resource('users', UserController::class);
         Route::post('users/{user}/verify', [UserController::class, 'verify'])->name('users.verify');
@@ -110,7 +113,9 @@ Route::middleware(['auth', 'verified', 'role:Admin'])
         Route::post('permissions', [PermissionController::class, 'store'])->name('permissions.store');
         Route::delete('permissions/{permission}', [PermissionController::class, 'destroy'])->name('permissions.destroy');
 
-        Route::get('activity', [ActivityLogController::class, 'index'])->name('activity.index');
+        Route::get('monitoring', [MonitoringController::class, 'index'])->name('monitoring.index');
+        Route::get('activity', fn (Request $request) => redirect()->route('admin.monitoring.index', ['tab' => 'activity'] + $request->query()))
+            ->name('activity.index');
 
         Route::post('health/queue', [HealthController::class, 'dispatchPing'])->name('health.queue');
         Route::post('health/broadcast', [HealthController::class, 'broadcastPing'])->name('health.broadcast');
@@ -135,6 +140,8 @@ Route::middleware(['auth', 'verified', 'role:Admin'])
         Route::get('backups', [BackupController::class, 'index'])->name('backups.index');
         Route::post('backups/run', [BackupController::class, 'run'])->name('backups.run');
         Route::post('backups/clean', [BackupController::class, 'clean'])->name('backups.clean');
+        Route::get('backups/download', [BackupController::class, 'download'])->name('backups.download');
+        Route::post('backups/prepare-restore', [BackupController::class, 'prepareRestore'])->name('backups.prepareRestore');
 
         // Landlord — customer management. Only registered when multi-tenancy is
         // active so single-tenant installs don't expose a CRUD for a concept

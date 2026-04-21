@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
 import { Link, usePage, router } from '@inertiajs/vue3';
-import { computed, ref, watch, onMounted } from 'vue';
+import { computed, ref, watch } from 'vue';
 import Toast from 'primevue/toast';
 import Tooltip from 'primevue/tooltip';
 import DarkModeToggle from '@/Components/DarkModeToggle.vue';
@@ -10,7 +10,6 @@ import NotificationBell from '@/Components/NotificationBell.vue';
 import ChatDropdown from '@/Components/Chat/ChatDropdown.vue';
 import { useFlashToast } from '@/composables/useFlashToast';
 import { useCustomer } from '@/composables/useCustomer';
-import { useSettings } from '@/composables/useSettings';
 import { useUnreadCounts } from '@/composables/useUnreadCounts';
 import { useUserChannel } from '@/composables/useUserChannel';
 import type { PageProps } from '@/types';
@@ -25,7 +24,6 @@ const { tenancyEnabled } = useCustomer();
 const chatEnabled = computed(() => page.props.chat?.enabled ?? false);
 useFlashToast();
 
-const { settings, update } = useSettings();
 const { messagesCount: unreadMessagesCount, incrementMessages, incrementNotifications } = useUnreadCounts();
 
 // Server-pushed notifications keep admin navbar badges in sync.
@@ -43,47 +41,77 @@ interface NavItem {
     label: string;
     href: string;
     icon: string;
+    group: string;
     match?: (p: string) => boolean;
     external?: boolean;
     customerOnly?: boolean;
 }
 
 const navItems = computed<NavItem[]>(() => [
-    { label: t('admin.nav.overview'), href: '/admin', icon: 'pi-home', match: (p: string) => p === '/admin' },
-    { label: t('admin.nav.customers'), href: '/admin/customers', icon: 'pi-building', match: (p: string) => p.startsWith('/admin/customers'), customerOnly: true },
-    { label: t('admin.nav.users'), href: '/admin/users', icon: 'pi-users', match: (p: string) => p.startsWith('/admin/users') },
-    { label: t('admin.nav.roles'), href: '/admin/roles', icon: 'pi-shield', match: (p: string) => p.startsWith('/admin/roles') },
-    { label: t('admin.nav.permissions'), href: '/admin/permissions', icon: 'pi-key', match: (p: string) => p.startsWith('/admin/permissions') },
-    { label: t('admin.nav.activity_log'), href: '/admin/activity', icon: 'pi-list', match: (p: string) => p.startsWith('/admin/activity') },
-    { label: t('admin.nav.mail_settings'), href: '/admin/mail', icon: 'pi-envelope', match: (p: string) => p.startsWith('/admin/mail') },
-    { label: t('admin.nav.app_settings'), href: '/admin/settings', icon: 'pi-sliders-h', match: (p: string) => p === '/admin/settings' },
-    { label: t('admin.nav.storage'), href: '/admin/storage', icon: 'pi-database', match: (p: string) => p.startsWith('/admin/storage') },
-    { label: t('admin.nav.backups'), href: '/admin/backups', icon: 'pi-cloud-upload', match: (p: string) => p.startsWith('/admin/backups') },
-    { label: t('admin.nav.system'), href: '/admin/system', icon: 'pi-server', match: (p: string) => p.startsWith('/admin/system') || p.startsWith('/admin/health') },
-    { label: t('admin.nav.horizon'), href: '/horizon', icon: 'pi-compass', external: true },
-    { label: t('admin.nav.pulse'), href: '/pulse', icon: 'pi-chart-line', external: true },
-    { label: t('admin.nav.logs'), href: '/log-viewer', icon: 'pi-file', external: true },
+    // Main
+    { group: 'main', label: t('admin.nav.overview'), href: '/admin', icon: 'pi-home', match: (p: string) => p === '/admin' },
+
+    // Access
+    { group: 'access', label: t('admin.nav.customers'), href: '/admin/customers', icon: 'pi-building', match: (p: string) => p.startsWith('/admin/customers'), customerOnly: true },
+    { group: 'access', label: t('admin.nav.users'), href: '/admin/users', icon: 'pi-users', match: (p: string) => p.startsWith('/admin/users') },
+    { group: 'access', label: t('admin.nav.roles'), href: '/admin/roles', icon: 'pi-shield', match: (p: string) => p.startsWith('/admin/roles') },
+    { group: 'access', label: t('admin.nav.permissions'), href: '/admin/permissions', icon: 'pi-key', match: (p: string) => p.startsWith('/admin/permissions') },
+
+    // System
+    { group: 'system', label: t('admin.nav.app_settings'), href: '/admin/settings', icon: 'pi-sliders-h', match: (p: string) => p === '/admin/settings' },
+    { group: 'system', label: t('admin.nav.mail_settings'), href: '/admin/mail', icon: 'pi-envelope', match: (p: string) => p.startsWith('/admin/mail') },
+    { group: 'system', label: t('admin.nav.storage'), href: '/admin/storage', icon: 'pi-database', match: (p: string) => p.startsWith('/admin/storage') },
+    { group: 'system', label: t('admin.nav.backups'), href: '/admin/backups', icon: 'pi-cloud-upload', match: (p: string) => p.startsWith('/admin/backups') },
+    { group: 'system', label: t('admin.nav.system'), href: '/admin/system', icon: 'pi-server', match: (p: string) => p.startsWith('/admin/system') || p.startsWith('/admin/health') },
+
+    // Observability
+    { group: 'observability', label: t('admin.nav.monitoring'), href: '/admin/monitoring', icon: 'pi-chart-bar', match: (p: string) => p.startsWith('/admin/monitoring') || p.startsWith('/admin/activity') },
 ]);
 
-const nav = computed<NavItem[]>(() => navItems.value.filter((item) => !item.customerOnly || tenancyEnabled.value));
+interface NavGroup {
+    key: string;
+    label: string;
+    items: NavItem[];
+}
+
+const groupedNav = computed<NavGroup[]>(() => {
+    const filtered = navItems.value.filter((item) => !item.customerOnly || tenancyEnabled.value);
+    const groupOrder: Array<{ key: string; label: string }> = [
+        { key: 'main', label: t('admin.nav.group_main') },
+        { key: 'access', label: t('admin.nav.group_access') },
+        { key: 'system', label: t('admin.nav.group_system') },
+        { key: 'observability', label: t('admin.nav.group_observability') },
+    ];
+    return groupOrder
+        .map(({ key, label }) => ({ key, label, items: filtered.filter((item) => item.group === key) }))
+        .filter((group) => group.items.length > 0);
+});
 
 const mobileOpen = ref(false);
 const userMenuOpen = ref(false);
 
-// Collapsible sidebar — persisted per user via settings composable.
-const sidebarCollapsed = ref<boolean>(Boolean(settings.value.admin_sidebar_collapsed ?? false));
+// Collapsible sidebar — local UI preference persisted via localStorage only.
+// Intentionally decoupled from useSettings() to avoid a re-sync flash when the
+// debounced server patch response re-hydrates page props.
+const SIDEBAR_STORAGE_KEY = 'admin_sidebar_collapsed';
+const sidebarCollapsed = ref<boolean>(readSidebarPref());
 
-onMounted(() => {
-    sidebarCollapsed.value = Boolean(settings.value.admin_sidebar_collapsed ?? false);
-});
-
-watch(() => settings.value.admin_sidebar_collapsed, (v) => {
-    sidebarCollapsed.value = Boolean(v);
-});
+function readSidebarPref(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+        return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1';
+    } catch {
+        return false;
+    }
+}
 
 function toggleSidebar() {
     sidebarCollapsed.value = !sidebarCollapsed.value;
-    update({ admin_sidebar_collapsed: sidebarCollapsed.value });
+    try {
+        window.localStorage.setItem(SIDEBAR_STORAGE_KEY, sidebarCollapsed.value ? '1' : '0');
+    } catch {
+        // localStorage unavailable — ignore; state still applies for the session.
+    }
 }
 
 function logout() {
@@ -125,29 +153,38 @@ watch(currentPath, () => {
                     <i class="pi pi-times"></i>
                 </button>
             </div>
-            <nav class="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-4rem)]">
-                <template v-for="item in nav" :key="item.href">
-                    <a v-if="item.external" :href="item.href" target="_blank"
-                       v-tooltip.right="sidebarCollapsed ? item.label : null"
-                       class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800"
-                       :class="sidebarCollapsed ? 'md:justify-center' : ''">
-                        <i :class="['pi', item.icon]"></i>
-                        <span :class="sidebarCollapsed ? 'md:hidden' : ''">{{ item.label }}</span>
-                        <i class="pi pi-external-link text-xs ml-auto opacity-60" :class="sidebarCollapsed ? 'md:hidden' : ''"></i>
-                    </a>
-                    <Link v-else :href="item.href"
-                          v-tooltip.right="sidebarCollapsed ? item.label : null"
-                          class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors"
-                          :class="[
-                              item.match && item.match(currentPath)
-                                  ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
-                                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800',
-                              sidebarCollapsed ? 'md:justify-center' : '',
-                          ]">
-                        <i :class="['pi', item.icon]"></i>
-                        <span :class="sidebarCollapsed ? 'md:hidden' : ''">{{ item.label }}</span>
-                    </Link>
-                </template>
+            <nav class="p-3 overflow-y-auto max-h-[calc(100vh-4rem)]">
+                <div v-for="(group, gIdx) in groupedNav" :key="group.key"
+                     :class="[gIdx > 0 ? 'mt-4 pt-3 border-t border-gray-100 dark:border-dark-800' : '']">
+                    <div v-if="!sidebarCollapsed"
+                         class="hidden md:block px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-dark-400">
+                        {{ group.label }}
+                    </div>
+                    <div class="space-y-1">
+                        <template v-for="item in group.items" :key="item.href">
+                            <a v-if="item.external" :href="item.href" target="_blank"
+                               v-tooltip.right="sidebarCollapsed ? item.label : null"
+                               class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800"
+                               :class="sidebarCollapsed ? 'md:justify-center' : ''">
+                                <i :class="['pi', item.icon]"></i>
+                                <span :class="sidebarCollapsed ? 'md:hidden' : ''">{{ item.label }}</span>
+                                <i class="pi pi-external-link text-xs ml-auto opacity-60" :class="sidebarCollapsed ? 'md:hidden' : ''"></i>
+                            </a>
+                            <Link v-else :href="item.href"
+                                  v-tooltip.right="sidebarCollapsed ? item.label : null"
+                                  class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors"
+                                  :class="[
+                                      item.match && item.match(currentPath)
+                                          ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800',
+                                      sidebarCollapsed ? 'md:justify-center' : '',
+                                  ]">
+                                <i :class="['pi', item.icon]"></i>
+                                <span :class="sidebarCollapsed ? 'md:hidden' : ''">{{ item.label }}</span>
+                            </Link>
+                        </template>
+                    </div>
+                </div>
             </nav>
 
             <!-- Collapse toggle (desktop only) -->
