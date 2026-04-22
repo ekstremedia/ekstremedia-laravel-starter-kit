@@ -1,20 +1,13 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
-import PageHeader from '@/Components/Admin/PageHeader.vue';
-import DataTableShell from '@/Components/Admin/DataTableShell.vue';
-import PaginationLinks from '@/Components/Admin/PaginationLinks.vue';
-import DataTable from 'primevue/datatable';
-import Column from 'primevue/column';
-import Select from 'primevue/select';
-import DatePicker from 'primevue/datepicker';
-import Button from 'primevue/button';
-import Tag from 'primevue/tag';
 import { useI18n } from 'vue-i18n';
+import CommandLayout from '@/Layouts/CommandLayout.vue';
+import CmdDataTable, { type Column as CmdColumn } from '@/Components/Command/DataTable.vue';
+import Icon from '@/Components/Command/Icon.vue';
 import { formatDateTime } from '@/composables/useDateTime';
 
-defineOptions({ layout: AdminLayout });
+defineOptions({ layout: CommandLayout });
 
 const { t } = useI18n();
 
@@ -34,12 +27,13 @@ interface PaginatedActivities {
     data: Activity[];
     links: Array<{ url: string | null; label: string; active: boolean }>;
     total?: number;
+    current_page?: number;
+    last_page?: number;
+    per_page?: number;
 }
 
 interface Props {
     tab: 'activity' | 'logs' | 'pulse' | 'horizon';
-    // Activity-only payload. Nullable / empty on iframe tabs where the server
-    // skips the DB queries to save a round-trip.
     activities?: PaginatedActivities | null;
     filters: {
         user_id?: number | null;
@@ -60,38 +54,19 @@ const props = withDefaults(defineProps<Props>(), {
     events: () => [],
 });
 
-function parseLocalDate(value?: string | null): Date | null {
-    if (!value) return null;
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-    if (!match) return null;
-    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-}
-
-function formatLocalDate(value: Date | null): string | undefined {
-    if (!value) return undefined;
-    const y = value.getFullYear();
-    const m = String(value.getMonth() + 1).padStart(2, '0');
-    const d = String(value.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-}
-
 const activeTab = ref<Props['tab']>(props.tab);
 
 watch(activeTab, (next) => {
     if (next === props.tab) return;
-    router.get(
-        '/admin/monitoring',
-        { tab: next },
-        { preserveState: true, preserveScroll: true, replace: true },
-    );
+    router.get('/admin/monitoring', { tab: next }, { preserveState: true, preserveScroll: true, replace: true });
 });
 
 const f = ref({
-    user_id: props.filters.user_id ?? null,
-    log_name: props.filters.log_name ?? null,
-    event: props.filters.event ?? null,
-    date_from: parseLocalDate(props.filters.date_from),
-    date_to: parseLocalDate(props.filters.date_to),
+    user_id: props.filters.user_id ?? null as number | null,
+    log_name: props.filters.log_name ?? null as string | null,
+    event: props.filters.event ?? null as string | null,
+    date_from: props.filters.date_from ?? '',
+    date_to: props.filters.date_to ?? '',
 });
 
 function apply() {
@@ -102,25 +77,25 @@ function apply() {
             user_id: f.value.user_id || undefined,
             log_name: f.value.log_name || undefined,
             event: f.value.event || undefined,
-            date_from: formatLocalDate(f.value.date_from),
-            date_to: formatLocalDate(f.value.date_to),
+            date_from: f.value.date_from || undefined,
+            date_to: f.value.date_to || undefined,
         },
         { preserveState: true, replace: true },
     );
 }
 
 function reset() {
-    f.value = { user_id: null, log_name: null, event: null, date_from: null, date_to: null };
+    f.value = { user_id: null, log_name: null, event: null, date_from: '', date_to: '' };
     apply();
 }
 
-interface TabItem { key: Props['tab']; label: string; icon: string; external?: string }
+interface TabItem { key: Props['tab']; label: string; external?: string }
 
 const tabs = computed<TabItem[]>(() => [
-    { key: 'activity', label: t('admin.monitoring.tab_activity'), icon: 'pi-list' },
-    { key: 'logs', label: t('admin.monitoring.tab_logs'), icon: 'pi-file', external: props.endpoints.logs },
-    { key: 'pulse', label: t('admin.monitoring.tab_pulse'), icon: 'pi-chart-line', external: props.endpoints.pulse },
-    { key: 'horizon', label: t('admin.monitoring.tab_horizon'), icon: 'pi-compass', external: props.endpoints.horizon },
+    { key: 'activity', label: t('admin.monitoring.tab_activity') },
+    { key: 'logs', label: t('admin.monitoring.tab_logs'), external: props.endpoints.logs },
+    { key: 'pulse', label: t('admin.monitoring.tab_pulse'), external: props.endpoints.pulse },
+    { key: 'horizon', label: t('admin.monitoring.tab_horizon'), external: props.endpoints.horizon },
 ]);
 
 const iframeUrl = computed(() => {
@@ -129,93 +104,183 @@ const iframeUrl = computed(() => {
     if (activeTab.value === 'horizon') return props.endpoints.horizon;
     return null;
 });
+
+// Rows for Cmd table — identity mapping to get stable id.
+const rows = computed(() => props.activities?.data ?? []);
+
+const columns: CmdColumn<Activity>[] = [
+    { key: 'created_at', label: t('admin.activity.when'), sortable: true, width: '150px', mono: true },
+    { key: 'causer', label: t('admin.activity.user'), sortable: true, width: '200px', getter: (r) => r.causer?.email ?? '—' },
+    { key: 'log_name', label: t('admin.activity.log_name'), sortable: true, width: '120px' },
+    { key: 'event', label: t('admin.activity.event'), sortable: true, width: '140px' },
+    { key: 'description', label: t('admin.activity.description'), sortable: true },
+    { key: 'subject', label: t('admin.activity.subject'), width: '140px', getter: (r) => r.subject_type ? `${r.subject_type.split('\\').pop()}#${r.subject_id}` : '' },
+];
+
+const search = ref('');
+const sortKey = ref('created_at');
+const sortDir = ref<'asc' | 'desc'>('desc');
+
+const inputStyle = {
+    background: 'var(--panel2)',
+    border: '1px solid var(--border)',
+    borderRadius: '5px',
+    padding: '6px 10px',
+    color: 'var(--fg)',
+    fontSize: '11.5px',
+    outline: 'none',
+    fontFamily: 'inherit',
+    width: '100%',
+} as const;
 </script>
 
 <template>
-    <div>
-        <Head :title="t('admin.monitoring.head_title')" />
+    <Head :title="t('admin.monitoring.head_title')" />
 
-        <PageHeader :title="t('admin.monitoring.title')" :description="t('admin.monitoring.description')" />
+    <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '14px' }">
+        <div>
+            <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }">
+                {{ t('admin.monitoring.title') }}
+            </h1>
+            <div
+                class="cmd-mono"
+                :style="{ marginTop: '3px', fontSize: '11.5px', color: 'var(--fg-mute)' }"
+            >{{ t('admin.monitoring.description') }}</div>
+        </div>
+    </div>
 
-    <!-- Tab rail -->
-    <div class="mb-4 border-b border-gray-200 dark:border-dark-800">
-        <nav class="flex flex-wrap gap-1">
-            <button
-                v-for="tab in tabs"
-                :key="tab.key"
-                type="button"
-                @click="activeTab = tab.key"
-                class="relative inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer border-b-2 -mb-px"
-                :class="
-                    activeTab === tab.key
-                        ? 'text-gray-900 dark:text-white border-gray-900 dark:border-white'
-                        : 'text-gray-500 dark:text-dark-400 hover:text-gray-900 dark:hover:text-white border-transparent'
-                "
-            >
-                <i :class="['pi', tab.icon, 'text-xs']"></i>
-                <span>{{ tab.label }}</span>
-            </button>
-        </nav>
+    <!-- Tabs -->
+    <div
+        :style="{
+            display: 'flex',
+            gap: '2px',
+            marginBottom: '16px',
+            borderBottom: '1px solid var(--border)',
+        }"
+    >
+        <button
+            v-for="tab in tabs"
+            :key="tab.key"
+            type="button"
+            @click="activeTab = tab.key"
+            :style="{
+                background: 'transparent',
+                border: 'none',
+                borderBottom: activeTab === tab.key ? '2px solid var(--accent)' : '2px solid transparent',
+                padding: '8px 14px',
+                marginBottom: '-1px',
+                fontSize: '12px',
+                fontWeight: activeTab === tab.key ? 500 : 400,
+                color: activeTab === tab.key ? 'var(--fg)' : 'var(--fg-dim)',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+            }"
+        >{{ tab.label }}</button>
     </div>
 
     <!-- Activity tab -->
     <div v-if="activeTab === 'activity'">
-        <div class="mb-4 p-4 bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl grid grid-cols-2 md:grid-cols-5 gap-3">
-            <Select v-model="f.user_id" :options="users" optionLabel="email" optionValue="id" :placeholder="t('admin.activity.user')" showClear class="w-full" />
-            <Select v-model="f.log_name" :options="logNames" :placeholder="t('admin.activity.log_name')" showClear class="w-full" />
-            <Select v-model="f.event" :options="events" :placeholder="t('admin.activity.event')" showClear class="w-full" />
-            <DatePicker v-model="f.date_from" :placeholder="t('admin.activity.from')" dateFormat="yy-mm-dd" class="w-full" />
-            <DatePicker v-model="f.date_to" :placeholder="t('admin.activity.to')" dateFormat="yy-mm-dd" class="w-full" />
-            <div class="col-span-2 md:col-span-5 flex gap-2">
-                <Button :label="t('admin.activity.apply')" icon="pi pi-filter" @click="apply" />
-                <Button :label="t('admin.activity.reset')" severity="secondary" @click="reset" />
+        <!-- Filters -->
+        <div
+            class="cmd-card"
+            :style="{
+                padding: '12px',
+                marginBottom: '12px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                gap: '8px',
+                alignItems: 'end',
+            }"
+        >
+            <select v-model="f.user_id" :style="inputStyle">
+                <option :value="null">{{ t('admin.activity.user') }} — alle</option>
+                <option v-for="u in users" :key="u.id" :value="u.id">{{ u.email }}</option>
+            </select>
+            <select v-model="f.log_name" :style="inputStyle">
+                <option :value="null">{{ t('admin.activity.log_name') }} — alle</option>
+                <option v-for="l in logNames" :key="l" :value="l">{{ l }}</option>
+            </select>
+            <select v-model="f.event" :style="inputStyle">
+                <option :value="null">{{ t('admin.activity.event') }} — alle</option>
+                <option v-for="e in events" :key="e" :value="e">{{ e }}</option>
+            </select>
+            <input type="date" v-model="f.date_from" :placeholder="t('admin.activity.from')" :style="inputStyle" />
+            <input type="date" v-model="f.date_to" :placeholder="t('admin.activity.to')" :style="inputStyle" />
+            <div :style="{ display: 'flex', gap: '6px' }">
+                <button
+                    type="button"
+                    @click="apply"
+                    :style="{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '6px 11px', borderRadius: '5px', fontSize: '11.5px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }"
+                >{{ t('admin.activity.apply') }}</button>
+                <button
+                    type="button"
+                    @click="reset"
+                    :style="{ background: 'transparent', color: 'var(--fg-dim)', border: '1px solid var(--border)', padding: '6px 11px', borderRadius: '5px', fontSize: '11.5px', cursor: 'pointer', fontFamily: 'inherit' }"
+                >{{ t('admin.activity.reset') }}</button>
             </div>
         </div>
 
-        <DataTableShell hide-search :count="activities?.total ?? activities?.data?.length ?? 0" :count-label="t('admin.activity.title').toLowerCase()">
-            <DataTable :value="activities?.data ?? []" stripedRows removableSort scrollable class="border-0">
-                <Column field="created_at" :header="t('admin.activity.when')" style="width: 12rem" sortable>
-                    <template #body="{ data }">{{ formatDateTime(data.created_at) }}</template>
-                </Column>
-                <Column :header="t('admin.activity.user')" sortable :sortField="(d: any) => d.causer?.email ?? ''">
-                    <template #body="{ data }">
-                        <span v-if="data.causer">{{ data.causer.email }}</span>
-                        <span v-else class="text-gray-400">{{ t('admin.activity.system') }}</span>
-                    </template>
-                </Column>
-                <Column field="log_name" :header="t('admin.activity.log_name')" sortable>
-                    <template #body="{ data }"><Tag v-if="data.log_name" :value="data.log_name" severity="info" /></template>
-                </Column>
-                <Column field="event" :header="t('admin.activity.event')" sortable>
-                    <template #body="{ data }"><Tag v-if="data.event" :value="data.event" /></template>
-                </Column>
-                <Column field="description" :header="t('admin.activity.description')" sortable />
-                <Column :header="t('admin.activity.subject')">
-                    <template #body="{ data }">
-                        <span v-if="data.subject_type" class="text-xs text-gray-500">{{ data.subject_type.split('\\').pop() }}#{{ data.subject_id }}</span>
-                    </template>
-                </Column>
-            </DataTable>
-        </DataTableShell>
-
-        <PaginationLinks :links="activities?.links ?? null" />
+        <CmdDataTable
+            :rows="activities ?? rows"
+            :columns="columns"
+            v-model:search="search"
+            v-model:sort-key="sortKey"
+            v-model:sort-dir="sortDir"
+            :search-placeholder="'Søk i aktivitetslogg…'"
+            :search-keys="['description', 'event', 'log_name']"
+            :empty-text="t('admin.activity.empty') ?? 'Ingen aktivitet.'"
+            :local-sort="false"
+            :local-search="true"
+        >
+            <template #cell:created_at="{ row }">{{ formatDateTime(row.created_at) }}</template>
+            <template #cell:causer="{ row }">
+                <span v-if="row.causer" :style="{ color: 'var(--fg)' }">{{ row.causer.email }}</span>
+                <span v-else :style="{ color: 'var(--fg-mute)', fontStyle: 'italic' }">{{ t('admin.activity.system') }}</span>
+            </template>
+            <template #cell:log_name="{ row }">
+                <span
+                    v-if="row.log_name"
+                    class="cmd-mono"
+                    :style="{ fontSize: '10.5px', color: 'var(--accent)', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', padding: '1px 7px', borderRadius: '3px' }"
+                >{{ row.log_name }}</span>
+            </template>
+            <template #cell:event="{ row }">
+                <span
+                    v-if="row.event"
+                    class="cmd-mono"
+                    :style="{ fontSize: '10.5px', color: 'var(--fg-dim)', background: 'var(--panel2)', border: '1px solid var(--border)', padding: '1px 7px', borderRadius: '3px' }"
+                >{{ row.event }}</span>
+            </template>
+            <template #cell:subject="{ row }">
+                <span v-if="row.subject_type" class="cmd-mono" :style="{ fontSize: '10.5px', color: 'var(--fg-mute)' }">
+                    {{ row.subject_type.split('\\').pop() }}#{{ row.subject_id }}
+                </span>
+            </template>
+        </CmdDataTable>
     </div>
 
     <!-- Embedded dashboards -->
-    <div v-else class="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl overflow-hidden">
-        <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 dark:border-dark-800 bg-gray-50 dark:bg-dark-950/40">
-            <p class="text-xs text-gray-500 dark:text-dark-400">
-                {{ t('admin.monitoring.iframe_hint') }}
-            </p>
+    <div v-else class="cmd-card" :style="{ overflow: 'hidden' }">
+        <div
+            :style="{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 14px',
+                borderBottom: '1px solid var(--border)',
+                background: 'var(--panel2)',
+            }"
+        >
+            <span :style="{ fontSize: '11px', color: 'var(--fg-dim)' }">{{ t('admin.monitoring.iframe_hint') }}</span>
             <a
                 v-if="iframeUrl"
                 :href="iframeUrl"
                 target="_blank"
                 rel="noopener"
-                class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-dark-300 hover:text-gray-900 dark:hover:text-white"
+                :style="{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11.5px', color: 'var(--accent)', textDecoration: 'none' }"
             >
                 {{ t('admin.monitoring.open_new_tab') }}
-                <i class="pi pi-external-link text-[10px]"></i>
+                <Icon name="arrow" :size="11" />
             </a>
         </div>
         <iframe
@@ -223,10 +288,8 @@ const iframeUrl = computed(() => {
             :key="iframeUrl"
             :src="iframeUrl"
             :title="activeTab"
-            class="w-full bg-white"
-            style="height: calc(100vh - 16rem); min-height: 520px;"
+            :style="{ width: '100%', height: 'calc(100vh - 16rem)', minHeight: '520px', background: '#fff', border: 'none' }"
             loading="lazy"
         />
-    </div>
     </div>
 </template>

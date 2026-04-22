@@ -1,91 +1,162 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
-import PageHeader from '@/Components/Admin/PageHeader.vue';
-import DataTableShell from '@/Components/Admin/DataTableShell.vue';
-import DataTable from 'primevue/datatable';
-import Column from 'primevue/column';
-import InputText from 'primevue/inputtext';
-import Button from 'primevue/button';
-import ConfirmDialog from 'primevue/confirmdialog';
-import { useConfirm } from 'primevue/useconfirm';
-import { FilterMatchMode } from '@primevue/core/api';
 import { useI18n } from 'vue-i18n';
+import { useConfirm } from 'primevue/useconfirm';
+import CommandLayout from '@/Layouts/CommandLayout.vue';
+import CmdDataTable, { type Column } from '@/Components/Command/DataTable.vue';
+import Icon from '@/Components/Command/Icon.vue';
+import { useCommandToasts } from '@/composables/useCommandToasts';
 
-defineOptions({ layout: AdminLayout });
+defineOptions({ layout: CommandLayout });
 
 const { t } = useI18n();
+const { push } = useCommandToasts();
+const confirmer = useConfirm();
 
-interface Permission { id: number; name: string; guard_name: string; roles_count: number }
+interface Permission {
+    id: number;
+    name: string;
+    guard_name: string;
+    roles_count: number;
+}
+
 defineProps<{ permissions: Permission[] }>();
 
 const form = useForm({ name: '' });
-const confirm = useConfirm();
-const filters = ref({ global: { value: null as string | null, matchMode: FilterMatchMode.CONTAINS } });
-const searchValue = ref<string>('');
+const search = ref('');
+const sortKey = ref<string>('name');
+const sortDir = ref<'asc' | 'desc'>('asc');
 
-function onSearchInput(v: string) {
-    searchValue.value = v;
-    filters.value.global.value = v || null;
-}
+const columns: Column<Permission>[] = [
+    { key: 'name', label: t('common.name'), sortable: true },
+    { key: 'guard_name', label: t('admin.permissions.guard'), sortable: true, width: '160px', mono: true },
+    { key: 'roles_count', label: t('admin.permissions.roles'), sortable: true, width: '100px', align: 'right', mono: true },
+];
 
 function create() {
-    form.post('/admin/permissions', { onSuccess: () => form.reset() });
+    form.post('/admin/permissions', {
+        onSuccess: () => {
+            form.reset();
+            push(t('admin.permissions.toast_created'), 'success');
+        },
+    });
 }
 
 function destroy(p: Permission) {
-    confirm.require({
-        group: 'admin-permissions',
+    confirmer.require({
         message: t('admin.permissions.confirm_delete', { name: p.name }),
-        header: t('common.confirm'),
+        header: t('common.delete'),
         icon: 'pi pi-exclamation-triangle',
         acceptClass: 'p-button-danger',
-        accept: () => router.delete(`/admin/permissions/${p.id}`),
+        acceptLabel: t('common.delete'),
+        rejectLabel: t('common.cancel'),
+        accept: () => {
+            router.delete(`/admin/permissions/${p.id}`, {
+                onSuccess: () => push(t('admin.permissions.toast_deleted', { name: p.name }), 'danger'),
+            });
+        },
     });
 }
 </script>
 
 <template>
+    <div>
     <Head :title="t('admin.permissions.head_title')" />
-    <ConfirmDialog group="admin-permissions" />
 
-    <PageHeader :title="t('admin.permissions.title')" />
+    <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '14px' }">
+        <div>
+            <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }">
+                {{ t('admin.permissions.title') }}
+            </h1>
+            <div
+                class="cmd-mono"
+                :style="{ marginTop: '3px', fontSize: '11.5px', color: 'var(--fg-mute)' }"
+            >{{ permissions.length }} {{ t('admin.permissions.title').toLowerCase() }}</div>
+        </div>
+    </div>
 
-    <form @submit.prevent="create" class="flex flex-wrap items-start gap-2 mb-6">
-        <InputText v-model="form.name" :placeholder="t('admin.permissions.new_permission')" class="w-80" />
-        <Button type="submit" :label="t('common.add')" icon="pi pi-plus" :loading="form.processing" />
-        <p v-if="form.errors.name" class="text-xs text-red-500 self-center">{{ form.errors.name }}</p>
+    <!-- Quick-add form -->
+    <form
+        @submit.prevent="create"
+        :style="{
+            display: 'flex',
+            gap: '6px',
+            alignItems: 'center',
+            background: 'var(--panel)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-card)',
+            padding: '10px 12px',
+            marginBottom: '12px',
+        }"
+    >
+        <input
+            v-model="form.name"
+            :placeholder="t('admin.permissions.new_permission')"
+            :style="{
+                flex: 1,
+                maxWidth: '320px',
+                background: 'var(--panel2)',
+                border: '1px solid var(--border)',
+                borderRadius: '5px',
+                padding: '6px 10px',
+                color: 'var(--fg)',
+                fontSize: '12px',
+                outline: 'none',
+                fontFamily: 'inherit',
+            }"
+        />
+        <button
+            type="submit"
+            :disabled="form.processing"
+            :style="{
+                background: 'var(--accent)',
+                color: '#fff',
+                border: 'none',
+                padding: '6px 11px',
+                borderRadius: '5px',
+                fontSize: '11.5px',
+                fontWeight: 500,
+                cursor: form.processing ? 'not-allowed' : 'pointer',
+                opacity: form.processing ? 0.6 : 1,
+                fontFamily: 'inherit',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+            }"
+        >
+            <Icon name="plus" :size="12" />
+            {{ t('common.add') }}
+        </button>
+        <span
+            v-if="form.errors.name"
+            :style="{ color: 'var(--danger)', fontSize: '11px', marginLeft: '8px' }"
+        >{{ form.errors.name }}</span>
     </form>
 
-    <DataTableShell
-        :count="permissions.length"
-        :count-label="t('admin.permissions.title').toLowerCase()"
+    <CmdDataTable
+        :rows="permissions"
+        :columns="columns"
+        v-model:search="search"
+        v-model:sort-key="sortKey"
+        v-model:sort-dir="sortDir"
         :search-placeholder="t('admin.permissions.filter')"
-        :search-value="searchValue"
-        @update:search-value="onSearchInput"
+        :search-keys="['name', 'guard_name']"
     >
-        <DataTable
-            :value="permissions"
-            stripedRows
-            removableSort
-            scrollable
-            v-model:filters="filters"
-            :globalFilterFields="['name', 'guard_name']"
-            class="border-0"
-        >
-            <Column field="name" :header="t('common.name')" sortable>
-                <template #body="{ data }">
-                    <span class="font-medium text-gray-900 dark:text-white">{{ data.name }}</span>
-                </template>
-            </Column>
-            <Column field="guard_name" :header="t('admin.permissions.guard')" style="width: 8rem" sortable />
-            <Column field="roles_count" :header="t('admin.permissions.roles')" style="width: 6rem" sortable />
-            <Column :header="t('common.actions')" style="width: 8rem">
-                <template #body="{ data }">
-                    <Button icon="pi pi-trash" size="small" severity="danger" :title="t('common.delete')" @click="destroy(data)" />
-                </template>
-            </Column>
-        </DataTable>
-    </DataTableShell>
+        <template #cell:name="{ row }">
+            <span :style="{ fontWeight: 500, color: 'var(--fg)' }">{{ row.name }}</span>
+        </template>
+
+        <template #actions="{ row }">
+            <button
+                type="button"
+                :title="t('common.delete')"
+                @click="destroy(row)"
+                :style="{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '4px', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }"
+            >
+                <Icon name="trash" :size="12" />
+            </button>
+        </template>
+    </CmdDataTable>
+    </div>
 </template>

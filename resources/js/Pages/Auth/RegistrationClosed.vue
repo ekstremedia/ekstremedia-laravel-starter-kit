@@ -1,20 +1,56 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
+import AuthLayout from '@/Layouts/AuthLayout.vue';
+import AuthCard from '@/Components/Command/AuthCard.vue';
+import Dot from '@/Components/Command/Dot.vue';
+
+defineOptions({ layout: AuthLayout });
 
 const { t } = useI18n();
 </script>
 
 <template>
-    <Head title="Registration closed" />
-    <div class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-dark-950 text-gray-900 dark:text-gray-100 p-6">
-        <div class="max-w-md text-center">
-            <i class="pi pi-lock text-5xl text-amber-500 mb-4"></i>
-            <h1 class="text-2xl font-semibold mb-2">{{ t('auth.registration_closed') }}</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                {{ t('auth.registration_closed_desc') }}
-            </p>
-            <Link href="/login" class="text-indigo-500 hover:underline text-sm">{{ t('auth.back_to_login') }}</Link>
+    <Head :title="t('auth.registration_closed')" />
+
+    <AuthCard
+        :eyebrow="t('auth.registration_closed')"
+        :title="t('auth.registration_closed_desc')"
+    >
+        <div
+            :style="{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '9px 12px',
+                marginBottom: '14px',
+                borderRadius: '5px',
+                background: 'rgba(251,191,36,0.12)',
+                border: '1px solid rgba(251,191,36,0.33)',
+                color: 'var(--fg)',
+                fontSize: '12px',
+            }"
+        >
+            <Dot color="var(--warning)" :size="6" />
+            <span>{{ t('auth.registration_closed_message') }}</span>
         </div>
-    </div>
+
+        <Link
+            href="/login"
+            :style="{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                background: 'var(--accent)',
+                color: '#fff',
+                padding: '10px 14px',
+                borderRadius: '5px',
+                fontSize: '12.5px',
+                fontWeight: 500,
+                textDecoration: 'none',
+                fontFamily: 'inherit',
+            }"
+        >{{ t('auth.back_to_login') }}</Link>
+    </AuthCard>
 </template>

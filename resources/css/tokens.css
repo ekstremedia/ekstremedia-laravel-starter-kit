@@ -1,0 +1,169 @@
+/*
+ * Command design-system tokens.
+ *
+ * Three themes (dark / hc / light), four accents, three densities.
+ * Selected via `data-theme`, `data-accent`, `data-density` on :root.
+ * `.dark` class still drives PrimeVue's dark palette — we keep it in sync
+ * from useTweaks() whenever theme is dark or hc so PrimeVue dialogs /
+ * datatables don't flash a light palette inside a dark Command shell.
+ */
+
+:root {
+    /* Dark (default) */
+    --bg: #0a0c12;
+    --bg2: #07080d;
+    --panel: #0c0f17;
+    --panel2: #0d1018;
+    --fg: #d5d9e5;
+    --fg-dim: rgba(213, 217, 229, 0.60);
+    --fg-mute: rgba(213, 217, 229, 0.40);
+    --border: rgba(255, 255, 255, 0.06);
+    --row-hover: rgba(255, 255, 255, 0.025);
+    --skeleton-highlight: rgba(255, 255, 255, 0.06);
+
+    /* Accent: cobalt (default) */
+    --accent: #4c6fff;
+    --accent-soft: rgba(76, 111, 255, 0.12);
+    --accent-border: rgba(76, 111, 255, 0.33);
+
+    /* Semantic tones (constant across themes) */
+    --success: #5ee59a;
+    --warning: #fbbf24;
+    --danger: #ff8a8a;
+
+    /* Density: comfortable (default) */
+    --pad-page: 16px;
+    --pad-row: 8px;
+
+    /* Radii */
+    --radius-card: 6px;
+    --radius-control: 5px;
+    --radius-chip: 3px;
+
+    /* Chrome */
+    --rail-w: 52px;
+    --topbar-h: 42px;
+    --settings-aside-w: 180px;
+
+    /* Shadows */
+    --shadow-palette: 0 24px 80px rgba(0, 0, 0, 0.5);
+    --shadow-toast: 0 4px 14px rgba(0, 0, 0, 0.3);
+
+    /* Typography */
+    --font-ui: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+
+/* High-contrast theme */
+:root[data-theme='hc'] {
+    --bg: #000;
+    --bg2: #000;
+    --panel: #050608;
+    --panel2: #070a10;
+    --fg: #fff;
+    --fg-dim: rgba(255, 255, 255, 0.70);
+    --fg-mute: rgba(255, 255, 255, 0.45);
+    --border: rgba(255, 255, 255, 0.14);
+    --row-hover: rgba(255, 255, 255, 0.05);
+    --skeleton-highlight: rgba(255, 255, 255, 0.12);
+}
+
+/* Light theme */
+:root[data-theme='light'] {
+    --bg: #f7f7f8;
+    --bg2: #fff;
+    --panel: #fff;
+    --panel2: #fafbfc;
+    --fg: #0f172a;
+    --fg-dim: rgba(15, 23, 42, 0.65);
+    --fg-mute: rgba(15, 23, 42, 0.42);
+    --border: rgba(15, 23, 42, 0.08);
+    --row-hover: rgba(15, 23, 42, 0.03);
+    --shadow-palette: 0 24px 80px rgba(15, 23, 42, 0.18);
+    --shadow-toast: 0 4px 14px rgba(15, 23, 42, 0.12);
+    --skeleton-highlight: rgba(15, 23, 42, 0.08);
+}
+
+/* Accent variants */
+:root[data-accent='emerald'] {
+    --accent: #10b981;
+    --accent-soft: rgba(16, 185, 129, 0.12);
+    --accent-border: rgba(16, 185, 129, 0.33);
+}
+
+:root[data-accent='amber'] {
+    --accent: #f59e0b;
+    --accent-soft: rgba(245, 158, 11, 0.12);
+    --accent-border: rgba(245, 158, 11, 0.33);
+}
+
+:root[data-accent='violet'] {
+    --accent: #8b5cf6;
+    --accent-soft: rgba(139, 92, 246, 0.12);
+    --accent-border: rgba(139, 92, 246, 0.33);
+}
+
+/* Density variants */
+:root[data-density='compact'] {
+    --pad-page: 12px;
+    --pad-row: 6px;
+}
+
+:root[data-density='relaxed'] {
+    --pad-page: 20px;
+    --pad-row: 12px;
+}
+
+/* Keyframes consumed by Command components */
+@keyframes cmdFadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cmdShimmer {
+    0%   { background-position: -200px 0; }
+    100% { background-position: calc(100% + 200px) 0; }
+}
+
+@keyframes cmdToastIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Root shell utility for pages rendered inside CommandLayout — sets base
+ * typography so inline style={{fontFamily}} ports aren't needed on every
+ * descendant. */
+.cmd-shell {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+.cmd-mono { font-family: var(--font-mono); font-feature-settings: 'tnum' 1, 'zero' 0; }
+.cmd-uc   { text-transform: uppercase; letter-spacing: 0.08em; }
+
+.cmd-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+}
+
+.cmd-skeleton {
+    display: inline-block;
+    min-height: 10px;
+    background-color: var(--panel2);
+    background-image: linear-gradient(
+        90deg,
+        transparent 0%,
+        var(--skeleton-highlight) 50%,
+        transparent 100%
+    );
+    background-size: 200px 100%;
+    background-repeat: no-repeat;
+    animation: cmdShimmer 1.2s infinite linear;
+    border-radius: 4px;
+}

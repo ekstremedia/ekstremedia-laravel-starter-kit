@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { onMounted, onUnmounted, ref } from 'vue';
-import { gsap } from 'gsap';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
-import Tag from 'primevue/tag';
-import Button from 'primevue/button';
 import { useI18n } from 'vue-i18n';
+import CommandLayout from '@/Layouts/CommandLayout.vue';
+import Icon, { type IconName } from '@/Components/Command/Icon.vue';
+import Dot from '@/Components/Command/Dot.vue';
 import { formatDateTime } from '@/composables/useDateTime';
 
-defineOptions({ layout: AdminLayout });
+defineOptions({ layout: CommandLayout });
 
 const { t } = useI18n();
 
@@ -29,8 +28,6 @@ const props = defineProps<Props>();
 
 const queueLast = ref(props.health.queue.last);
 const broadcastLast = ref<{ nonce: string; at: string } | null>(null);
-const queueCard = ref<HTMLElement | null>(null);
-const broadcastCard = ref<HTMLElement | null>(null);
 const extensionsOpen = ref(false);
 
 function pingQueue() {
@@ -53,7 +50,6 @@ async function pollQueue() {
         const json = await res.json();
         if (json.last && json.last.nonce !== queueLast.value?.nonce) {
             queueLast.value = json.last;
-            if (queueCard.value) gsap.fromTo(queueCard.value, { backgroundColor: 'rgba(34,197,94,0.25)' }, { backgroundColor: 'transparent', duration: 1.2 });
             break;
         }
     }
@@ -65,7 +61,6 @@ onMounted(() => {
     if (echo) {
         echoChannel = echo.private('admin.health').listen('.ping', (e: { nonce: string; at: string }) => {
             broadcastLast.value = e;
-            if (broadcastCard.value) gsap.fromTo(broadcastCard.value, { backgroundColor: 'rgba(59,130,246,0.25)' }, { backgroundColor: 'transparent', duration: 1.2 });
         });
     }
 });
@@ -74,205 +69,300 @@ onUnmounted(() => {
     if (echo && echoChannel) echo.leave('admin.health');
 });
 
-const driverIcons: Record<string, string> = {
-    broadcast: 'pi-wifi',
-    cache: 'pi-bolt',
-    database: 'pi-database',
-    logs: 'pi-file',
-    mail: 'pi-envelope',
-    queue: 'pi-inbox',
-    session: 'pi-id-card',
-    filesystem: 'pi-folder',
+const driverIcons: Record<string, IconName> = {
+    broadcast: 'server',
+    cache: 'key',
+    database: 'disk',
+    logs: 'log',
+    mail: 'mail',
+    queue: 'server',
+    session: 'user',
+    filesystem: 'disk',
 };
 
-function formatTime(iso: string | undefined) {
-    return formatDateTime(iso);
+function chipStyle(tone: 'success' | 'warning' | 'danger' | 'info' | 'muted') {
+    const colorMap: Record<string, { color: string; bg: string; border: string }> = {
+        success: { color: 'var(--success)', bg: 'rgba(94,229,154,0.12)', border: 'rgba(94,229,154,0.33)' },
+        warning: { color: 'var(--warning)', bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.33)' },
+        danger: { color: 'var(--danger)', bg: 'rgba(255,138,138,0.12)', border: 'rgba(255,138,138,0.33)' },
+        info: { color: 'var(--accent)', bg: 'var(--accent-soft)', border: 'var(--accent-border)' },
+        muted: { color: 'var(--fg-dim)', bg: 'var(--panel2)', border: 'var(--border)' },
+    };
+    const c = colorMap[tone];
+    return {
+        fontSize: '10.5px',
+        color: c.color,
+        background: c.bg,
+        border: `1px solid ${c.border}`,
+        padding: '2px 7px',
+        borderRadius: '3px',
+    };
 }
 </script>
 
 <template>
-    <Head title="System · Admin" />
+    <div>
+    <Head :title="t('admin.system.head_title')" />
 
-    <div class="flex items-center justify-between mb-6">
+    <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '18px' }">
         <div>
-            <h1 class="text-2xl font-semibold">{{ t('admin.system.title') }}</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ t('admin.system.desc') }}</p>
+            <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }">
+                {{ t('admin.system.title') }}
+            </h1>
+            <div
+                class="cmd-mono"
+                :style="{ marginTop: '3px', fontSize: '11.5px', color: 'var(--fg-mute)' }"
+            >{{ t('admin.system.desc') }}</div>
         </div>
     </div>
 
-    <!-- Health row -->
-    <section class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
-        <div ref="queueCard" class="p-6 rounded-2xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 transition-colors">
-            <div class="flex items-start justify-between mb-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center"><i class="pi pi-inbox text-lg"></i></div>
+    <!-- Health cards: queue / broadcast / redis -->
+    <section :style="{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '20px' }">
+        <div class="cmd-card" :style="{ padding: '16px' }">
+            <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }">
+                <div :style="{ display: 'flex', alignItems: 'center', gap: '10px' }">
+                    <div :style="{ width: '30px', height: '30px', borderRadius: '6px', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }">
+                        <Icon name="server" :size="14" />
+                    </div>
                     <div>
-                        <h2 class="font-semibold">{{ t('admin.system.queue') }}</h2>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.system.queue_driver') }}</p>
+                        <div :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">{{ t('admin.system.queue') }}</div>
+                        <div :style="{ fontSize: '11px', color: 'var(--fg-mute)' }">{{ t('admin.system.queue_driver') }}</div>
                     </div>
                 </div>
-                <Tag :value="health.queue.driver" severity="info" />
+                <span :style="chipStyle('info')">{{ health.queue.driver }}</span>
             </div>
-            <p class="text-xs uppercase tracking-wide text-gray-400 mb-1">{{ t('admin.system.last_ping') }}</p>
-            <p v-if="queueLast" class="text-sm font-mono">{{ formatTime(queueLast.at) }}<br><span class="text-xs opacity-60">{{ queueLast.nonce }}</span></p>
-            <p v-else class="text-sm text-gray-400 italic">{{ t('admin.system.no_pings') }}</p>
-            <Button :label="t('admin.system.dispatch_ping')" icon="pi pi-play" size="small" severity="secondary" class="mt-4 w-full" @click="pingQueue" />
+            <div
+                class="cmd-mono cmd-uc"
+                :style="{ fontSize: '9.5px', color: 'var(--fg-mute)', marginBottom: '5px', fontWeight: 500 }"
+            >{{ t('admin.system.last_ping') }}</div>
+            <div v-if="queueLast" class="cmd-mono" :style="{ fontSize: '11.5px', color: 'var(--fg)' }">
+                {{ formatDateTime(queueLast.at) }}
+                <div :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginTop: '2px' }">{{ queueLast.nonce }}</div>
+            </div>
+            <div v-else :style="{ fontSize: '12px', color: 'var(--fg-mute)', fontStyle: 'italic' }">
+                {{ t('admin.system.no_pings') }}
+            </div>
+            <button
+                type="button"
+                @click="pingQueue"
+                :style="{ width: '100%', marginTop: '14px', background: 'transparent', color: 'var(--fg-dim)', border: '1px solid var(--border)', padding: '6px 11px', borderRadius: '5px', fontSize: '11.5px', cursor: 'pointer', fontFamily: 'inherit' }"
+            >{{ t('admin.system.dispatch_ping') }}</button>
         </div>
 
-        <div ref="broadcastCard" class="p-6 rounded-2xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 transition-colors">
-            <div class="flex items-start justify-between mb-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center"><i class="pi pi-wifi text-lg"></i></div>
+        <div class="cmd-card" :style="{ padding: '16px' }">
+            <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }">
+                <div :style="{ display: 'flex', alignItems: 'center', gap: '10px' }">
+                    <div :style="{ width: '30px', height: '30px', borderRadius: '6px', background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.3)', color: '#0ea5e9', display: 'flex', alignItems: 'center', justifyContent: 'center' }">
+                        <Icon name="bell" :size="14" />
+                    </div>
                     <div>
-                        <h2 class="font-semibold">{{ t('admin.system.broadcast') }}</h2>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.system.broadcast_driver') }}</p>
+                        <div :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">{{ t('admin.system.broadcast') }}</div>
+                        <div :style="{ fontSize: '11px', color: 'var(--fg-mute)' }">{{ t('admin.system.broadcast_driver') }}</div>
                     </div>
                 </div>
-                <Tag :value="health.broadcast.driver" severity="info" />
+                <span :style="chipStyle('info')">{{ health.broadcast.driver }}</span>
             </div>
-            <p class="text-xs uppercase tracking-wide text-gray-400 mb-1">{{ t('admin.system.last_event') }}</p>
-            <p v-if="broadcastLast" class="text-sm font-mono">{{ formatTime(broadcastLast.at) }}<br><span class="text-xs opacity-60">{{ broadcastLast.nonce }}</span></p>
-            <p v-else class="text-sm text-gray-400 italic">{{ t('admin.system.listening_on') }} <code>admin.health</code>…</p>
-            <Button :label="t('admin.system.broadcast_ping')" icon="pi pi-send" size="small" severity="secondary" class="mt-4 w-full" @click="pingBroadcast" />
+            <div
+                class="cmd-mono cmd-uc"
+                :style="{ fontSize: '9.5px', color: 'var(--fg-mute)', marginBottom: '5px', fontWeight: 500 }"
+            >{{ t('admin.system.last_event') }}</div>
+            <div v-if="broadcastLast" class="cmd-mono" :style="{ fontSize: '11.5px', color: 'var(--fg)' }">
+                {{ formatDateTime(broadcastLast.at) }}
+                <div :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginTop: '2px' }">{{ broadcastLast.nonce }}</div>
+            </div>
+            <div v-else :style="{ fontSize: '12px', color: 'var(--fg-mute)', fontStyle: 'italic' }">
+                {{ t('admin.system.listening_on') }} <code class="cmd-mono">admin.health</code>…
+            </div>
+            <button
+                type="button"
+                @click="pingBroadcast"
+                :style="{ width: '100%', marginTop: '14px', background: 'transparent', color: 'var(--fg-dim)', border: '1px solid var(--border)', padding: '6px 11px', borderRadius: '5px', fontSize: '11.5px', cursor: 'pointer', fontFamily: 'inherit' }"
+            >{{ t('admin.system.broadcast_ping') }}</button>
         </div>
 
-        <div class="p-6 rounded-2xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800">
-            <div class="flex items-start justify-between mb-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center"><i class="pi pi-database text-lg"></i></div>
+        <div class="cmd-card" :style="{ padding: '16px' }">
+            <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }">
+                <div :style="{ display: 'flex', alignItems: 'center', gap: '10px' }">
+                    <div :style="{ width: '30px', height: '30px', borderRadius: '6px', background: 'rgba(255,138,138,0.1)', border: '1px solid rgba(255,138,138,0.3)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }">
+                        <Icon name="disk" :size="14" />
+                    </div>
                     <div>
-                        <h2 class="font-semibold">{{ t('admin.system.redis') }}</h2>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.system.redis_driver') }}</p>
+                        <div :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">{{ t('admin.system.redis') }}</div>
+                        <div :style="{ fontSize: '11px', color: 'var(--fg-mute)' }">{{ t('admin.system.redis_driver') }}</div>
                     </div>
                 </div>
-                <Tag :value="health.redis.ok ? t('admin.system.connected') : t('admin.system.down')" :severity="health.redis.ok ? 'success' : 'danger'" />
+                <span :style="chipStyle(health.redis.ok ? 'success' : 'danger')">
+                    {{ health.redis.ok ? t('admin.system.connected') : t('admin.system.down') }}
+                </span>
             </div>
-            <p class="text-xs uppercase tracking-wide text-gray-400 mb-1">PING</p>
-            <p v-if="health.redis.ok" class="text-2xl font-mono text-emerald-500">→ {{ health.redis.pong }}</p>
-            <p v-else class="text-sm text-red-500 font-mono">{{ health.redis.error }}</p>
+            <div
+                class="cmd-mono cmd-uc"
+                :style="{ fontSize: '9.5px', color: 'var(--fg-mute)', marginBottom: '5px', fontWeight: 500 }"
+            >PING</div>
+            <div v-if="health.redis.ok" class="cmd-mono" :style="{ fontSize: '22px', fontWeight: 600, color: 'var(--success)' }">
+                → {{ health.redis.pong }}
+            </div>
+            <div v-else class="cmd-mono" :style="{ fontSize: '12px', color: 'var(--danger)' }">
+                {{ health.redis.error }}
+            </div>
         </div>
     </section>
 
-    <!-- Key-stat strip -->
-    <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div class="p-5 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-indigo-500/5 border border-indigo-500/20">
-            <div class="flex items-center gap-2 text-xs uppercase tracking-wide text-indigo-400 mb-2"><i class="pi pi-code"></i>{{ t('admin.system.php') }}</div>
-            <p class="text-2xl font-semibold font-mono">{{ php.version }}</p>
-            <p class="text-xs text-gray-500 mt-1">{{ php.sapi }}</p>
-        </div>
-        <div class="p-5 rounded-2xl bg-gradient-to-br from-rose-500/10 to-rose-500/5 border border-rose-500/20">
-            <div class="flex items-center gap-2 text-xs uppercase tracking-wide text-rose-400 mb-2"><i class="pi pi-box"></i>{{ t('admin.system.laravel') }}</div>
-            <p class="text-2xl font-semibold font-mono">{{ laravel.version }}</p>
-            <p class="text-xs text-gray-500 mt-1">{{ laravel.environment }}{{ laravel.debug ? ' · debug' : '' }}</p>
-        </div>
-        <div class="p-5 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20">
-            <div class="flex items-center gap-2 text-xs uppercase tracking-wide text-emerald-400 mb-2"><i class="pi pi-server"></i>{{ t('admin.system.host') }}</div>
-            <p class="text-xl font-semibold font-mono truncate">{{ system.hostname }}</p>
-            <p class="text-xs text-gray-500 mt-1">{{ system.os }}</p>
-        </div>
-        <div class="p-5 rounded-2xl bg-gradient-to-br from-amber-500/10 to-amber-500/5 border border-amber-500/20">
-            <div class="flex items-center gap-2 text-xs uppercase tracking-wide text-amber-400 mb-2"><i class="pi pi-th-large"></i>{{ t('admin.system.extensions') }}</div>
-            <p class="text-2xl font-semibold">{{ extensions.length }}</p>
-            <p class="text-xs text-gray-500 mt-1">loaded</p>
+    <!-- Key-stat strip: PHP / Laravel / host / extensions -->
+    <section
+        :style="{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+            gap: '1px',
+            background: 'var(--border)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-card)',
+            overflow: 'hidden',
+            marginBottom: '20px',
+        }"
+    >
+        <div
+            v-for="kpi in [
+                { label: t('admin.system.php'), value: php.version, hint: php.sapi },
+                { label: t('admin.system.laravel'), value: laravel.version, hint: `${laravel.environment}${laravel.debug ? ' · debug' : ''}` },
+                { label: t('admin.system.host'), value: system.hostname, hint: system.os },
+                { label: t('admin.system.extensions'), value: extensions.length, hint: 'loaded' },
+            ]"
+            :key="String(kpi.label)"
+            :style="{ background: 'var(--panel)', padding: '14px 16px' }"
+        >
+            <div class="cmd-mono cmd-uc" :style="{ fontSize: '9.5px', color: 'var(--fg-mute)', marginBottom: '6px', fontWeight: 500 }">{{ kpi.label }}</div>
+            <div class="cmd-mono" :style="{ fontSize: '18px', fontWeight: 600, color: 'var(--fg)', letterSpacing: '-0.01em', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }">{{ kpi.value }}</div>
+            <div :style="{ fontSize: '10.5px', color: 'var(--fg-mute)', marginTop: '4px' }">{{ kpi.hint }}</div>
         </div>
     </section>
 
     <!-- Drivers grid -->
-    <section class="mb-8">
-        <h2 class="text-sm uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold mb-3 flex items-center gap-2">
-            <i class="pi pi-sitemap"></i> {{ t('admin.system.drivers') }}
-        </h2>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div v-for="(v, k) in drivers" :key="k"
-                 class="flex items-center gap-3 p-4 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800">
-                <div class="w-9 h-9 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
-                    <i :class="['pi', driverIcons[k] || 'pi-cog']"></i>
+    <section :style="{ marginBottom: '20px' }">
+        <h2
+            class="cmd-mono cmd-uc"
+            :style="{ fontSize: '10px', color: 'var(--fg-mute)', fontWeight: 500, marginBottom: '10px', letterSpacing: '0.06em' }"
+        >{{ t('admin.system.drivers') }}</h2>
+        <div :style="{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '10px' }">
+            <div
+                v-for="(v, k) in drivers"
+                :key="k"
+                class="cmd-card"
+                :style="{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px' }"
+            >
+                <div :style="{ width: '30px', height: '30px', borderRadius: '6px', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }">
+                    <Icon :name="(driverIcons[k] || 'cog') as IconName" :size="14" />
                 </div>
-                <div class="min-w-0">
-                    <p class="text-xs text-gray-500 uppercase tracking-wide">{{ k }}</p>
-                    <p class="font-mono text-sm truncate">{{ v }}</p>
+                <div :style="{ minWidth: 0 }">
+                    <div class="cmd-mono cmd-uc" :style="{ fontSize: '9.5px', color: 'var(--fg-mute)' }">{{ k }}</div>
+                    <div class="cmd-mono" :style="{ fontSize: '12px', color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">{{ v }}</div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Cache status + PHP limits + Laravel detail -->
-    <section class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
-        <div class="p-6 rounded-2xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800">
-            <h3 class="font-semibold mb-4 flex items-center gap-2"><i class="pi pi-bolt text-indigo-500"></i>{{ t('admin.system.cache_status') }}</h3>
-            <ul class="space-y-2">
-                <li v-for="(v, k) in cache_status" :key="k" class="flex items-center justify-between">
-                    <span class="text-sm capitalize">{{ k }}</span>
-                    <Tag :value="v ? t('admin.system.cached') : t('admin.system.not_cached')" :severity="v ? 'success' : 'secondary'" />
+    <!-- Cache + PHP limits + Laravel detail -->
+    <section :style="{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '20px' }">
+        <div class="cmd-card" :style="{ padding: '16px' }">
+            <div :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--fg)', marginBottom: '12px' }">
+                {{ t('admin.system.cache_status') }}
+            </div>
+            <ul :style="{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }">
+                <li
+                    v-for="(v, k) in cache_status"
+                    :key="k"
+                    :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', textTransform: 'capitalize', color: 'var(--fg)' }"
+                >
+                    <span>{{ k }}</span>
+                    <span :style="chipStyle(v ? 'success' : 'muted')">
+                        {{ v ? t('admin.system.cached') : t('admin.system.not_cached') }}
+                    </span>
                 </li>
             </ul>
         </div>
 
-        <div class="p-6 rounded-2xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800">
-            <h3 class="font-semibold mb-4 flex items-center gap-2"><i class="pi pi-sliders-h text-indigo-500"></i>{{ t('admin.system.php_limits') }}</h3>
-            <dl class="space-y-2 text-sm">
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.upload_max') }}</dt><dd class="font-mono">{{ php.upload_max_filesize }}</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.post_max') }}</dt><dd class="font-mono">{{ php.post_max_size }}</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.memory_limit') }}</dt><dd class="font-mono">{{ php.memory_limit }}</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.execution_time') }}</dt><dd class="font-mono">{{ php.max_execution_time }}s</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.max_uploads') }}</dt><dd class="font-mono">{{ php.max_file_uploads }}</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.zend') }}</dt><dd class="font-mono">{{ php.zend_version }}</dd></div>
+        <div class="cmd-card" :style="{ padding: '16px' }">
+            <div :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--fg)', marginBottom: '12px' }">
+                {{ t('admin.system.php_limits') }}
+            </div>
+            <dl :style="{ display: 'flex', flexDirection: 'column', gap: '7px', margin: 0, fontSize: '12px' }">
+                <div v-for="row in [
+                    { label: t('admin.system.upload_max'), value: php.upload_max_filesize },
+                    { label: t('admin.system.post_max'), value: php.post_max_size },
+                    { label: t('admin.system.memory_limit'), value: php.memory_limit },
+                    { label: t('admin.system.execution_time'), value: `${php.max_execution_time}s` },
+                    { label: t('admin.system.max_uploads'), value: php.max_file_uploads },
+                    { label: t('admin.system.zend'), value: php.zend_version },
+                ]" :key="row.label" :style="{ display: 'flex', justifyContent: 'space-between' }">
+                    <dt :style="{ color: 'var(--fg-mute)' }">{{ row.label }}</dt>
+                    <dd class="cmd-mono" :style="{ color: 'var(--fg)', margin: 0 }">{{ row.value }}</dd>
+                </div>
             </dl>
         </div>
 
-        <div class="p-6 rounded-2xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800">
-            <h3 class="font-semibold mb-4 flex items-center gap-2"><i class="pi pi-box text-indigo-500"></i>{{ t('admin.system.laravel_runtime') }}</h3>
-            <dl class="space-y-2 text-sm">
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.app_name') }}</dt><dd class="font-mono truncate max-w-[60%]">{{ laravel.app_name }}</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.environment') }}</dt><dd><Tag :value="String(laravel.environment)" :severity="laravel.environment === 'production' ? 'danger' : 'success'" /></dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.debug') }}</dt><dd><Tag :value="laravel.debug ? t('admin.system.debug_on') : t('admin.system.debug_off')" :severity="laravel.debug ? 'warn' : 'success'" /></dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.maintenance_mode') }}</dt><dd><Tag :value="laravel.maintenance ? t('admin.system.debug_on') : t('admin.system.debug_off')" :severity="laravel.maintenance ? 'warn' : 'secondary'" /></dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.timezone') }}</dt><dd class="font-mono">{{ laravel.timezone }}</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.locale') }}</dt><dd class="font-mono">{{ laravel.locale }}</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.composer') }}</dt><dd class="font-mono">{{ laravel.composer_version }}</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.storage_link') }}</dt><dd><Tag :value="laravel.storage_linked ? t('admin.system.linked') : t('admin.system.missing')" :severity="laravel.storage_linked ? 'success' : 'warn'" /></dd></div>
+        <div class="cmd-card" :style="{ padding: '16px' }">
+            <div :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--fg)', marginBottom: '12px' }">
+                {{ t('admin.system.laravel_runtime') }}
+            </div>
+            <dl :style="{ display: 'flex', flexDirection: 'column', gap: '7px', margin: 0, fontSize: '12px' }">
+                <div :style="{ display: 'flex', justifyContent: 'space-between' }"><dt :style="{ color: 'var(--fg-mute)' }">{{ t('admin.system.app_name') }}</dt><dd class="cmd-mono" :style="{ color: 'var(--fg)', margin: 0, maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">{{ laravel.app_name }}</dd></div>
+                <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }"><dt :style="{ color: 'var(--fg-mute)' }">{{ t('admin.system.environment') }}</dt><dd :style="{ margin: 0 }"><span :style="chipStyle(laravel.environment === 'production' ? 'danger' : 'success')">{{ laravel.environment }}</span></dd></div>
+                <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }"><dt :style="{ color: 'var(--fg-mute)' }">{{ t('admin.system.debug') }}</dt><dd :style="{ margin: 0 }"><span :style="chipStyle(laravel.debug ? 'warning' : 'success')">{{ laravel.debug ? t('admin.system.debug_on') : t('admin.system.debug_off') }}</span></dd></div>
+                <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }"><dt :style="{ color: 'var(--fg-mute)' }">{{ t('admin.system.maintenance_mode') }}</dt><dd :style="{ margin: 0 }"><span :style="chipStyle(laravel.maintenance ? 'warning' : 'muted')">{{ laravel.maintenance ? t('admin.system.debug_on') : t('admin.system.debug_off') }}</span></dd></div>
+                <div :style="{ display: 'flex', justifyContent: 'space-between' }"><dt :style="{ color: 'var(--fg-mute)' }">{{ t('admin.system.timezone') }}</dt><dd class="cmd-mono" :style="{ color: 'var(--fg)', margin: 0 }">{{ laravel.timezone }}</dd></div>
+                <div :style="{ display: 'flex', justifyContent: 'space-between' }"><dt :style="{ color: 'var(--fg-mute)' }">{{ t('admin.system.locale') }}</dt><dd class="cmd-mono" :style="{ color: 'var(--fg)', margin: 0 }">{{ laravel.locale }}</dd></div>
+                <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }"><dt :style="{ color: 'var(--fg-mute)' }">{{ t('admin.system.storage_link') }}</dt><dd :style="{ margin: 0 }"><span :style="chipStyle(laravel.storage_linked ? 'success' : 'warning')">{{ laravel.storage_linked ? t('admin.system.linked') : t('admin.system.missing') }}</span></dd></div>
             </dl>
         </div>
     </section>
 
-    <!-- Host row -->
-    <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-        <div class="p-6 rounded-2xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800">
-            <h3 class="font-semibold mb-4 flex items-center gap-2"><i class="pi pi-server text-indigo-500"></i>{{ t('admin.system.host_section') }}</h3>
-            <dl class="space-y-2 text-sm">
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.os_family') }}</dt><dd class="font-mono">{{ system.os_family }}</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.hostname') }}</dt><dd class="font-mono">{{ system.hostname }}</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.server_software') }}</dt><dd class="font-mono truncate max-w-[60%]">{{ system.server_software }}</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.document_root') }}</dt><dd class="font-mono text-xs truncate max-w-[60%]">{{ system.document_root }}</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.app_url') }}</dt><dd class="font-mono text-xs truncate max-w-[60%]">{{ laravel.url }}</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">{{ t('admin.system.ini_file') }}</dt><dd class="font-mono text-xs truncate max-w-[60%]">{{ php.ini_loaded_file }}</dd></div>
+    <!-- Host + extensions -->
+    <section :style="{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }">
+        <div class="cmd-card" :style="{ padding: '16px' }">
+            <div :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--fg)', marginBottom: '12px' }">
+                {{ t('admin.system.host_section') }}
+            </div>
+            <dl :style="{ display: 'flex', flexDirection: 'column', gap: '7px', margin: 0, fontSize: '12px' }">
+                <div v-for="row in [
+                    { label: t('admin.system.os_family'), value: system.os_family },
+                    { label: t('admin.system.hostname'), value: system.hostname },
+                    { label: t('admin.system.server_software'), value: system.server_software },
+                    { label: t('admin.system.document_root'), value: system.document_root },
+                    { label: t('admin.system.app_url'), value: laravel.url },
+                    { label: t('admin.system.ini_file'), value: php.ini_loaded_file },
+                ]" :key="row.label" :style="{ display: 'flex', justifyContent: 'space-between', gap: '10px' }">
+                    <dt :style="{ color: 'var(--fg-mute)', flexShrink: 0 }">{{ row.label }}</dt>
+                    <dd class="cmd-mono" :style="{ color: 'var(--fg)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '11px' }">{{ row.value }}</dd>
+                </div>
             </dl>
         </div>
 
-        <div class="p-6 rounded-2xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="font-semibold flex items-center gap-2"><i class="pi pi-th-large text-indigo-500"></i>{{ t('admin.system.loaded_extensions') }}
-                    <Tag :value="String(extensions.length)" severity="secondary" />
-                </h3>
-                <button @click="extensionsOpen = !extensionsOpen" class="text-xs text-indigo-500 hover:underline">
-                    {{ extensionsOpen ? t('admin.system.hide') : t('admin.system.show_all') }}
-                </button>
+        <div class="cmd-card" :style="{ padding: '16px' }">
+            <div :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }">
+                <div :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--fg)', display: 'flex', alignItems: 'center', gap: '8px' }">
+                    {{ t('admin.system.loaded_extensions') }}
+                    <span :style="chipStyle('muted')">{{ extensions.length }}</span>
+                </div>
+                <button
+                    type="button"
+                    @click="extensionsOpen = !extensionsOpen"
+                    :style="{ background: 'transparent', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: '11.5px', fontFamily: 'inherit' }"
+                >{{ extensionsOpen ? t('admin.system.hide') : t('admin.system.show_all') }}</button>
             </div>
-            <div v-if="extensionsOpen" class="flex flex-wrap gap-1 max-h-64 overflow-y-auto">
-                <span v-for="e in extensions" :key="e"
-                      class="px-2 py-0.5 rounded-md text-xs font-mono bg-gray-100 dark:bg-dark-800 text-gray-700 dark:text-gray-300">
-                    {{ e }}
-                </span>
-            </div>
-            <div v-else class="flex flex-wrap gap-1">
-                <span v-for="e in extensions.slice(0, 24)" :key="e"
-                      class="px-2 py-0.5 rounded-md text-xs font-mono bg-gray-100 dark:bg-dark-800 text-gray-700 dark:text-gray-300">
-                    {{ e }}
-                </span>
-                <span v-if="extensions.length > 24" class="px-2 py-0.5 rounded-md text-xs text-gray-400">
-                    {{ t('admin.system.more', { n: extensions.length - 24 }) }}
-                </span>
+            <div :style="{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxHeight: extensionsOpen ? '280px' : 'auto', overflowY: extensionsOpen ? 'auto' : 'visible' }">
+                <span
+                    v-for="e in extensionsOpen ? extensions : extensions.slice(0, 24)"
+                    :key="e"
+                    class="cmd-mono"
+                    :style="{ fontSize: '10px', padding: '1px 6px', background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '3px', color: 'var(--fg-dim)' }"
+                >{{ e }}</span>
+                <span
+                    v-if="!extensionsOpen && extensions.length > 24"
+                    class="cmd-mono"
+                    :style="{ fontSize: '10px', padding: '1px 6px', color: 'var(--fg-mute)' }"
+                >{{ t('admin.system.more', { n: extensions.length - 24 }) }}</span>
             </div>
         </div>
     </section>
+    </div>
 </template>

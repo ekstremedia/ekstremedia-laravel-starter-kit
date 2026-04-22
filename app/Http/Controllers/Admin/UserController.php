@@ -17,6 +17,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -75,7 +76,45 @@ class UserController extends Controller
         return Inertia::render('Admin/Users/Index', [
             'users' => $users,
             'filters' => ['search' => $search, 'sort' => $sort, 'direction' => $direction],
+            'allRoles' => Role::orderBy('name')->pluck('name')->all(),
+            'userStats' => [
+                'total' => User::count(),
+                'active' => Schema::hasColumn('users', 'banned_at')
+                    ? User::whereNull('banned_at')->count()
+                    : User::count(),
+            ],
         ]);
+    }
+
+    public function setRole(Request $request, User $user): RedirectResponse
+    {
+        if ($user->id === $request->user()->id) {
+            return back()->with('error', 'You cannot change your own role.');
+        }
+
+        $data = $request->validate([
+            'role' => ['required', 'string', Rule::exists('roles', 'name')],
+        ]);
+
+        // Prevent demoting the last admin — the system must always have at
+        // least one Admin to avoid a lockout state.
+        if ($user->hasRole('Admin') && $data['role'] !== 'Admin') {
+            $remainingAdmins = User::role('Admin')->where('id', '!=', $user->id)->count();
+            if ($remainingAdmins === 0) {
+                return back()->with('error', 'Cannot demote the last admin.');
+            }
+        }
+
+        $before = $user->getRoleNames()->all();
+        $user->syncRoles([$data['role']]);
+
+        activity('user')
+            ->performedOn($user)
+            ->withProperties(['before' => $before, 'after' => [$data['role']]])
+            ->event('role_changed')
+            ->log("Role changed to {$data['role']} for {$user->email}");
+
+        return back()->with('success', __('flash.users.role_updated', ['role' => $data['role']]));
     }
 
     public function setQuota(Request $request, User $user): RedirectResponse

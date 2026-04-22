@@ -1,0 +1,330 @@
+<script setup lang="ts">
+/*
+ * Persistent left rail. 52 px by default, 180 px when the user pins it
+ * expanded via the chevron at the bottom. Expanded state persists to
+ * starter_kit_settings → rail_expanded.
+ *
+ * Active item: accent-soft tile + 2×20 px accent bar at left: -10 when
+ * collapsed. Hover tooltip appears only in collapsed mode; in expanded
+ * mode the labels sit inline next to each icon.
+ */
+import { computed, ref } from 'vue';
+import { Link, usePage } from '@inertiajs/vue3';
+import { useI18n } from 'vue-i18n';
+import type { PageProps } from '@/types';
+import { useTweaks } from '@/composables/useTweaks';
+import Icon, { type IconName } from './Icon.vue';
+
+interface RailItem {
+    id: string;
+    href: string;
+    label: string;
+    icon: IconName;
+    kb?: string;
+    match: (path: string) => boolean;
+    hideWhen?: () => boolean;
+}
+
+type RailEntry = RailItem | { separator: true; key: string };
+
+const { t } = useI18n();
+const page = usePage<PageProps>();
+const currentPath = computed(() => page.url.split('?')[0]);
+const tenancyEnabled = computed(() => page.props.tenancy?.enabled ?? false);
+const user = computed(() => page.props.auth?.user);
+const isAdmin = computed(() => (user.value?.roles ?? []).includes('Admin'));
+const chatEnabled = computed(() => page.props.chat?.enabled ?? false);
+const customer = computed(() => page.props.customer);
+const customerSlug = computed(() => customer.value?.slug ?? null);
+const filesEnabled = computed(() => customer.value?.files_feature_enabled ?? false);
+const { state, toggleRail } = useTweaks();
+const expanded = computed(() => state.value.railExpanded);
+
+const initials = computed(() =>
+    ((user.value?.first_name?.[0] ?? '') + (user.value?.last_name?.[0] ?? '')).toUpperCase() || '??',
+);
+
+const items = computed<RailEntry[]>(() => {
+    const dashboardHref = customerSlug.value ? `/c/${customerSlug.value}/dashboard` : '/app';
+    const filesHref = customerSlug.value ? `/c/${customerSlug.value}/files` : '/app';
+
+    const entries: RailEntry[] = [
+        { id: 'home', href: '/home', label: t('rail.home'), icon: 'user', kb: 'H', match: (p) => p === '/home' || p === '/' },
+        { id: 'my-dashboard', href: dashboardHref, label: t('rail.dashboard'), icon: 'home', match: (p) => p.startsWith('/c/') && p.includes('/dashboard') },
+        { id: 'files', href: filesHref, label: t('rail.files'), icon: 'disk', match: (p) => p.startsWith('/c/') && p.includes('/files'), hideWhen: () => !customerSlug.value || !filesEnabled.value },
+        { id: 'chat', href: '/chat', label: t('rail.chat'), icon: 'mail', match: (p) => p.startsWith('/chat'), hideWhen: () => !chatEnabled.value },
+    ];
+
+    if (isAdmin.value) {
+        entries.push(
+            { separator: true, key: 's1' },
+            { id: 'dashboard', href: '/admin', label: t('rail.admin_overview'), icon: 'home', kb: 'D', match: (p) => p === '/admin' },
+            { id: 'users', href: '/admin/users', label: t('rail.users'), icon: 'users', kb: 'U', match: (p) => p.startsWith('/admin/users') },
+            { id: 'customers', href: '/admin/customers', label: t('rail.customers'), icon: 'customer', match: (p) => p.startsWith('/admin/customers'), hideWhen: () => !tenancyEnabled.value },
+            { id: 'roles', href: '/admin/roles', label: t('rail.roles'), icon: 'role', match: (p) => p.startsWith('/admin/roles') },
+            { id: 'perms', href: '/admin/permissions', label: t('rail.permissions'), icon: 'key', match: (p) => p.startsWith('/admin/permissions') },
+            { separator: true, key: 's2' },
+            { id: 'settings', href: '/admin/settings', label: t('rail.app_settings'), icon: 'cog', kb: 'A', match: (p) => p === '/admin/settings' },
+            { id: 'mail', href: '/admin/mail', label: t('rail.mail'), icon: 'mail', match: (p) => p.startsWith('/admin/mail') },
+            { id: 'storage', href: '/admin/storage', label: t('rail.storage'), icon: 'disk', match: (p) => p.startsWith('/admin/storage') },
+            { id: 'backups', href: '/admin/backups', label: t('rail.backups'), icon: 'shield', match: (p) => p.startsWith('/admin/backups') },
+            { id: 'server', href: '/admin/system', label: t('rail.server'), icon: 'server', match: (p) => p.startsWith('/admin/system') || p.startsWith('/admin/health') },
+            { separator: true, key: 's3' },
+            { id: 'logs', href: '/admin/monitoring', label: t('rail.logs'), icon: 'log', match: (p) => p.startsWith('/admin/monitoring') || p.startsWith('/admin/activity') },
+        );
+    }
+
+    return entries;
+});
+
+const visibleItems = computed(() =>
+    items.value.filter((entry) => ('separator' in entry) ? true : !entry.hideWhen?.()),
+);
+
+const hoverId = ref<string | null>(null);
+const isItem = (entry: RailEntry): entry is RailItem => !('separator' in entry);
+</script>
+
+<template>
+    <aside
+        class="cmd-rail"
+        :class="{ 'is-expanded': expanded }"
+        role="navigation"
+        :aria-label="t('rail.aria_label')"
+        :style="{
+            width: expanded ? '180px' : '52px',
+            background: 'var(--bg2)',
+            borderRight: '1px solid var(--border)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: expanded ? 'stretch' : 'center',
+            padding: expanded ? '12px 10px' : '12px 0',
+            flexShrink: 0,
+            alignSelf: 'stretch',
+            transition: 'width 0.14s ease-out, padding 0.14s ease-out',
+            overflow: 'hidden',
+        }"
+    >
+        <Link
+            href="/home"
+            :title="'Min side'"
+            :style="{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '10px',
+                height: '30px',
+                minWidth: '30px',
+                padding: expanded ? '0 6px' : '0',
+                justifyContent: expanded ? 'flex-start' : 'center',
+                borderRadius: '6px',
+                background: 'var(--accent)',
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: '12px',
+                marginBottom: '14px',
+                fontFamily: 'var(--font-mono)',
+                textDecoration: 'none',
+                alignSelf: expanded ? 'stretch' : 'center',
+                width: expanded ? 'auto' : '30px',
+                overflow: 'hidden',
+            }"
+        >
+            <span :style="{ flexShrink: 0 }">SK</span>
+            <span
+                v-if="expanded"
+                :style="{ fontSize: '12px', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }"
+            >Starter Kit</span>
+        </Link>
+
+        <template v-for="entry in visibleItems" :key="isItem(entry) ? entry.id : entry.key">
+            <div
+                v-if="!isItem(entry)"
+                :style="{ height: '1px', background: 'var(--border)', margin: '6px 0', width: expanded ? '100%' : '20px', alignSelf: expanded ? 'stretch' : 'center' }"
+            />
+            <Link
+                v-else
+                :href="entry.href"
+                @mouseenter="hoverId = entry.id"
+                @mouseleave="hoverId = null"
+                :style="{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    height: '34px',
+                    minWidth: '34px',
+                    padding: expanded ? '0 10px' : '0',
+                    justifyContent: expanded ? 'flex-start' : 'center',
+                    borderRadius: '6px',
+                    marginBottom: '2px',
+                    color: entry.match(currentPath) ? 'var(--fg)' : 'var(--fg-mute)',
+                    background: entry.match(currentPath) ? 'var(--accent-soft)' : 'transparent',
+                    position: 'relative',
+                    transition: 'background 0.12s, color 0.12s',
+                    textDecoration: 'none',
+                    width: expanded ? 'auto' : '34px',
+                    alignSelf: expanded ? 'stretch' : 'center',
+                }"
+                class="cmd-rail-item"
+            >
+                <Icon :name="entry.icon" :size="15" :style="{ flexShrink: 0 }" />
+
+                <span
+                    v-if="entry.match(currentPath)"
+                    :style="{
+                        position: 'absolute',
+                        left: expanded ? '-11px' : '-10px',
+                        top: '6px',
+                        bottom: '6px',
+                        width: '2px',
+                        background: 'var(--accent)',
+                        borderRadius: '2px',
+                    }"
+                />
+
+                <!-- Inline label when expanded. -->
+                <span
+                    v-if="expanded"
+                    :style="{
+                        fontSize: '12px',
+                        fontWeight: entry.match(currentPath) ? 500 : 400,
+                        flex: 1,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                    }"
+                >{{ entry.label }}</span>
+                <kbd
+                    v-if="expanded && state.showKbdHints && entry.kb"
+                    class="cmd-mono"
+                    :style="{
+                        fontSize: '9.5px',
+                        padding: '1px 5px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '3px',
+                        color: 'var(--fg-dim)',
+                        background: 'var(--bg)',
+                        flexShrink: 0,
+                    }"
+                >G {{ entry.kb }}</kbd>
+
+                <!-- Floating tooltip only in collapsed mode. -->
+                <span
+                    v-if="!expanded && hoverId === entry.id"
+                    :style="{
+                        position: 'absolute',
+                        left: '44px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'var(--panel2)',
+                        color: 'var(--fg)',
+                        padding: '5px 10px',
+                        borderRadius: '5px',
+                        fontSize: '11.5px',
+                        whiteSpace: 'nowrap',
+                        zIndex: 30,
+                        border: '1px solid var(--border)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        pointerEvents: 'none',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                    }"
+                >
+                    {{ entry.label }}
+                    <kbd
+                        v-if="state.showKbdHints && entry.kb"
+                        class="cmd-mono"
+                        :style="{
+                            fontSize: '9.5px',
+                            padding: '1px 5px',
+                            border: '1px solid var(--border)',
+                            borderRadius: '3px',
+                            color: 'var(--fg-dim)',
+                            background: 'var(--bg)',
+                        }"
+                    >G {{ entry.kb }}</kbd>
+                </span>
+            </Link>
+        </template>
+
+        <div style="flex: 1" />
+
+        <!-- Expand / collapse toggle pinned above the avatar. -->
+        <button
+            type="button"
+            @click="toggleRail"
+            :title="expanded ? t('rail.collapse') : t('rail.expand')"
+            :aria-label="expanded ? t('rail.collapse') : t('rail.expand')"
+            :aria-expanded="expanded"
+            :style="{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                height: '28px',
+                padding: expanded ? '0 10px' : '0',
+                justifyContent: expanded ? 'flex-start' : 'center',
+                borderRadius: '6px',
+                background: 'transparent',
+                border: '1px solid var(--border)',
+                color: 'var(--fg-mute)',
+                cursor: 'pointer',
+                marginBottom: '8px',
+                width: expanded ? 'auto' : '28px',
+                minWidth: '28px',
+                alignSelf: expanded ? 'stretch' : 'center',
+                fontFamily: 'inherit',
+            }"
+            class="cmd-rail-toggle"
+        >
+            <span :style="{ display: 'flex', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.14s' }">
+                <Icon name="chevR" :size="11" />
+            </span>
+            <span
+                v-if="expanded"
+                class="cmd-mono cmd-uc"
+                :style="{ fontSize: '10px', letterSpacing: '0.06em' }"
+            >{{ t('rail.collapse_label') }}</span>
+        </button>
+
+        <Link
+            href="/profile"
+            :title="user?.full_name ?? ''"
+            :style="{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                height: '34px',
+                padding: expanded ? '0 6px' : '0',
+                justifyContent: expanded ? 'flex-start' : 'center',
+                borderRadius: expanded ? '6px' : '50%',
+                background: 'var(--accent-soft)',
+                border: '1px solid var(--accent-border)',
+                color: 'var(--accent)',
+                fontSize: '10px',
+                fontWeight: 700,
+                fontFamily: 'var(--font-mono)',
+                textDecoration: 'none',
+                width: expanded ? 'auto' : '28px',
+                minWidth: '28px',
+                alignSelf: expanded ? 'stretch' : 'center',
+                overflow: 'hidden',
+            }"
+        >
+            <span :style="{ flexShrink: 0 }">{{ initials }}</span>
+            <span
+                v-if="expanded"
+                :style="{ fontSize: '11.5px', color: 'var(--fg)', fontFamily: 'var(--font-ui)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }"
+            >{{ user?.full_name ?? '' }}</span>
+        </Link>
+    </aside>
+</template>
+
+<style scoped>
+.cmd-rail-item:hover {
+    color: var(--fg) !important;
+}
+.cmd-rail-toggle:hover {
+    color: var(--fg) !important;
+    background: var(--panel2) !important;
+}
+</style>

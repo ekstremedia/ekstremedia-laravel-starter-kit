@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
-import InputText from 'primevue/inputtext';
-import Password from 'primevue/password';
-import MultiSelect from 'primevue/multiselect';
-import Button from 'primevue/button';
+import CommandLayout from '@/Layouts/CommandLayout.vue';
+import Field from '@/Components/Command/Field.vue';
+import Icon from '@/Components/Command/Icon.vue';
 
-defineOptions({ layout: AdminLayout });
+defineOptions({ layout: CommandLayout });
 
 interface Props { roles: { id: number; name: string }[] }
 defineProps<Props>();
@@ -23,54 +21,130 @@ const form = useForm({
     roles: [] as string[],
 });
 
+function toggleRole(name: string) {
+    const i = form.roles.indexOf(name);
+    if (i >= 0) form.roles.splice(i, 1);
+    else form.roles.push(name);
+}
+
 function submit() {
     form.post('/admin/users');
 }
 </script>
 
 <template>
-    <Head title="New user · Admin" />
-    <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-semibold">{{ t('admin.users.new_user') }}</h1>
-        <Link href="/admin/users" class="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">{{ t('common.back') }}</Link>
+    <div>
+    <Head :title="t('admin.users.new_user') + ' · Admin'" />
+
+    <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '18px' }">
+        <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }">
+            {{ t('admin.users.new_user') }}
+        </h1>
+        <Link
+            href="/admin/users"
+            :style="{ fontSize: '11.5px', color: 'var(--fg-dim)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px' }"
+        >
+            <Icon name="chevR" :size="10" :style="{ transform: 'rotate(180deg)' }" />
+            {{ t('common.back') }}
+        </Link>
     </div>
 
-    <form @submit.prevent="submit" class="max-w-2xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl p-6 space-y-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-                <label class="block text-sm mb-1">{{ t('admin.users.first_name') }}</label>
-                <InputText v-model="form.first_name" class="w-full" />
-                <p v-if="form.errors.first_name" class="text-xs text-red-500 mt-1">{{ form.errors.first_name }}</p>
-            </div>
-            <div>
-                <label class="block text-sm mb-1">{{ t('admin.users.last_name') }}</label>
-                <InputText v-model="form.last_name" class="w-full" />
-                <p v-if="form.errors.last_name" class="text-xs text-red-500 mt-1">{{ form.errors.last_name }}</p>
-            </div>
+    <form
+        @submit.prevent="submit"
+        class="cmd-card"
+        :style="{ maxWidth: '680px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }"
+    >
+        <div :style="{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }">
+            <Field
+                v-model="form.first_name"
+                :label="t('admin.users.first_name')"
+                :error="form.errors.first_name"
+                autocomplete="given-name"
+                autofocus
+            />
+            <Field
+                v-model="form.last_name"
+                :label="t('admin.users.last_name')"
+                :error="form.errors.last_name"
+                autocomplete="family-name"
+            />
         </div>
+        <Field
+            v-model="form.email"
+            type="email"
+            :label="t('admin.users.email')"
+            :error="form.errors.email"
+            autocomplete="email"
+        />
+        <div :style="{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }">
+            <Field
+                v-model="form.password"
+                type="password"
+                :label="t('admin.users.password')"
+                :error="form.errors.password"
+                autocomplete="new-password"
+            />
+            <Field
+                v-model="form.password_confirmation"
+                type="password"
+                :label="t('admin.users.confirm_password')"
+                autocomplete="new-password"
+            />
+        </div>
+
         <div>
-            <label class="block text-sm mb-1">{{ t('admin.users.email') }}</label>
-            <InputText v-model="form.email" type="email" class="w-full" />
-            <p v-if="form.errors.email" class="text-xs text-red-500 mt-1">{{ form.errors.email }}</p>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-                <label class="block text-sm mb-1">{{ t('admin.users.password') }}</label>
-                <Password v-model="form.password" toggleMask :feedback="false" class="w-full" inputClass="w-full" />
-                <p v-if="form.errors.password" class="text-xs text-red-500 mt-1">{{ form.errors.password }}</p>
+            <div
+                class="cmd-mono cmd-uc"
+                :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '6px', fontWeight: 500, letterSpacing: '0.06em' }"
+            >{{ t('admin.users.roles') }}</div>
+            <div :style="{ display: 'flex', flexWrap: 'wrap', gap: '6px' }">
+                <button
+                    v-for="r in roles"
+                    :key="r.id"
+                    type="button"
+                    @click="toggleRole(r.name)"
+                    :style="{
+                        padding: '5px 11px',
+                        fontSize: '11.5px',
+                        borderRadius: '5px',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        background: form.roles.includes(r.name) ? 'var(--accent-soft)' : 'transparent',
+                        border: `1px solid ${form.roles.includes(r.name) ? 'var(--accent-border)' : 'var(--border)'}`,
+                        color: form.roles.includes(r.name) ? 'var(--fg)' : 'var(--fg-dim)',
+                    }"
+                >{{ r.name }}</button>
             </div>
-            <div>
-                <label class="block text-sm mb-1">{{ t('admin.users.confirm_password') }}</label>
-                <Password v-model="form.password_confirmation" toggleMask :feedback="false" class="w-full" inputClass="w-full" />
-            </div>
         </div>
-        <div>
-            <label class="block text-sm mb-1">{{ t('admin.users.roles') }}</label>
-            <MultiSelect v-model="form.roles" :options="roles" optionLabel="name" optionValue="name" placeholder="Select roles" class="w-full" />
-        </div>
-        <div class="flex gap-2">
-            <Button type="submit" :label="t('admin.users.create_user')" icon="pi pi-check" :loading="form.processing" />
-            <Link href="/admin/users"><Button :label="t('common.cancel')" severity="secondary" /></Link>
+
+        <div :style="{ display: 'flex', gap: '6px', paddingTop: '4px' }">
+            <button
+                type="submit"
+                :disabled="form.processing"
+                :style="{
+                    background: 'var(--accent)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '7px 12px',
+                    borderRadius: '5px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    cursor: form.processing ? 'not-allowed' : 'pointer',
+                    opacity: form.processing ? 0.6 : 1,
+                    fontFamily: 'inherit',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                }"
+            >
+                <Icon name="plus" :size="12" />
+                {{ t('admin.users.create_user') }}
+            </button>
+            <Link
+                href="/admin/users"
+                :style="{ background: 'transparent', color: 'var(--fg-dim)', border: '1px solid var(--border)', padding: '7px 12px', borderRadius: '5px', fontSize: '12px', textDecoration: 'none', fontFamily: 'inherit' }"
+            >{{ t('common.cancel') }}</Link>
         </div>
     </form>
+    </div>
 </template>

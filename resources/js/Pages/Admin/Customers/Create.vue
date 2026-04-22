@@ -1,19 +1,16 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
-import InputText from 'primevue/inputtext';
-import Button from 'primevue/button';
 import { useI18n } from 'vue-i18n';
+import CommandLayout from '@/Layouts/CommandLayout.vue';
+import Field from '@/Components/Command/Field.vue';
+import Icon from '@/Components/Command/Icon.vue';
 
-defineOptions({ layout: AdminLayout });
+defineOptions({ layout: CommandLayout });
 
 const { t } = useI18n();
 
-const form = useForm({
-    name: '',
-    slug: '',
-});
+const form = useForm({ name: '', slug: '' });
 
 function submit() {
     form.post('/admin/customers');
@@ -27,44 +24,89 @@ function slugify(value: string): string {
         .slice(0, 63);
 }
 
-// Live preview that mirrors the server-side fallback (`Str::slug($name)`): if
-// the user hasn't typed a slug, show what we'd derive from the current name.
 const effectiveSlug = computed(() => form.slug || slugify(form.name));
 
 function onNameBlur() {
-    if (!form.slug && form.name) {
-        form.slug = slugify(form.name);
-    }
+    if (!form.slug && form.name) form.slug = slugify(form.name);
 }
 </script>
 
 <template>
-    <Head title="New customer · Admin" />
     <div>
-        <div class="flex items-center justify-between mb-6">
-            <h1 class="text-2xl font-semibold">{{ t('admin.customers.new_customer') }}</h1>
-            <Link href="/admin/customers" class="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">{{ t('common.back') }}</Link>
+    <Head :title="t('admin.customers.new_customer') + ' · Admin'" />
+
+    <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '18px' }">
+        <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }">
+            {{ t('admin.customers.new_customer') }}
+        </h1>
+        <Link
+            href="/admin/customers"
+            :style="{ fontSize: '11.5px', color: 'var(--fg-dim)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px' }"
+        >
+            <Icon name="chevR" :size="10" :style="{ transform: 'rotate(180deg)' }" />
+            {{ t('common.back') }}
+        </Link>
+    </div>
+
+    <form
+        @submit.prevent="submit"
+        class="cmd-card"
+        :style="{ maxWidth: '560px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }"
+    >
+        <div @focusout="onNameBlur">
+            <Field
+                v-model="form.name"
+                :label="t('common.name')"
+                :error="form.errors.name"
+                placeholder="Acme Corp"
+                autofocus
+            />
+        </div>
+        <div>
+            <Field
+                v-model="form.slug"
+                :label="t('admin.customers.slug')"
+                :error="form.errors.slug"
+                placeholder="acme"
+            />
+            <p
+                class="cmd-mono"
+                :style="{ fontSize: '10.5px', color: 'var(--fg-mute)', marginTop: '5px', display: 'flex', alignItems: 'center', gap: '6px' }"
+            >
+                <span>→</span>
+                <code :style="{ background: 'var(--panel2)', border: '1px solid var(--border)', padding: '1px 6px', borderRadius: '3px', color: 'var(--fg-dim)' }">/c/{{ effectiveSlug || 'slug' }}</code>
+            </p>
+            <p :style="{ fontSize: '11px', color: 'var(--fg-mute)', marginTop: '5px' }">{{ t('admin.customers.slug_help') }}</p>
         </div>
 
-        <form @submit.prevent="submit"
-              class="max-w-2xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl p-6 space-y-4">
-            <div>
-                <label class="block text-sm mb-1">{{ t('common.name') }}</label>
-                <InputText v-model="form.name" class="w-full" @blur="onNameBlur" placeholder="Acme Corp" />
-                <p v-if="form.errors.name" class="text-xs text-red-500 mt-1">{{ form.errors.name }}</p>
-            </div>
-            <div>
-                <label class="block text-sm mb-1">{{ t('admin.customers.slug') }}</label>
-                <InputText v-model="form.slug" class="w-full" placeholder="acme" />
-                <p class="text-xs text-gray-500 dark:text-dark-400 mt-1">
-                    {{ t('admin.customers.slug_help') }}
-                </p>
-                <p v-if="form.errors.slug" class="text-xs text-red-500 mt-1">{{ form.errors.slug }}</p>
-            </div>
-            <div class="flex gap-2 pt-2">
-                <Button type="submit" :label="t('admin.customers.create')" icon="pi pi-check" :loading="form.processing" />
-                <Link href="/admin/customers"><Button :label="t('common.cancel')" severity="secondary" /></Link>
-            </div>
-        </form>
+        <div :style="{ display: 'flex', gap: '6px', paddingTop: '4px' }">
+            <button
+                type="submit"
+                :disabled="form.processing"
+                :style="{
+                    background: 'var(--accent)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '7px 12px',
+                    borderRadius: '5px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    cursor: form.processing ? 'not-allowed' : 'pointer',
+                    opacity: form.processing ? 0.6 : 1,
+                    fontFamily: 'inherit',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                }"
+            >
+                <Icon name="plus" :size="12" />
+                {{ t('admin.customers.create') }}
+            </button>
+            <Link
+                href="/admin/customers"
+                :style="{ background: 'transparent', color: 'var(--fg-dim)', border: '1px solid var(--border)', padding: '7px 12px', borderRadius: '5px', fontSize: '12px', textDecoration: 'none', fontFamily: 'inherit' }"
+            >{{ t('common.cancel') }}</Link>
+        </div>
+    </form>
     </div>
 </template>

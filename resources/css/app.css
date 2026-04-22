@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import './tokens.css';
 
 @variant dark (&:where(.dark, .dark *));
 

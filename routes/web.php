@@ -19,6 +19,7 @@ use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\AvatarController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CustomerLandingController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationPreferenceController;
 use App\Http\Controllers\PersonalAccessTokenController;
@@ -114,6 +115,9 @@ Route::middleware('auth')->group(function () {
 // Post-login landing — redirects to the user's customer or renders the picker.
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/app', CustomerLandingController::class)->name('app.landing');
+
+    // Command-design "Min side" — user overview inside the CommandLayout shell.
+    Route::get('/home', [HomeController::class, 'index'])->name('home.me');
 });
 
 // Admin routes (system super-user — spans all tenants)
@@ -134,6 +138,7 @@ Route::middleware(['auth', 'verified', 'role:Admin'])
         Route::post('users/{user}/send-password-reset', [UserController::class, 'sendPasswordReset'])->name('users.sendPasswordReset');
         Route::post('users/{user}/notify-test', [UserController::class, 'notifyTest'])->name('users.notifyTest');
         Route::patch('users/{user}/quota', [UserController::class, 'setQuota'])->name('users.setQuota');
+        Route::patch('users/{user}/role', [UserController::class, 'setRole'])->name('users.setRole');
 
         Route::resource('roles', RoleController::class)->except(['show']);
 

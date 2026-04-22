@@ -3,7 +3,7 @@ import { Head, usePage, router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import { computed, ref, onBeforeUnmount, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import AppLayout from '@/Layouts/CommandLayout.vue';
 import ConversationList from '@/Components/Chat/ConversationList.vue';
 import MessageThread from '@/Components/Chat/MessageThread.vue';
 import MessageInput from '@/Components/Chat/MessageInput.vue';
@@ -311,11 +311,22 @@ function getCsrfToken(): string {
 <template>
     <AppLayout>
         <Head :title="t('chat.title')" />
-        <div class="max-w-6xl mx-auto px-0 sm:px-4 lg:px-8 py-0 sm:py-6">
-            <div class="bg-white dark:bg-dark-900 sm:rounded-2xl sm:border border-gray-200 dark:border-dark-700 overflow-hidden flex" style="height: calc(100vh - 10rem);">
+        <div :style="{ maxWidth: '1100px', margin: '0 auto', padding: '16px' }">
+            <div
+                class="cmd-card"
+                :style="{
+                    display: 'flex',
+                    overflow: 'hidden',
+                    height: 'calc(100vh - 10rem)',
+                }"
+            >
                 <!-- Conversation list (hidden on mobile when thread is open) -->
                 <div
-                    class="w-full sm:w-80 lg:w-96 border-r border-gray-200 dark:border-dark-700 shrink-0"
+                    :style="{
+                        borderRight: '1px solid var(--border)',
+                        flexShrink: 0,
+                        width: '320px',
+                    }"
                     :class="mobileShowThread ? 'hidden sm:flex sm:flex-col' : 'flex flex-col'"
                 >
                     <ConversationList
@@ -334,15 +345,27 @@ function getCsrfToken(): string {
                 >
                     <template v-if="activeConversation">
                         <!-- Thread header -->
-                        <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-dark-700">
+                        <div
+                            :style="{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                padding: '11px 16px',
+                                borderBottom: '1px solid var(--border)',
+                                background: 'var(--panel2)',
+                            }"
+                        >
                             <button
                                 @click="goBackToList"
                                 :aria-label="t('chat.back_to_conversations')"
-                                class="sm:hidden p-1 rounded hover:bg-gray-100 dark:hover:bg-dark-800 cursor-pointer"
+                                class="sm:hidden"
+                                :style="{ background: 'transparent', border: 'none', color: 'var(--fg-dim)', cursor: 'pointer', padding: '4px', borderRadius: '3px' }"
                             >
-                                <i class="pi pi-arrow-left text-gray-500"></i>
+                                <i class="pi pi-arrow-left"></i>
                             </button>
-                            <h3 class="text-sm font-semibold truncate">{{ otherParticipantName(activeConversation) }}</h3>
+                            <h3 :style="{ fontSize: '12.5px', fontWeight: 600, color: 'var(--fg)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">
+                                {{ otherParticipantName(activeConversation) }}
+                            </h3>
                         </div>
 
                         <MessageThread

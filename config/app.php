@@ -15,6 +15,8 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    'storage_key' => env('VITE_APP_STORAGE_KEY', 'starter_kit_settings'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

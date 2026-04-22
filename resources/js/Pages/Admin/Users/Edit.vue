@@ -2,7 +2,7 @@
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
+import AdminLayout from '@/Layouts/CommandLayout.vue';
 import InputText from 'primevue/inputtext';
 import Password from 'primevue/password';
 import MultiSelect from 'primevue/multiselect';

@@ -5,6 +5,7 @@ import { router } from '@inertiajs/vue3';
 import { useToast } from 'primevue/usetoast';
 import { useCustomer } from '@/composables/useCustomer';
 import { useUnreadCounts } from '@/composables/useUnreadCounts';
+import Icon from '@/Components/Command/Icon.vue';
 
 interface NotificationItem {
     id: string;
@@ -22,6 +23,7 @@ const { notificationsCount: unreadCount, decrementNotifications, setNotification
 const open = ref(false);
 const notifications = ref<NotificationItem[]>([]);
 const loading = ref(false);
+const hoverId = ref<string | null>(null);
 
 const notificationsUrl = computed(() => customerUrl('/notifications'));
 const readAllUrl = computed(() => customerUrl('/notifications/read-all'));
@@ -35,14 +37,11 @@ function fetchNotifications() {
         .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
         .then(json => { notifications.value = json.recent ?? []; })
         .catch(() => {
-            // Surface failures instead of silently leaving the panel blank
-            // (indistinguishable from "you're all caught up").
             toast.add({ severity: 'error', summary: t('notifications.load_failed'), life: 4000 });
         })
         .finally(() => { loading.value = false; });
 }
 
-// Reactive now-tick so "2m ago" labels tick forward while the panel is open.
 const nowTick = ref(Date.now());
 let tickHandle: number | undefined;
 onMounted(() => {
@@ -55,14 +54,10 @@ onBeforeUnmount(() => {
 });
 
 function onKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape' && open.value) {
-        open.value = false;
-    }
+    if (e.key === 'Escape' && open.value) open.value = false;
 }
 
-watch(open, (v) => {
-    if (v) fetchNotifications();
-});
+watch(open, (v) => { if (v) fetchNotifications(); });
 
 defineExpose({ refresh: fetchNotifications });
 
@@ -111,7 +106,6 @@ function markAllRead() {
 }
 
 function timeAgo(iso: string): string {
-    // Read nowTick.value so Vue re-runs this when the interval fires.
     const seconds = Math.floor((nowTick.value - new Date(iso).getTime()) / 1000);
     if (seconds < 60) return t('notifications.just_now');
     const minutes = Math.floor(seconds / 60);
@@ -124,74 +118,222 @@ function timeAgo(iso: string): string {
 
 function notificationTitle(n: NotificationItem): string {
     if (n.data.title) return n.data.title;
-    // Localize the fallback so screen readers / non-English users never see
-    // a raw PHP class basename like "NewCommentNotification".
     return t('notifications.untitled');
 }
 </script>
 
 <template>
-    <div class="relative">
+    <div :style="{ position: 'relative' }">
         <button
             type="button"
             @click="open = !open"
-            class="relative p-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-dark-800 cursor-pointer"
             :aria-label="t('notifications.title')"
             :aria-expanded="open"
             aria-haspopup="true"
+            :style="{
+                background: open ? 'var(--accent-soft)' : 'transparent',
+                border: `1px solid ${open ? 'var(--accent-border)' : 'var(--border)'}`,
+                color: open ? 'var(--accent)' : 'var(--fg-dim)',
+                padding: '4px 7px',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+                transition: 'background 0.12s, border-color 0.12s, color 0.12s',
+            }"
         >
-            <i class="pi pi-bell text-lg text-gray-600 dark:text-gray-300"></i>
+            <Icon name="bell" :size="13" />
             <span
                 v-if="unreadCount > 0"
-                class="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center"
+                class="cmd-mono"
+                :style="{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    minWidth: '14px',
+                    height: '14px',
+                    padding: '0 3px',
+                    borderRadius: '7px',
+                    background: 'var(--danger)',
+                    color: '#0a0c12',
+                    fontSize: '9px',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }"
             >{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
         </button>
+
         <Transition
-            enter-active-class="transition ease-out duration-100"
-            enter-from-class="opacity-0 scale-95"
-            enter-to-class="opacity-100 scale-100"
-            leave-active-class="transition ease-in duration-75"
-            leave-from-class="opacity-100 scale-100"
-            leave-to-class="opacity-0 scale-95"
+            enter-active-class="cmd-pop-enter"
+            leave-active-class="cmd-pop-leave"
         >
             <div
                 v-if="open"
-                class="absolute right-0 mt-2 w-80 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 shadow-lg py-2 z-50"
+                :style="{
+                    position: 'absolute',
+                    right: 0,
+                    top: 'calc(100% + 6px)',
+                    width: '340px',
+                    background: 'var(--panel)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    boxShadow: 'var(--shadow-palette)',
+                    zIndex: 50,
+                    overflow: 'hidden',
+                    animation: 'cmdFadeIn 0.12s ease-out',
+                }"
             >
-                <div class="flex items-center justify-between px-4 pb-2 border-b border-gray-100 dark:border-dark-700">
-                    <span class="text-sm font-medium">{{ t('notifications.title') }}</span>
-                    <div v-if="notifications.length > 0" class="flex gap-2">
-                        <button v-if="unreadCount > 0" @click="markAllRead" class="text-xs text-indigo-500 hover:underline cursor-pointer">{{ t('notifications.mark_all_read') }}</button>
-                        <button @click="clearAll" class="text-xs text-red-400 hover:underline cursor-pointer">{{ t('notifications.clear_all') }}</button>
+                <!-- Header -->
+                <div
+                    :style="{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 14px',
+                        borderBottom: '1px solid var(--border)',
+                        gap: '10px',
+                    }"
+                >
+                    <div :style="{ display: 'flex', alignItems: 'center', gap: '7px' }">
+                        <span
+                            class="cmd-mono cmd-uc"
+                            :style="{ fontSize: '10px', color: 'var(--fg-mute)', fontWeight: 500, letterSpacing: '0.08em' }"
+                        >{{ t('notifications.title') }}</span>
+                        <span
+                            v-if="unreadCount > 0"
+                            class="cmd-mono"
+                            :style="{ fontSize: '9.5px', color: 'var(--accent)', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', padding: '1px 6px', borderRadius: '3px' }"
+                        >{{ unreadCount }}</span>
+                    </div>
+                    <div v-if="notifications.length > 0" :style="{ display: 'flex', gap: '10px' }">
+                        <button
+                            v-if="unreadCount > 0"
+                            type="button"
+                            @click="markAllRead"
+                            :style="{ background: 'transparent', border: 'none', color: 'var(--accent)', fontSize: '11px', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }"
+                        >{{ t('notifications.mark_all_read') }}</button>
+                        <button
+                            type="button"
+                            @click="clearAll"
+                            :style="{ background: 'transparent', border: 'none', color: 'var(--danger)', fontSize: '11px', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }"
+                        >{{ t('notifications.clear_all') }}</button>
                     </div>
                 </div>
-                <div v-if="loading" class="px-4 py-6 text-center">
-                    <i class="pi pi-spin pi-spinner text-gray-400"></i>
+
+                <!-- Body -->
+                <div
+                    v-if="loading"
+                    :style="{ padding: '28px 14px', textAlign: 'center', color: 'var(--fg-mute)', fontSize: '11.5px' }"
+                >
+                    <span class="cmd-mono">{{ t('notifications.loading') }}</span>
                 </div>
-                <div v-else-if="notifications.length === 0" class="px-4 py-6 text-center text-sm text-gray-400">
+                <div
+                    v-else-if="notifications.length === 0"
+                    :style="{ padding: '28px 14px', textAlign: 'center', color: 'var(--fg-mute)', fontSize: '12px' }"
+                >
                     {{ t('notifications.empty') }}
                 </div>
-                <ul v-else class="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-dark-800">
-                    <li v-for="n in notifications" :key="n.id"
-                        class="group px-4 py-3 flex items-start gap-3 transition-colors"
-                        :class="n.read_at ? 'opacity-60' : 'bg-indigo-50/50 dark:bg-dark-800/50'">
-                        <i :class="n.data.icon ? `pi ${n.data.icon}` : 'pi pi-bell'"
-                           class="mt-0.5 text-sm text-indigo-500"></i>
-                        <div class="flex-1 min-w-0 cursor-pointer" @click="markOneRead(n)">
-                            <p class="text-sm font-medium truncate">{{ notificationTitle(n) }}</p>
-                            <p v-if="n.data.message" class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{{ n.data.message }}</p>
-                            <p class="text-[10px] text-gray-400 mt-1">{{ timeAgo(n.created_at) }}</p>
+                <ul
+                    v-else
+                    :style="{ listStyle: 'none', padding: 0, margin: 0, maxHeight: '360px', overflowY: 'auto' }"
+                >
+                    <li
+                        v-for="n in notifications"
+                        :key="n.id"
+                        @mouseenter="hoverId = n.id"
+                        @mouseleave="hoverId = null"
+                        @click="markOneRead(n)"
+                        :style="{
+                            display: 'grid',
+                            gridTemplateColumns: '10px 1fr 24px',
+                            gap: '10px',
+                            padding: '10px 14px',
+                            borderBottom: '1px solid var(--border)',
+                            cursor: n.read_at ? 'default' : 'pointer',
+                            background: hoverId === n.id ? 'var(--row-hover)' : 'transparent',
+                            transition: 'background 0.1s',
+                            opacity: n.read_at ? 0.65 : 1,
+                        }"
+                    >
+                        <!-- Unread dot -->
+                        <span
+                            :style="{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                background: n.read_at ? 'transparent' : 'var(--accent)',
+                                marginTop: '6px',
+                                justifySelf: 'center',
+                            }"
+                        />
+                        <!-- Content -->
+                        <div :style="{ minWidth: 0 }">
+                            <div
+                                :style="{
+                                    fontSize: '12.5px',
+                                    fontWeight: n.read_at ? 400 : 500,
+                                    color: 'var(--fg)',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                }"
+                            >{{ notificationTitle(n) }}</div>
+                            <div
+                                v-if="n.data.message"
+                                :style="{
+                                    fontSize: '11px',
+                                    color: 'var(--fg-dim)',
+                                    marginTop: '2px',
+                                    lineHeight: 1.4,
+                                    overflow: 'hidden',
+                                    display: '-webkit-box',
+                                    '-webkit-line-clamp': 2,
+                                    '-webkit-box-orient': 'vertical',
+                                }"
+                            >{{ n.data.message }}</div>
+                            <div
+                                class="cmd-mono"
+                                :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginTop: '4px' }"
+                            >{{ timeAgo(n.created_at) }}</div>
                         </div>
-                        <div class="flex items-center gap-1 shrink-0 mt-0.5">
-                            <span v-if="!n.read_at" class="w-2 h-2 rounded-full bg-indigo-500"></span>
-                            <button @click.stop="deleteOne(n)" class="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-opacity cursor-pointer" :aria-label="t('notifications.delete')">
-                                <i class="pi pi-times text-xs"></i>
-                            </button>
-                        </div>
+                        <!-- Delete icon (shown on hover) -->
+                        <button
+                            type="button"
+                            @click.stop="deleteOne(n)"
+                            :aria-label="t('notifications.delete')"
+                            :style="{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--fg-mute)',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                borderRadius: '3px',
+                                opacity: hoverId === n.id ? 1 : 0,
+                                transition: 'opacity 0.12s, color 0.12s',
+                                alignSelf: 'start',
+                            }"
+                            class="cmd-notif-delete"
+                        >
+                            <Icon name="trash" :size="11" />
+                        </button>
                     </li>
                 </ul>
             </div>
         </Transition>
-        <div v-if="open" @click="open = false" class="fixed inset-0 z-40"></div>
+        <div
+            v-if="open"
+            @click="open = false"
+            :style="{ position: 'fixed', inset: 0, zIndex: 40 }"
+        ></div>
     </div>
 </template>
+
+<style scoped>
+.cmd-notif-delete:hover {
+    color: var(--danger) !important;
+}
+</style>

@@ -1,98 +1,150 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
-import PageHeader from '@/Components/Admin/PageHeader.vue';
-import DataTableShell from '@/Components/Admin/DataTableShell.vue';
-import DataTable from 'primevue/datatable';
-import Column from 'primevue/column';
-import Button from 'primevue/button';
-import Tag from 'primevue/tag';
-import ConfirmDialog from 'primevue/confirmdialog';
-import { useConfirm } from 'primevue/useconfirm';
-import { FilterMatchMode } from '@primevue/core/api';
 import { useI18n } from 'vue-i18n';
+import { useConfirm } from 'primevue/useconfirm';
+import CommandLayout from '@/Layouts/CommandLayout.vue';
+import CmdDataTable, { type Column } from '@/Components/Command/DataTable.vue';
+import Icon from '@/Components/Command/Icon.vue';
+import { useCommandToasts } from '@/composables/useCommandToasts';
 
-defineOptions({ layout: AdminLayout });
+defineOptions({ layout: CommandLayout });
 
 const { t } = useI18n();
+const { push } = useCommandToasts();
+const confirmer = useConfirm();
 
-interface Role { id: number; name: string; permissions: string[]; users_count: number }
-defineProps<{ roles: Role[] }>();
-
-const confirm = useConfirm();
-const filters = ref({ global: { value: null as string | null, matchMode: FilterMatchMode.CONTAINS } });
-const searchValue = ref<string>('');
-
-function onSearchInput(v: string) {
-    searchValue.value = v;
-    filters.value.global.value = v || null;
+interface Role {
+    id: number;
+    name: string;
+    permissions: string[];
+    users_count: number;
 }
 
+defineProps<{ roles: Role[] }>();
+
+const search = ref('');
+const sortKey = ref<string>('name');
+const sortDir = ref<'asc' | 'desc'>('asc');
+
+const columns: Column<Role>[] = [
+    { key: 'name', label: t('common.name'), sortable: true },
+    { key: 'permissions', label: t('admin.roles.permissions'), sortable: false },
+    { key: 'users_count', label: t('admin.roles.users'), sortable: true, width: '100px', align: 'right', mono: true },
+];
+
 function destroy(r: Role) {
-    confirm.require({
-        group: 'admin-roles',
+    confirmer.require({
         message: t('admin.roles.confirm_delete', { name: r.name }),
-        header: t('common.confirm'),
+        header: t('common.delete'),
         icon: 'pi pi-exclamation-triangle',
         acceptClass: 'p-button-danger',
-        accept: () => router.delete(`/admin/roles/${r.id}`),
+        acceptLabel: t('common.delete'),
+        rejectLabel: t('common.cancel'),
+        accept: () => {
+            router.delete(`/admin/roles/${r.id}`, {
+                onSuccess: () => push(t('admin.roles.toast_deleted', { name: r.name }), 'danger'),
+            });
+        },
     });
 }
 </script>
 
 <template>
+    <div>
     <Head :title="t('admin.roles.head_title')" />
-    <ConfirmDialog group="admin-roles" />
 
-    <PageHeader :title="t('admin.roles.title')">
-        <template #actions>
-            <Link href="/admin/roles/create">
-                <Button :label="t('admin.roles.new_role')" icon="pi pi-plus" />
-            </Link>
-        </template>
-    </PageHeader>
-
-    <DataTableShell
-        :count="roles.length"
-        :count-label="t('admin.roles.title').toLowerCase()"
-        :search-placeholder="t('admin.roles.filter')"
-        :search-value="searchValue"
-        @update:search-value="onSearchInput"
-    >
-        <DataTable
-            :value="roles"
-            stripedRows
-            removableSort
-            scrollable
-            v-model:filters="filters"
-            :globalFilterFields="['name', 'permissions']"
-            class="border-0"
+    <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '14px' }">
+        <div>
+            <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }">
+                {{ t('admin.roles.title') }}
+            </h1>
+            <div
+                class="cmd-mono"
+                :style="{ marginTop: '3px', fontSize: '11.5px', color: 'var(--fg-mute)' }"
+            >{{ roles.length }} {{ t('admin.roles.title').toLowerCase() }}</div>
+        </div>
+        <Link
+            href="/admin/roles/create"
+            :style="{
+                background: 'var(--accent)',
+                color: '#fff',
+                border: 'none',
+                padding: '5px 11px',
+                borderRadius: '5px',
+                fontSize: '11.5px',
+                fontWeight: 500,
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+            }"
         >
-            <Column field="name" :header="t('common.name')" sortable>
-                <template #body="{ data }">
-                    <Link
-                        :href="`/admin/roles/${data.id}/edit`"
-                        class="font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline underline-offset-2"
-                    >
-                        {{ data.name }}
-                    </Link>
-                </template>
-            </Column>
-            <Column :header="t('admin.roles.permissions')">
-                <template #body="{ data }">
-                    <Tag v-for="p in data.permissions" :key="p" :value="p" severity="secondary" class="mr-1 mb-1" />
-                </template>
-            </Column>
-            <Column field="users_count" :header="t('admin.roles.users')" style="width: 6rem" sortable />
-            <Column :header="t('common.actions')" style="width: 10rem">
-                <template #body="{ data }">
-                    <Link :href="`/admin/roles/${data.id}/edit`">
-                        <Button icon="pi pi-pencil" size="small" severity="secondary" class="mr-2" :title="t('common.edit')" :aria-label="t('common.edit')" />
-                    </Link>
-                    <Button icon="pi pi-trash" size="small" severity="danger" :title="t('common.delete')" :aria-label="t('common.delete')" @click="destroy(data)" />
-                </template>
-            </Column>
-        </DataTable>
-    </DataTableShell>
+            <Icon name="plus" :size="12" />
+            {{ t('admin.roles.new_role') }}
+        </Link>
+    </div>
+
+    <CmdDataTable
+        :rows="roles"
+        :columns="columns"
+        v-model:search="search"
+        v-model:sort-key="sortKey"
+        v-model:sort-dir="sortDir"
+        :search-placeholder="t('admin.roles.filter')"
+        :search-keys="['name', 'permissions']"
+    >
+        <template #cell:name="{ row }">
+            <Link
+                :href="`/admin/roles/${row.id}/edit`"
+                :style="{ fontWeight: 500, color: 'var(--fg)', textDecoration: 'none' }"
+            >{{ row.name }}</Link>
+        </template>
+
+        <template #cell:permissions="{ row }">
+            <div :style="{ display: 'flex', flexWrap: 'wrap', gap: '3px' }">
+                <span
+                    v-for="p in (row.permissions ?? []).slice(0, 6)"
+                    :key="p"
+                    class="cmd-mono"
+                    :style="{
+                        fontSize: '10px',
+                        padding: '1px 6px',
+                        background: 'var(--panel2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '3px',
+                        color: 'var(--fg-dim)',
+                    }"
+                >{{ p }}</span>
+                <span
+                    v-if="(row.permissions ?? []).length > 6"
+                    class="cmd-mono"
+                    :style="{
+                        fontSize: '10px',
+                        color: 'var(--fg-mute)',
+                        padding: '1px 4px',
+                    }"
+                >+{{ row.permissions.length - 6 }}</span>
+            </div>
+        </template>
+
+        <template #actions="{ row }">
+            <Link
+                :href="`/admin/roles/${row.id}/edit`"
+                :title="t('common.edit')"
+                :style="{ background: 'transparent', border: 'none', color: 'var(--fg-dim)', cursor: 'pointer', padding: '4px', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }"
+            >
+                <Icon name="edit" :size="12" />
+            </Link>
+            <button
+                type="button"
+                :title="t('common.delete')"
+                @click="destroy(row)"
+                :style="{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '4px', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }"
+            >
+                <Icon name="trash" :size="12" />
+            </button>
+        </template>
+    </CmdDataTable>
+    </div>
 </template>

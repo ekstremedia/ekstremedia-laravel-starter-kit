@@ -1,25 +1,18 @@
 <script setup lang="ts">
 import { Head, useForm, Link, usePage } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
-import { computed, onMounted, ref } from 'vue';
-import { gsap } from 'gsap';
+import { computed } from 'vue';
 import AuthLayout from '@/Layouts/AuthLayout.vue';
-import TextInput from '@/Components/TextInput.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
+import AuthCard from '@/Components/Command/AuthCard.vue';
+import Field from '@/Components/Command/Field.vue';
+import Icon from '@/Components/Command/Icon.vue';
 import type { PageProps } from '@/types';
 
-const { t, te } = useI18n();
+defineOptions({ layout: AuthLayout });
+
+const { t } = useI18n();
 const page = usePage<PageProps>();
 const oauthProviders = computed(() => page.props.oauth?.providers ?? []);
-
-const providerIcons: Record<string, string> = { google: 'pi-google', github: 'pi-github' };
-function providerIcon(name: string): string {
-    return providerIcons[name] ?? 'pi-sign-in';
-}
-function providerLabel(name: string, fallback: string): string {
-    const key = `auth.oauth.${name}`;
-    return te(key) ? t(key) : fallback;
-}
 
 const form = useForm({
     first_name: '',
@@ -27,21 +20,6 @@ const form = useForm({
     email: '',
     password: '',
     password_confirmation: '',
-});
-
-const formFields = ref<HTMLElement>();
-
-onMounted(() => {
-    if (formFields.value) {
-        gsap.from(formFields.value.children, {
-            y: 15,
-            opacity: 0,
-            duration: 0.4,
-            stagger: 0.08,
-            ease: 'power2.out',
-            delay: 0.3,
-        });
-    }
 });
 
 function submit() {
@@ -54,98 +32,121 @@ function submit() {
 <template>
     <Head :title="t('nav.register')" />
 
-    <AuthLayout>
-        <div class="bg-white dark:bg-dark-900 rounded-2xl shadow-lg dark:shadow-dark-950/50 border border-gray-100 dark:border-dark-700 p-8 transition-colors">
-            <!-- Header -->
-            <div class="text-center mb-8">
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                    {{ t('auth.register_title') }}
-                </h1>
-                <p class="mt-2 text-gray-600 dark:text-dark-400">
-                    {{ t('auth.register_subtitle') }}
-                </p>
+    <AuthCard
+        :eyebrow="t('auth.register_title')"
+        :title="t('auth.register_subtitle')"
+    >
+        <form @submit.prevent="submit" :style="{ display: 'flex', flexDirection: 'column', gap: '14px' }">
+            <div :style="{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }">
+                <Field
+                    v-model="form.first_name"
+                    :label="t('auth.first_name')"
+                    :placeholder="t('auth.first_name')"
+                    :error="form.errors.first_name"
+                    autocomplete="given-name"
+                    autofocus
+                />
+                <Field
+                    v-model="form.last_name"
+                    :label="t('auth.last_name')"
+                    :placeholder="t('auth.last_name')"
+                    :error="form.errors.last_name"
+                    autocomplete="family-name"
+                />
             </div>
 
-            <form @submit.prevent="submit">
-                <div ref="formFields" class="space-y-5">
-                    <!-- Name row -->
-                    <div class="grid grid-cols-2 gap-4">
-                        <TextInput
-                            v-model="form.first_name"
-                            :label="t('auth.first_name')"
-                            :placeholder="t('auth.first_name')"
-                            :error="form.errors.first_name"
-                            autofocus
-                        />
-                        <TextInput
-                            v-model="form.last_name"
-                            :label="t('auth.last_name')"
-                            :placeholder="t('auth.last_name')"
-                            :error="form.errors.last_name"
-                        />
-                    </div>
+            <Field
+                v-model="form.email"
+                type="email"
+                :label="t('auth.email')"
+                :placeholder="t('auth.email')"
+                :error="form.errors.email"
+                autocomplete="email"
+            />
+            <Field
+                v-model="form.password"
+                type="password"
+                :label="t('auth.password')"
+                :placeholder="t('auth.password')"
+                :error="form.errors.password"
+                autocomplete="new-password"
+            />
+            <Field
+                v-model="form.password_confirmation"
+                type="password"
+                :label="t('auth.password_confirmation')"
+                :placeholder="t('auth.password_confirmation')"
+                :error="form.errors.password_confirmation"
+                autocomplete="new-password"
+            />
 
-                    <TextInput
-                        v-model="form.email"
-                        type="email"
-                        :label="t('auth.email')"
-                        :placeholder="t('auth.email')"
-                        :error="form.errors.email"
-                    />
+            <button
+                type="submit"
+                :disabled="form.processing"
+                :style="{
+                    background: 'var(--accent)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '10px 14px',
+                    borderRadius: '5px',
+                    fontSize: '12.5px',
+                    fontWeight: 500,
+                    cursor: form.processing ? 'not-allowed' : 'pointer',
+                    opacity: form.processing ? 0.6 : 1,
+                    fontFamily: 'inherit',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    marginTop: '4px',
+                }"
+            >
+                {{ t('nav.register') }}
+                <Icon name="arrow" :size="12" />
+            </button>
+        </form>
 
-                    <TextInput
-                        v-model="form.password"
-                        type="password"
-                        :label="t('auth.password')"
-                        :placeholder="t('auth.password')"
-                        :error="form.errors.password"
-                    />
-
-                    <TextInput
-                        v-model="form.password_confirmation"
-                        type="password"
-                        :label="t('auth.password_confirmation')"
-                        :placeholder="t('auth.password_confirmation')"
-                        :error="form.errors.password_confirmation"
-                    />
-
-                    <PrimaryButton :disabled="form.processing">
-                        {{ t('nav.register') }}
-                    </PrimaryButton>
-                </div>
-            </form>
-
-            <div v-if="oauthProviders.length > 0" class="mt-6">
-                <div class="relative">
-                    <div class="absolute inset-0 flex items-center">
-                        <div class="w-full border-t border-gray-200 dark:border-dark-700"></div>
-                    </div>
-                    <div class="relative flex justify-center text-xs uppercase tracking-wider">
-                        <span class="bg-white dark:bg-dark-900 px-2 text-gray-400">
-                            {{ t('auth.or_continue_with') }}
-                        </span>
-                    </div>
-                </div>
-                <div class="mt-4 grid gap-2" :class="oauthProviders.length > 1 ? 'grid-cols-2' : 'grid-cols-1'">
-                    <a
-                        v-for="p in oauthProviders"
-                        :key="p.name"
-                        :href="`/auth/${p.name}/redirect`"
-                        class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 dark:border-dark-700 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors"
-                    >
-                        <i :class="['pi', providerIcon(p.name), 'text-base']"></i>
-                        <span>{{ providerLabel(p.name, p.label) }}</span>
-                    </a>
-                </div>
+        <div v-if="oauthProviders.length > 0" :style="{ marginTop: '20px' }">
+            <div :style="{ display: 'flex', alignItems: 'center', gap: '10px', margin: '0 0 12px' }">
+                <div :style="{ flex: 1, height: '1px', background: 'var(--border)' }" />
+                <span
+                    class="cmd-mono cmd-uc"
+                    :style="{ fontSize: '9.5px', color: 'var(--fg-mute)', letterSpacing: '0.08em' }"
+                >{{ t('auth.or_continue_with') }}</span>
+                <div :style="{ flex: 1, height: '1px', background: 'var(--border)' }" />
             </div>
-
-            <!-- Login link -->
-            <p class="mt-6 text-center text-sm text-gray-600 dark:text-dark-400">
-                {{ t('auth.have_account') }}
-                <Link href="/login" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
-                    {{ t('nav.login') }}
-                </Link>
-            </p>
+            <div :style="{ display: 'grid', gap: '8px', gridTemplateColumns: oauthProviders.length > 1 ? '1fr 1fr' : '1fr' }">
+                <a
+                    v-for="p in oauthProviders"
+                    :key="p.name"
+                    :href="`/auth/${p.name}/redirect`"
+                    :style="{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        padding: '8px 12px',
+                        background: 'var(--panel2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '5px',
+                        color: 'var(--fg)',
+                        fontSize: '12px',
+                        textDecoration: 'none',
+                    }"
+                >
+                    <i :class="['pi', `pi-${p.name}`]" :style="{ fontSize: '14px' }"></i>
+                    <span>{{ p.label }}</span>
+                </a>
+            </div>
         </div>
-    </AuthLayout>
+
+        <p
+            :style="{ marginTop: '20px', textAlign: 'center', fontSize: '12px', color: 'var(--fg-dim)' }"
+        >
+            {{ t('auth.have_account') }}
+            <Link href="/login" :style="{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }">
+                {{ t('nav.login') }}
+            </Link>
+        </p>
+    </AuthCard>
 </template>

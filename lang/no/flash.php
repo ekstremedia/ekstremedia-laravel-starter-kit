@@ -76,6 +76,7 @@ return [
         'verification_resent' => 'Bekreftelses-e-post sendt.',
         'twofa_reset' => 'Tofaktorautentisering er tilbakestilt for denne brukeren.',
         'test_notification_sent' => 'Testvarsel sendt.',
+        'role_updated' => 'Rolle oppdatert til :role.',
         'customer_attached' => 'La til :email i :name.',
         'customers_attached' => 'La til :email i :names.',
         'customer_detached' => 'Fjernet :email fra :name.',

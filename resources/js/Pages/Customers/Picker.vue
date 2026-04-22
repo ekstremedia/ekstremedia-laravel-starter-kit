@@ -1,47 +1,91 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import AppLayout from '@/Layouts/CommandLayout.vue';
+import Icon from '@/Components/Command/Icon.vue';
 import type { Customer } from '@/types';
 
 const { t } = useI18n();
 
-defineProps<{
-    customers: Customer[];
-}>();
+defineProps<{ customers: Customer[] }>();
 </script>
 
 <template>
     <Head :title="t('picker.title')" />
     <AppLayout>
-        <div class="max-w-3xl mx-auto py-10 px-4 sm:px-6">
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+        <div :style="{ maxWidth: '780px', margin: '0 auto', padding: '32px 16px' }">
+            <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }">
                 {{ t('picker.title') }}
             </h1>
-            <p class="text-sm text-gray-500 dark:text-dark-400 mb-8">
-                {{ t('picker.subtitle') }}
-            </p>
+            <p
+                class="cmd-mono"
+                :style="{ marginTop: '4px', fontSize: '11.5px', color: 'var(--fg-mute)', marginBottom: '20px' }"
+            >{{ t('picker.subtitle') }}</p>
 
-            <div v-if="customers.length === 0"
-                 class="rounded-xl border border-dashed border-gray-300 dark:border-dark-700 p-8 text-center">
-                <i class="pi pi-building text-3xl text-gray-400 mb-3 block"></i>
-                <p class="text-sm text-gray-600 dark:text-dark-400">
-                    {{ t('picker.empty') }}
-                </p>
+            <div
+                v-if="customers.length === 0"
+                :style="{
+                    padding: '48px 20px',
+                    textAlign: 'center',
+                    background: 'var(--panel)',
+                    border: '1px dashed var(--border)',
+                    borderRadius: 'var(--radius-card)',
+                }"
+            >
+                <div :style="{ display: 'flex', justifyContent: 'center', marginBottom: '12px', color: 'var(--fg-mute)' }">
+                    <Icon name="customer" :size="24" />
+                </div>
+                <p :style="{ fontSize: '12.5px', color: 'var(--fg-dim)' }">{{ t('picker.empty') }}</p>
             </div>
 
-            <ul v-else class="grid gap-3 sm:grid-cols-2">
+            <ul
+                v-else
+                :style="{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: '1px',
+                    background: 'var(--border)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-card)',
+                    overflow: 'hidden',
+                    listStyle: 'none',
+                    padding: 0,
+                    margin: 0,
+                }"
+            >
                 <li v-for="c in customers" :key="c.id">
                     <Link
                         :href="`/c/${c.slug}/dashboard`"
-                        class="flex items-center gap-3 p-4 rounded-xl border border-gray-200 dark:border-dark-700 bg-white dark:bg-dark-900 hover:border-indigo-500 hover:shadow-sm transition"
+                        class="cmd-picker-link"
+                        :style="{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '14px 16px',
+                            background: 'var(--panel)',
+                            textDecoration: 'none',
+                            transition: 'background 0.12s',
+                        }"
                     >
-                        <div class="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-sm font-semibold">
-                            {{ c.name.slice(0, 2).toUpperCase() }}
-                        </div>
-                        <div class="min-w-0">
-                            <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ c.name }}</p>
-                            <p class="text-xs text-gray-500 dark:text-dark-400 truncate">/c/{{ c.slug }}</p>
+                        <div
+                            :style="{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '5px',
+                                background: 'var(--accent)',
+                                color: '#fff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                fontFamily: 'var(--font-mono)',
+                                flexShrink: 0,
+                            }"
+                        >{{ c.name.slice(0, 2).toUpperCase() }}</div>
+                        <div :style="{ minWidth: 0 }">
+                            <div :style="{ fontSize: '13px', fontWeight: 500, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">{{ c.name }}</div>
+                            <div class="cmd-mono" :style="{ fontSize: '11px', color: 'var(--fg-dim)' }">/c/{{ c.slug }}</div>
                         </div>
                     </Link>
                 </li>
@@ -49,3 +93,7 @@ defineProps<{
         </div>
     </AppLayout>
 </template>
+
+<style scoped>
+.cmd-picker-link:hover { background: var(--panel2) !important; }
+</style>

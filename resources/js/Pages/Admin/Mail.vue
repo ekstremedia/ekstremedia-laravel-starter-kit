@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
+import AdminLayout from '@/Layouts/CommandLayout.vue';
 import InputText from 'primevue/inputtext';
 import InputNumber from 'primevue/inputnumber';
 import Password from 'primevue/password';
@@ -9,11 +9,6 @@ import ToggleSwitch from 'primevue/toggleswitch';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import Textarea from 'primevue/textarea';
-import Tabs from 'primevue/tabs';
-import TabList from 'primevue/tablist';
-import Tab from 'primevue/tab';
-import TabPanels from 'primevue/tabpanels';
-import TabPanel from 'primevue/tabpanel';
 import Tag from 'primevue/tag';
 import Dialog from 'primevue/dialog';
 import type { PageProps } from '@/types';
@@ -53,6 +48,13 @@ const props = defineProps<Props>();
 
 const page = usePage<PageProps>();
 const userEmail = computed(() => page.props.auth?.user?.email ?? '');
+
+type MailTab = 'smtp' | 'templates';
+const activeTab = ref<MailTab>('smtp');
+const tabs: { key: MailTab; label: string; icon: string }[] = [
+    { key: 'smtp', label: t('admin.mail.smtp_tab'), icon: 'pi-cog' },
+    { key: 'templates', label: t('admin.mail.templates_tab'), icon: 'pi-file-edit' },
+];
 
 // ── SMTP form ────────────────────────────────────────────────────
 const smtpForm = useForm({
@@ -218,18 +220,48 @@ function closeEditor() {
         </div>
     </Dialog>
 
-    <h1 class="text-2xl font-semibold mb-6">{{ t('admin.mail.title') }}</h1>
+    <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '18px' }">
+        <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }">{{ t('admin.mail.title') }}</h1>
+    </div>
 
-    <Tabs value="smtp">
-        <TabList>
-            <Tab value="smtp"><i class="pi pi-cog mr-2"></i>{{ t('admin.mail.smtp_tab') }}</Tab>
-            <Tab value="templates"><i class="pi pi-file-edit mr-2"></i>{{ t('admin.mail.templates_tab') }}</Tab>
-        </TabList>
+    <!-- Tabs -->
+    <div
+        :style="{
+            display: 'flex',
+            gap: '2px',
+            marginBottom: '16px',
+            borderBottom: '1px solid var(--border)',
+        }"
+    >
+        <button
+            v-for="tab in tabs"
+            :key="tab.key"
+            type="button"
+            @click="activeTab = tab.key"
+            :style="{
+                background: 'transparent',
+                border: 'none',
+                borderBottom: activeTab === tab.key ? '2px solid var(--accent)' : '2px solid transparent',
+                padding: '8px 14px',
+                marginBottom: '-1px',
+                fontSize: '12px',
+                fontWeight: activeTab === tab.key ? 500 : 400,
+                color: activeTab === tab.key ? 'var(--fg)' : 'var(--fg-dim)',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+            }"
+        >
+            <i :class="['pi', tab.icon]" :style="{ fontSize: '11px' }"></i>
+            {{ tab.label }}
+        </button>
+    </div>
 
-        <TabPanels>
-            <!-- ── Tab 1: SMTP ──────────────────────────────────────── -->
-            <TabPanel value="smtp">
-                <form @submit.prevent="saveSmtp" class="max-w-3xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl p-6 space-y-4 mt-4">
+    <!-- ── Tab 1: SMTP ──────────────────────────────────────── -->
+    <div v-if="activeTab === 'smtp'">
+                <form @submit.prevent="saveSmtp" class="cmd-card" :style="{ maxWidth: '860px', padding: '24px', marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm mb-1">{{ t('admin.mail.mailer') }}</label>
@@ -279,16 +311,17 @@ function closeEditor() {
                         <Button type="button" :label="t('admin.mail.send_test')" icon="pi pi-send" severity="secondary" @click="sendTest" />
                     </div>
                 </form>
-            </TabPanel>
+    </div>
 
-            <!-- ── Tab 2: Email Templates ───────────────────────────── -->
-            <TabPanel value="templates">
+    <!-- ── Tab 2: Email Templates ───────────────────────────── -->
+    <div v-if="activeTab === 'templates'">
                 <div class="mt-4">
                     <!-- Template list -->
                     <div v-if="!editingTemplate" class="grid gap-3 max-w-4xl">
                         <button v-for="group in templates" :key="group.slug"
                                 type="button"
-                                class="w-full text-left bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors focus-visible:outline-2 focus-visible:outline-indigo-500"
+                                class="cmd-card"
+                                :style="{ width: '100%', textAlign: 'left', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontFamily: 'inherit', color: 'var(--fg)' }"
                                 @click="editTemplate(group)">
                             <div>
                                 <h3 class="font-medium">{{ group.name }}</h3>
@@ -320,7 +353,7 @@ function closeEditor() {
                                     @click="switchLocale(opt.value)" />
                         </div>
 
-                        <div class="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl p-6 space-y-4">
+                        <div class="cmd-card" :style="{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }">
                             <div>
                                 <label class="block text-sm mb-1">{{ t('admin.mail.subject') }}</label>
                                 <InputText v-model="templateForm.subject" class="w-full" />
@@ -360,8 +393,6 @@ function closeEditor() {
                         </div>
                     </div>
                 </div>
-            </TabPanel>
-        </TabPanels>
-    </Tabs>
+    </div>
     </div>
 </template>
