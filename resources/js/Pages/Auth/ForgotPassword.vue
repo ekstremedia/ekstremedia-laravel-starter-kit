@@ -1,35 +1,21 @@
 <script setup lang="ts">
 import { Head, useForm, Link, usePage } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
-import { onMounted, ref, computed } from 'vue';
-import { gsap } from 'gsap';
+import { computed } from 'vue';
 import AuthLayout from '@/Layouts/AuthLayout.vue';
-import TextInput from '@/Components/TextInput.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
+import AuthCard from '@/Components/Command/AuthCard.vue';
+import Field from '@/Components/Command/Field.vue';
+import Icon from '@/Components/Command/Icon.vue';
+import Dot from '@/Components/Command/Dot.vue';
 import type { PageProps } from '@/types';
+
+defineOptions({ layout: AuthLayout });
 
 const { t } = useI18n();
 const page = usePage<PageProps>();
 
-const form = useForm({
-    email: '',
-});
-
-const formFields = ref<HTMLElement>();
+const form = useForm({ email: '' });
 const status = computed(() => page.props.flash?.status);
-
-onMounted(() => {
-    if (formFields.value) {
-        gsap.from(formFields.value.children, {
-            y: 15,
-            opacity: 0,
-            duration: 0.4,
-            stagger: 0.08,
-            ease: 'power2.out',
-            delay: 0.3,
-        });
-    }
-});
 
 function submit() {
     form.post('/forgot-password');
@@ -39,50 +25,69 @@ function submit() {
 <template>
     <Head :title="t('auth.forgot_title')" />
 
-    <AuthLayout>
-        <div class="bg-white dark:bg-dark-900 rounded-2xl shadow-lg dark:shadow-dark-950/50 border border-gray-100 dark:border-dark-700 p-8 transition-colors">
-            <!-- Header -->
-            <div class="text-center mb-8">
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                    {{ t('auth.forgot_title') }}
-                </h1>
-                <p class="mt-2 text-gray-600 dark:text-dark-400">
-                    {{ t('auth.forgot_subtitle') }}
-                </p>
-            </div>
-
-            <!-- Status message -->
-            <div
-                v-if="status"
-                class="mb-6 px-4 py-3 rounded-lg bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 text-sm"
-            >
-                {{ status }}
-            </div>
-
-            <form @submit.prevent="submit">
-                <div ref="formFields" class="space-y-5">
-                    <TextInput
-                        v-model="form.email"
-                        type="email"
-                        :label="t('auth.email')"
-                        :placeholder="t('auth.email')"
-                        :error="form.errors.email"
-                        autofocus
-                    />
-
-                    <PrimaryButton :disabled="form.processing">
-                        {{ t('auth.forgot_send') }}
-                    </PrimaryButton>
-                </div>
-            </form>
-
-            <!-- Back to login -->
-            <p class="mt-6 text-center text-sm text-gray-600 dark:text-dark-400">
-                {{ t('auth.have_account') }}
-                <Link href="/login" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
-                    {{ t('nav.login') }}
-                </Link>
-            </p>
+    <AuthCard
+        :eyebrow="t('auth.forgot_title')"
+        :title="t('auth.forgot_subtitle')"
+    >
+        <div
+            v-if="status"
+            :style="{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '9px 12px',
+                marginBottom: '14px',
+                borderRadius: '5px',
+                background: 'rgba(94,229,154,0.12)',
+                border: '1px solid rgba(94,229,154,0.33)',
+                color: 'var(--fg)',
+                fontSize: '12px',
+            }"
+        >
+            <Dot color="var(--success)" :size="6" />
+            <span>{{ status }}</span>
         </div>
-    </AuthLayout>
+
+        <form @submit.prevent="submit" :style="{ display: 'flex', flexDirection: 'column', gap: '14px' }">
+            <Field
+                v-model="form.email"
+                type="email"
+                :label="t('auth.email')"
+                :placeholder="t('auth.email')"
+                :error="form.errors.email"
+                autocomplete="email"
+                autofocus
+            />
+            <button
+                type="submit"
+                :disabled="form.processing"
+                :style="{
+                    background: 'var(--accent)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '10px 14px',
+                    borderRadius: '5px',
+                    fontSize: '12.5px',
+                    fontWeight: 500,
+                    cursor: form.processing ? 'not-allowed' : 'pointer',
+                    opacity: form.processing ? 0.6 : 1,
+                    fontFamily: 'inherit',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                }"
+            >
+                {{ t('auth.forgot_send') }}
+                <Icon name="arrow" :size="12" />
+            </button>
+        </form>
+
+        <p :style="{ marginTop: '20px', textAlign: 'center', fontSize: '12px', color: 'var(--fg-dim)' }">
+            {{ t('auth.have_account') }}
+            <Link href="/login" :style="{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }">
+                {{ t('nav.login') }}
+            </Link>
+        </p>
+    </AuthCard>
 </template>

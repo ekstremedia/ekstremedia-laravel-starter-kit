@@ -2,7 +2,8 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import CommandLayout from '@/Layouts/CommandLayout.vue';
+import Icon from '@/Components/Command/Icon.vue';
 import UploadDialog from '@/Components/Files/UploadDialog.vue';
 import ImageLightbox from '@/Components/Files/ImageLightbox.vue';
 import VideoPlayer from '@/Components/Files/VideoPlayer.vue';
@@ -16,6 +17,8 @@ import { useToast } from 'primevue/usetoast';
 import { useCustomer } from '@/composables/useCustomer';
 import type { LightboxItem } from '@/types/lightbox';
 import type { PageProps } from '@/types';
+
+defineOptions({ layout: CommandLayout });
 
 interface FileItem {
     id: number;
@@ -177,7 +180,7 @@ const canRename = computed(() => hasPerm('rename files'));
 const canDelete = computed(() => hasPerm('delete files'));
 const canShare = computed(() => hasPerm('share files'));
 
-const mergedItems = computed(() => props.items.data.map((i) => ({ ...i, ...(liveItems[i.id] ?? {}) })));
+const mergedItems = computed(() => (props.items?.data ?? []).map((i) => ({ ...i, ...(liveItems[i.id] ?? {}) })));
 const imageItems = computed(() => mergedItems.value.filter((i) => i.type === 'file' && i.is_image));
 
 const lightboxItems = computed<LightboxItem[]>(() =>
@@ -451,133 +454,230 @@ const uploadUrl = computed(() => customerUrl('/files'));
 const extraUploadData = computed(() => ({ parent_id: currentFolderId.value }));
 
 const usageLabel = computed(() => {
-    if (props.usage.quota_bytes === null) return t('files.unlimited');
-    if (props.usage.quota_bytes === 0) return t('files.disabled');
+    const usage = props.usage;
+    if (!usage) return '';
+    if (usage.quota_bytes === null) return t('files.unlimited');
+    if (usage.quota_bytes === 0) return t('files.disabled');
     return t('files.used_of', {
-        used: formatBytes(props.usage.used_bytes),
-        quota: formatBytes(props.usage.quota_bytes),
+        used: formatBytes(usage.used_bytes),
+        quota: formatBytes(usage.quota_bytes),
     });
 });
 </script>
 
 <template>
-    <AppLayout>
+    <div>
         <Head :title="t('files.title')" />
         <ConfirmDialog group="files" />
 
         <div
-            class="relative mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8"
+            class="cmd-files-page"
             @dragenter="onAreaDragEnter"
             @dragleave="onAreaDragLeave"
             @dragover.prevent
             @drop="onDropOnFolder(null, $event)"
         >
-            <!-- External file drag overlay — shown only while an OS drag is over the page. -->
+            <!-- External drag overlay -->
             <div
                 v-if="externalDragOver && canUpload"
-                class="pointer-events-none fixed inset-4 z-30 flex items-center justify-center rounded-2xl border-2 border-dashed border-indigo-400 bg-indigo-500/10 backdrop-blur-sm"
+                :style="{
+                    position: 'fixed',
+                    inset: '16px',
+                    zIndex: 30,
+                    pointerEvents: 'none',
+                    borderRadius: '12px',
+                    border: '2px dashed var(--accent)',
+                    background: 'var(--accent-soft)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--accent)',
+                }"
             >
-                <div class="flex flex-col items-center gap-2 text-indigo-600 dark:text-indigo-300">
-                    <i class="pi pi-upload text-4xl" />
-                    <span class="text-lg font-medium">{{ t('files.drop_to_upload') }}</span>
+                <div :style="{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }">
+                    <i class="pi pi-upload" :style="{ fontSize: '32px' }" />
+                    <span :style="{ fontSize: '14px', fontWeight: 500 }">{{ t('files.drop_to_upload') }}</span>
                 </div>
             </div>
-            <!-- Toolbar -->
-            <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex items-center gap-2 text-sm">
-                    <Link :href="customerUrl('/files')" class="text-indigo-600 hover:underline dark:text-indigo-400">
-                        {{ t('files.root') }}
-                    </Link>
-                    <template v-for="(b, i) in breadcrumbs" :key="b.id">
-                        <i class="pi pi-chevron-right text-xs text-slate-400" />
-                        <Link
-                            v-if="i < breadcrumbs.length - 1"
-                            :href="customerUrl(`/files/${b.id}`)"
-                            class="text-indigo-600 hover:underline dark:text-indigo-400"
-                        >
-                            {{ b.name }}
-                        </Link>
-                        <span v-else class="font-medium text-slate-700 dark:text-slate-200">{{ b.name }}</span>
-                    </template>
-                </div>
 
-                <div class="flex flex-wrap items-center gap-2">
-                    <button
-                        v-if="canUpload"
-                        type="button"
-                        class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500"
-                        @click="uploadOpen = true"
-                    >
-                        <i class="pi pi-upload" />
-                        <span>{{ t('files.upload') }}</span>
-                    </button>
-                    <button
-                        v-if="canCreateFolder"
-                        type="button"
-                        class="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-dark-700 dark:bg-dark-900 dark:text-slate-200 dark:hover:bg-dark-800"
-                        @click="createFolder"
-                    >
-                        <i class="pi pi-folder-plus" />
-                        <span>{{ t('files.new_folder') }}</span>
-                    </button>
-                    <input
-                        v-model="searchQuery"
-                        type="search"
-                        :placeholder="t('files.search_placeholder')"
-                        class="w-48 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-dark-700 dark:bg-dark-900 dark:text-slate-100"
-                        @keyup.enter="onSearch"
-                    />
-                    <div class="inline-flex rounded-md border border-slate-300 p-0.5 dark:border-dark-700">
-                        <button
-                            type="button"
-                            class="rounded px-2 py-1 text-sm"
-                            :class="viewMode === 'grid' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300' : 'text-slate-500 dark:text-slate-400'"
-                            @click="setViewMode('grid')"
-                            :title="t('files.view_grid')"
-                            :aria-label="t('files.view_grid')"
-                        >
-                            <i class="pi pi-th-large" />
-                        </button>
-                        <button
-                            type="button"
-                            class="rounded px-2 py-1 text-sm"
-                            :class="viewMode === 'list' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300' : 'text-slate-500 dark:text-slate-400'"
-                            @click="setViewMode('list')"
-                            :title="t('files.view_list')"
-                            :aria-label="t('files.view_list')"
-                        >
-                            <i class="pi pi-list" />
-                        </button>
+            <!-- Header: meta + breadcrumbs + actions -->
+            <header :style="{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }">
+                <div
+                    class="cmd-mono cmd-uc"
+                    :style="{ fontSize: '10.5px', color: 'var(--fg-mute)', letterSpacing: '0.06em' }"
+                >{{ t('files.title') }}</div>
+                <div :style="{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }">
+                    <div :style="{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', flexWrap: 'wrap' }">
+                        <Link
+                            :href="customerUrl('/files')"
+                            :style="{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }"
+                        >{{ t('files.root') }}</Link>
+                        <template v-for="(b, i) in (breadcrumbs ?? [])" :key="b.id">
+                            <Icon name="chevR" :size="11" :style="{ color: 'var(--fg-mute)' }" />
+                            <Link
+                                v-if="i < (breadcrumbs?.length ?? 0) - 1"
+                                :href="customerUrl(`/files/${b.id}`)"
+                                :style="{ color: 'var(--accent)', textDecoration: 'none' }"
+                            >{{ b.name }}</Link>
+                            <span v-else :style="{ color: 'var(--fg)', fontWeight: 500 }">{{ b.name }}</span>
+                        </template>
                     </div>
-                    <Link
-                        :href="customerUrl('/files/trash')"
-                        class="relative inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-dark-700 dark:text-slate-200 dark:hover:bg-dark-800"
-                    >
-                        <i class="pi pi-trash" />
-                        <span>{{ t('files.trash') }}</span>
-                        <span
-                            v-if="props.trashed_count > 0"
-                            class="ml-1 inline-flex min-w-[1.25rem] justify-center rounded-full bg-rose-500/10 px-1.5 py-0.5 text-[0.65rem] font-semibold text-rose-600 dark:bg-rose-500/15 dark:text-rose-300"
+                    <div :style="{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }">
+                        <button
+                            v-if="canUpload"
+                            type="button"
+                            @click="uploadOpen = true"
+                            :style="{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                background: 'var(--accent)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '5px',
+                                padding: '6px 12px',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                fontFamily: 'inherit',
+                            }"
                         >
-                            {{ props.trashed_count }}
-                        </span>
-                    </Link>
+                            <Icon name="plus" :size="12" />
+                            <span>{{ t('files.upload') }}</span>
+                        </button>
+                        <button
+                            v-if="canCreateFolder"
+                            type="button"
+                            @click="createFolder"
+                            class="cmd-ghost-btn"
+                        >
+                            <i class="pi pi-folder-plus" :style="{ fontSize: '11px' }" />
+                            <span>{{ t('files.new_folder') }}</span>
+                        </button>
+                        <input
+                            v-model="searchQuery"
+                            type="search"
+                            :placeholder="t('files.search_placeholder')"
+                            @keyup.enter="onSearch"
+                            :style="{
+                                width: '192px',
+                                background: 'var(--panel2)',
+                                border: '1px solid var(--border)',
+                                borderRadius: '5px',
+                                padding: '6px 10px',
+                                fontSize: '12px',
+                                color: 'var(--fg)',
+                                fontFamily: 'inherit',
+                            }"
+                        />
+                        <div
+                            :style="{
+                                display: 'inline-flex',
+                                border: '1px solid var(--border)',
+                                borderRadius: '5px',
+                                padding: '2px',
+                                background: 'var(--panel2)',
+                            }"
+                        >
+                            <button
+                                type="button"
+                                @click="setViewMode('grid')"
+                                :title="t('files.view_grid')"
+                                :aria-label="t('files.view_grid')"
+                                :aria-pressed="viewMode === 'grid'"
+                                :style="{
+                                    padding: '4px 8px',
+                                    borderRadius: '3px',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '11px',
+                                    fontFamily: 'inherit',
+                                    background: viewMode === 'grid' ? 'var(--accent-soft)' : 'transparent',
+                                    color: viewMode === 'grid' ? 'var(--fg)' : 'var(--fg-mute)',
+                                }"
+                            ><i class="pi pi-th-large" /></button>
+                            <button
+                                type="button"
+                                @click="setViewMode('list')"
+                                :title="t('files.view_list')"
+                                :aria-label="t('files.view_list')"
+                                :aria-pressed="viewMode === 'list'"
+                                :style="{
+                                    padding: '4px 8px',
+                                    borderRadius: '3px',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '11px',
+                                    fontFamily: 'inherit',
+                                    background: viewMode === 'list' ? 'var(--accent-soft)' : 'transparent',
+                                    color: viewMode === 'list' ? 'var(--fg)' : 'var(--fg-mute)',
+                                }"
+                            ><i class="pi pi-list" /></button>
+                        </div>
+                        <Link
+                            :href="customerUrl('/files/trash')"
+                            class="cmd-ghost-btn"
+                            :style="{ position: 'relative' }"
+                        >
+                            <i class="pi pi-trash" :style="{ fontSize: '11px' }" />
+                            <span>{{ t('files.trash') }}</span>
+                            <span
+                                v-if="(props.trashed_count ?? 0) > 0"
+                                :style="{
+                                    marginLeft: '4px',
+                                    minWidth: '18px',
+                                    display: 'inline-flex',
+                                    justifyContent: 'center',
+                                    background: 'rgba(255, 138, 138, 0.15)',
+                                    color: 'var(--danger)',
+                                    borderRadius: '9px',
+                                    padding: '1px 6px',
+                                    fontSize: '10px',
+                                    fontWeight: 600,
+                                }"
+                            >{{ props.trashed_count }}</span>
+                        </Link>
+                    </div>
                 </div>
-            </div>
+            </header>
 
             <!-- Usage bar -->
-            <div class="mb-6 rounded-lg border border-slate-200 bg-white px-4 py-3 dark:border-dark-700 dark:bg-dark-900">
-                <div class="flex items-center justify-between text-sm">
-                    <span class="text-slate-600 dark:text-slate-300">{{ usageLabel }}</span>
-                    <span v-if="props.usage.quota_bytes && props.usage.quota_bytes > 0" class="font-medium text-slate-700 dark:text-slate-200">
-                        {{ props.usage.percent }}%
-                    </span>
+            <div
+                :style="{
+                    marginBottom: '16px',
+                    background: 'var(--panel)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    padding: '10px 14px',
+                }"
+            >
+                <div :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }">
+                    <span :style="{ color: 'var(--fg-dim)' }">{{ usageLabel }}</span>
+                    <span
+                        v-if="props.usage?.quota_bytes && props.usage.quota_bytes > 0"
+                        class="cmd-mono"
+                        :style="{ color: 'var(--fg)', fontWeight: 500, fontSize: '11px' }"
+                    >{{ props.usage.percent }}%</span>
                 </div>
-                <div v-if="props.usage.quota_bytes && props.usage.quota_bytes > 0" class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-dark-800">
+                <div
+                    v-if="props.usage.quota_bytes && props.usage.quota_bytes > 0"
+                    :style="{
+                        marginTop: '8px',
+                        height: '4px',
+                        overflow: 'hidden',
+                        borderRadius: '9999px',
+                        background: 'var(--panel2)',
+                        border: '1px solid var(--border)',
+                    }"
+                >
                     <div
-                        class="h-full transition-all"
-                        :class="props.usage.percent >= 95 ? 'bg-rose-500' : props.usage.percent >= 80 ? 'bg-amber-500' : 'bg-indigo-500'"
-                        :style="{ width: `${Math.min(100, props.usage.percent)}%` }"
+                        :style="{
+                            height: '100%',
+                            transition: 'width 180ms ease',
+                            background: props.usage.percent >= 95 ? 'var(--danger)' : props.usage.percent >= 80 ? 'var(--warning)' : 'var(--accent)',
+                            width: `${Math.min(100, props.usage.percent)}%`,
+                        }"
                     />
                 </div>
             </div>
@@ -585,10 +685,17 @@ const usageLabel = computed(() => {
             <!-- Empty state -->
             <div
                 v-if="mergedItems.length === 0"
-                class="rounded-lg border border-dashed border-slate-300 bg-white py-24 text-center dark:border-dark-700 dark:bg-dark-900"
+                :style="{
+                    border: '1px dashed var(--border)',
+                    background: 'var(--panel)',
+                    borderRadius: '6px',
+                    padding: '72px 16px',
+                    textAlign: 'center',
+                    color: 'var(--fg-mute)',
+                }"
             >
-                <i class="pi pi-folder-open text-4xl text-slate-400" />
-                <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">{{ t('files.empty') }}</p>
+                <i class="pi pi-folder-open" :style="{ fontSize: '32px' }" />
+                <p :style="{ marginTop: '10px', fontSize: '12px' }">{{ t('files.empty') }}</p>
             </div>
 
             <!-- Grid -->
@@ -596,16 +703,26 @@ const usageLabel = computed(() => {
                 v-else-if="viewMode === 'grid'"
                 tag="div"
                 name="item-fade"
-                class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
+                :style="{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))',
+                    gap: '10px',
+                }"
             >
                 <div
                     v-for="item in mergedItems"
                     :key="item.id"
-                    class="group relative cursor-pointer overflow-hidden rounded-lg border bg-white transition hover:border-indigo-400 dark:border-dark-700 dark:bg-dark-900"
-                    :class="[
-                        dragOverId === item.id ? 'ring-2 ring-indigo-500' : 'border-slate-200',
-                        draggingId === item.id ? 'opacity-50' : '',
-                    ]"
+                    class="cmd-file-card"
+                    :style="{
+                        border: `1px solid ${dragOverId === item.id ? 'var(--accent)' : 'var(--border)'}`,
+                        background: 'var(--panel)',
+                        borderRadius: '6px',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        position: 'relative',
+                        transition: 'border-color 0.12s, background 0.12s',
+                        opacity: draggingId === item.id ? 0.5 : 1,
+                    }"
                     draggable="true"
                     @dragstart="onDragStart(item, $event)"
                     @dragend="onDragEnd"
@@ -614,65 +731,139 @@ const usageLabel = computed(() => {
                     @drop="onDropOnFolder(item, $event)"
                     @click="openItem(item)"
                 >
-                    <div class="relative flex aspect-square items-center justify-center overflow-hidden bg-slate-50 dark:bg-dark-800">
+                    <div
+                        :style="{
+                            position: 'relative',
+                            aspectRatio: '1 / 1',
+                            background: 'var(--panel2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                        }"
+                    >
                         <img
                             v-if="item.thumbnail_url"
                             :src="item.thumbnail_url"
                             :alt="item.name"
-                            class="h-full w-full object-cover"
+                            :style="{ width: '100%', height: '100%', objectFit: 'cover' }"
                             loading="lazy"
                         />
-                        <i v-else :class="`pi ${iconFor(item)} text-5xl text-slate-400`" />
+                        <i v-else :class="`pi ${iconFor(item)}`" :style="{ fontSize: '40px', color: 'var(--fg-mute)' }" />
 
-                        <!-- Video play overlay (ready) -->
                         <div
                             v-if="item.is_video && item.video_ready"
-                            class="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/20"
+                            :style="{
+                                position: 'absolute',
+                                inset: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                pointerEvents: 'none',
+                            }"
                         >
-                            <div class="rounded-full bg-black/50 p-3 text-white shadow-lg opacity-90 transition group-hover:scale-105 group-hover:opacity-100">
-                                <i class="pi pi-play" />
-                            </div>
+                            <div
+                                :style="{
+                                    borderRadius: '9999px',
+                                    background: 'rgba(0,0,0,0.55)',
+                                    color: '#fff',
+                                    padding: '10px',
+                                    boxShadow: '0 4px 14px rgba(0,0,0,0.35)',
+                                }"
+                            ><i class="pi pi-play" /></div>
                         </div>
-
-                        <!-- Processing overlay -->
                         <div
                             v-else-if="item.is_video && item.video_processing"
-                            class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 bg-slate-900/60 text-white text-xs"
+                            :style="{
+                                position: 'absolute',
+                                inset: 0,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px',
+                                background: 'rgba(10,12,18,0.65)',
+                                color: '#fff',
+                                fontSize: '11px',
+                                pointerEvents: 'none',
+                            }"
                         >
-                            <i class="pi pi-spin pi-spinner text-2xl" />
+                            <i class="pi pi-spin pi-spinner" :style="{ fontSize: '20px' }" />
                             <span>{{ t('files.video_processing') }}</span>
                         </div>
                         <div
                             v-else-if="item.preview_processing"
-                            class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 bg-slate-900/50 text-white text-xs"
+                            :style="{
+                                position: 'absolute',
+                                inset: 0,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px',
+                                background: 'rgba(10,12,18,0.55)',
+                                color: '#fff',
+                                fontSize: '11px',
+                                pointerEvents: 'none',
+                            }"
                         >
-                            <i class="pi pi-spin pi-spinner text-2xl" />
+                            <i class="pi pi-spin pi-spinner" :style="{ fontSize: '20px' }" />
                             <span>{{ t('files.preview_processing') }}</span>
                         </div>
                     </div>
-                    <div class="px-2 py-1.5 text-xs">
-                        <div class="flex items-center justify-between gap-2">
+                    <div :style="{ padding: '7px 10px 9px' }">
+                        <div :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }">
                             <input
                                 v-if="renamingId === item.id"
                                 :ref="(el) => registerRenameInput(item.id, el)"
                                 v-model="renameValue"
                                 type="text"
-                                class="flex-1 rounded border border-indigo-300 bg-white px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-indigo-600 dark:bg-dark-900"
+                                :style="{
+                                    flex: 1,
+                                    border: '1px solid var(--accent-border)',
+                                    background: 'var(--panel2)',
+                                    color: 'var(--fg)',
+                                    borderRadius: '3px',
+                                    padding: '2px 4px',
+                                    fontSize: '12px',
+                                    fontFamily: 'inherit',
+                                }"
                                 @click.stop
                                 @keyup.enter="submitRename(item)"
                                 @blur="submitRename(item)"
                             />
-                            <span v-else class="truncate text-slate-700 dark:text-slate-200" :title="item.name">{{ item.name }}</span>
+                            <span
+                                v-else
+                                :title="item.name"
+                                :style="{
+                                    flex: 1,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    color: 'var(--fg)',
+                                    fontSize: '12px',
+                                }"
+                            >{{ item.name }}</span>
                         </div>
-                        <!-- Metadata: size for files, nothing for folders (kept &nbsp; so
-                             the row height stays constant across a mixed grid). -->
-                        <div class="mt-0.5 truncate text-[11px] text-slate-400 dark:text-dark-400">
+                        <div
+                            class="cmd-mono"
+                            :style="{
+                                marginTop: '2px',
+                                fontSize: '10.5px',
+                                color: 'var(--fg-mute)',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                            }"
+                        >
                             <template v-if="item.type === 'file'">{{ formatBytes(item.size) }}</template>
                             <template v-else>&nbsp;</template>
                         </div>
                     </div>
-                    <!-- Actions overlay — single cog that opens a menu. -->
-                    <div class="absolute right-1 top-1 opacity-0 transition group-hover:opacity-100">
+                    <div
+                        class="cmd-file-actions"
+                        :style="{ position: 'absolute', right: '4px', top: '4px', opacity: 0, transition: 'opacity 0.12s' }"
+                    >
                         <ItemActionsMenu
                             :item="item"
                             :download-url="item.type === 'file' ? customerUrl(`/files/${item.id}/download`) : undefined"
@@ -689,63 +880,140 @@ const usageLabel = computed(() => {
             <!-- List -->
             <div
                 v-else
-                class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-dark-700 dark:bg-dark-900"
+                :style="{
+                    background: 'var(--panel)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                }"
             >
-                <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-dark-700">
-                    <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500 dark:bg-dark-800 dark:text-slate-400">
+                <table :style="{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }">
+                    <thead>
                         <tr>
-                            <th class="px-4 py-2 font-medium">{{ t('files.root') }}</th>
-                            <th class="px-4 py-2 font-medium">{{ t('files.size') }}</th>
-                            <th class="px-4 py-2 font-medium">{{ t('files.modified') }}</th>
-                            <th class="px-4 py-2"></th>
+                            <th
+                                class="cmd-mono cmd-uc"
+                                :style="{
+                                    textAlign: 'left',
+                                    padding: '9px 14px',
+                                    fontSize: '10.5px',
+                                    color: 'var(--fg-mute)',
+                                    background: 'var(--panel2)',
+                                    borderBottom: '1px solid var(--border)',
+                                    fontWeight: 500,
+                                    letterSpacing: '0.06em',
+                                }"
+                            >{{ t('files.root') }}</th>
+                            <th
+                                class="cmd-mono cmd-uc"
+                                :style="{
+                                    textAlign: 'left',
+                                    padding: '9px 14px',
+                                    fontSize: '10.5px',
+                                    color: 'var(--fg-mute)',
+                                    background: 'var(--panel2)',
+                                    borderBottom: '1px solid var(--border)',
+                                    fontWeight: 500,
+                                    letterSpacing: '0.06em',
+                                    width: '100px',
+                                }"
+                            >{{ t('files.size') }}</th>
+                            <th
+                                class="cmd-mono cmd-uc"
+                                :style="{
+                                    textAlign: 'left',
+                                    padding: '9px 14px',
+                                    fontSize: '10.5px',
+                                    color: 'var(--fg-mute)',
+                                    background: 'var(--panel2)',
+                                    borderBottom: '1px solid var(--border)',
+                                    fontWeight: 500,
+                                    letterSpacing: '0.06em',
+                                    width: '180px',
+                                }"
+                            >{{ t('files.modified') }}</th>
+                            <th
+                                :style="{
+                                    padding: '9px 14px',
+                                    background: 'var(--panel2)',
+                                    borderBottom: '1px solid var(--border)',
+                                    width: '60px',
+                                }"
+                            />
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100 dark:divide-dark-800">
+                    <tbody>
                         <tr
                             v-for="item in mergedItems"
                             :key="item.id"
-                            class="hover:bg-slate-50 dark:hover:bg-dark-800"
-                            :class="[dragOverId === item.id ? 'ring-1 ring-inset ring-indigo-500' : '', draggingId === item.id ? 'opacity-50' : '']"
+                            class="cmd-file-row"
+                            :style="{
+                                borderTop: '1px solid var(--border)',
+                                background: dragOverId === item.id ? 'var(--accent-soft)' : 'transparent',
+                                opacity: draggingId === item.id ? 0.5 : 1,
+                            }"
                             draggable="true"
                             @dragstart="onDragStart(item, $event)"
                             @dragend="onDragEnd"
                             @dragover="onDragOverFolder(item, $event)"
                             @drop="onDropOnFolder(item, $event)"
                         >
-                            <td class="flex items-center gap-2 px-4 py-2">
-                                <i :class="`pi ${iconFor(item)} text-slate-500`" />
-                                <button v-if="renamingId !== item.id" type="button" class="truncate text-left hover:underline" @click="openItem(item)">
-                                    {{ item.name }}
-                                </button>
-                                <input
-                                    v-else
-                                    :ref="(el) => registerRenameInput(item.id, el)"
-                                    v-model="renameValue"
-                                    type="text"
-                                    class="rounded border border-indigo-300 bg-white px-1 py-0.5 text-xs dark:border-indigo-600 dark:bg-dark-900"
-                                    @click.stop
-                                    @keyup.enter="submitRename(item)"
-                                    @blur="submitRename(item)"
-                                />
-                            </td>
-                            <td class="px-4 py-2 text-slate-500 dark:text-slate-400">
-                                {{ item.type === 'file' ? formatBytes(item.size) : '—' }}
-                            </td>
-                            <td class="px-4 py-2 text-slate-500 dark:text-slate-400">
-                                {{ item.updated_at ? new Date(item.updated_at).toLocaleString() : '—' }}
-                            </td>
-                            <td class="px-4 py-2 text-right">
-                                <div class="flex justify-end">
-                                    <ItemActionsMenu
-                                        :item="item"
-                                        :download-url="item.type === 'file' ? customerUrl(`/files/${item.id}/download`) : undefined"
-                                        variant="inline"
-                                        @open="openItem(item)"
-                                        @rename="startRename(item)"
-                                        @share="openShareDialog(item)"
-                                        @delete="confirmDelete(item)"
+                            <td :style="{ padding: '8px 14px', color: 'var(--fg)' }">
+                                <div :style="{ display: 'flex', alignItems: 'center', gap: '8px' }">
+                                    <i :class="`pi ${iconFor(item)}`" :style="{ color: 'var(--fg-mute)', fontSize: '12px' }" />
+                                    <button
+                                        v-if="renamingId !== item.id"
+                                        type="button"
+                                        :style="{
+                                            background: 'transparent',
+                                            border: 'none',
+                                            color: 'var(--fg)',
+                                            padding: 0,
+                                            cursor: 'pointer',
+                                            textAlign: 'left',
+                                            fontSize: '12.5px',
+                                            fontFamily: 'inherit',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
+                                        }"
+                                        @click="openItem(item)"
+                                    >{{ item.name }}</button>
+                                    <input
+                                        v-else
+                                        :ref="(el) => registerRenameInput(item.id, el)"
+                                        v-model="renameValue"
+                                        type="text"
+                                        :style="{
+                                            border: '1px solid var(--accent-border)',
+                                            background: 'var(--panel2)',
+                                            color: 'var(--fg)',
+                                            borderRadius: '3px',
+                                            padding: '2px 4px',
+                                            fontSize: '12px',
+                                            fontFamily: 'inherit',
+                                        }"
+                                        @click.stop
+                                        @keyup.enter="submitRename(item)"
+                                        @blur="submitRename(item)"
                                     />
                                 </div>
+                            </td>
+                            <td class="cmd-mono" :style="{ padding: '8px 14px', color: 'var(--fg-dim)', fontSize: '11.5px' }">
+                                {{ item.type === 'file' ? formatBytes(item.size) : '—' }}
+                            </td>
+                            <td class="cmd-mono" :style="{ padding: '8px 14px', color: 'var(--fg-dim)', fontSize: '11.5px' }">
+                                {{ item.updated_at ? new Date(item.updated_at).toLocaleString() : '—' }}
+                            </td>
+                            <td :style="{ padding: '8px 14px', textAlign: 'right' }">
+                                <ItemActionsMenu
+                                    :item="item"
+                                    :download-url="item.type === 'file' ? customerUrl(`/files/${item.id}/download`) : undefined"
+                                    variant="inline"
+                                    @open="openItem(item)"
+                                    @rename="startRename(item)"
+                                    @share="openShareDialog(item)"
+                                    @delete="confirmDelete(item)"
+                                />
                             </td>
                         </tr>
                     </tbody>
@@ -771,52 +1039,109 @@ const usageLabel = computed(() => {
             :title="videoItem?.name ?? null"
         />
 
-        <!-- Doc preview dialog — shows the rendered first-page image with a
-             Download link for the original file. -->
+        <!-- Doc preview dialog -->
         <Teleport to="body">
             <Transition name="doc-preview">
                 <div
                     v-if="docPreviewItem"
-                    class="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+                    :style="{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 90,
+                        background: 'rgba(0,0,0,0.7)',
+                        backdropFilter: 'blur(4px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '16px',
+                    }"
                     role="dialog"
                     aria-modal="true"
                     @click.self="docPreviewItem = null"
                 >
-                    <div class="flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-900">
-                        <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3 dark:border-dark-700">
-                            <div class="flex min-w-0 items-center gap-2">
-                                <i class="pi pi-file text-indigo-500" />
-                                <h2 class="truncate text-base font-semibold text-slate-800 dark:text-slate-100">
+                    <div
+                        :style="{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            width: '100%',
+                            maxWidth: '960px',
+                            maxHeight: '100%',
+                            background: 'var(--panel)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            boxShadow: 'var(--shadow-palette)',
+                        }"
+                    >
+                        <div
+                            :style="{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '10px',
+                                borderBottom: '1px solid var(--border)',
+                                padding: '12px 16px',
+                            }"
+                        >
+                            <div :style="{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }">
+                                <i class="pi pi-file" :style="{ color: 'var(--accent)' }" />
+                                <h2 :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }">
                                     {{ docPreviewItem.name }}
                                 </h2>
                             </div>
-                            <div class="flex items-center gap-2">
+                            <div :style="{ display: 'flex', alignItems: 'center', gap: '8px' }">
                                 <a
                                     :href="customerUrl(`/files/${docPreviewItem.id}/download`)"
-                                    class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500"
+                                    :style="{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        background: 'var(--accent)',
+                                        color: '#fff',
+                                        borderRadius: '5px',
+                                        padding: '5px 10px',
+                                        fontSize: '12px',
+                                        fontWeight: 500,
+                                        textDecoration: 'none',
+                                    }"
                                 >
-                                    <i class="pi pi-download" />
+                                    <i class="pi pi-download" :style="{ fontSize: '11px' }" />
                                     <span>{{ t('files.download_original') }}</span>
                                 </a>
                                 <button
                                     type="button"
-                                    class="rounded-md p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-dark-800"
                                     :aria-label="t('common.close')"
                                     @click="docPreviewItem = null"
-                                >
-                                    <i class="pi pi-times" />
-                                </button>
+                                    :style="{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--fg-mute)',
+                                        padding: '6px',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                    }"
+                                ><i class="pi pi-times" /></button>
                             </div>
                         </div>
-                        <div class="flex-1 overflow-auto bg-slate-50 p-4 dark:bg-dark-950">
+                        <div
+                            :style="{
+                                flex: 1,
+                                overflow: 'auto',
+                                background: 'var(--bg2)',
+                                padding: '16px',
+                            }"
+                        >
                             <img
                                 v-if="docPreviewItem.preview_url"
                                 :src="docPreviewItem.preview_url"
                                 :alt="docPreviewItem.name"
-                                class="mx-auto max-h-[75vh] rounded shadow"
+                                :style="{ maxHeight: '75vh', display: 'block', margin: '0 auto', borderRadius: '4px', boxShadow: '0 2px 10px rgba(0,0,0,0.25)' }"
                             />
-                            <div v-else class="flex flex-col items-center gap-2 py-20 text-sm text-slate-500 dark:text-slate-400">
-                                <i class="pi pi-spin pi-spinner text-3xl" />
+                            <div
+                                v-else
+                                :style="{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '80px 0', color: 'var(--fg-mute)', fontSize: '12px' }"
+                            >
+                                <i class="pi pi-spin pi-spinner" :style="{ fontSize: '24px' }" />
                                 <span>{{ t('files.preview_processing') }}</span>
                             </div>
                         </div>
@@ -855,80 +1180,183 @@ const usageLabel = computed(() => {
         <!-- Share dialog -->
         <div
             v-if="shareDialogFile"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            :style="{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 50,
+                background: 'rgba(0,0,0,0.55)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '16px',
+            }"
             @click.self="shareDialogFile = null"
         >
-            <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-dark-900">
-                <h2 class="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800 dark:text-slate-100">
-                    <i class="pi pi-share-alt text-indigo-500" />
-                    {{ t('files.share_title', { name: shareDialogFile.name }) }}
+            <div
+                :style="{
+                    width: '100%',
+                    maxWidth: '420px',
+                    background: 'var(--panel)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    padding: '20px',
+                    boxShadow: 'var(--shadow-palette)',
+                }"
+            >
+                <h2
+                    :style="{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: 'var(--fg)',
+                        marginBottom: '14px',
+                    }"
+                >
+                    <i class="pi pi-share-alt" :style="{ color: 'var(--accent)' }" />
+                    <span>{{ t('files.share_title', { name: shareDialogFile.name }) }}</span>
                 </h2>
 
-                <div v-if="!shareResultUrl" class="space-y-3">
-                    <label class="flex items-center justify-between gap-3 text-sm">
+                <div v-if="!shareResultUrl" :style="{ display: 'flex', flexDirection: 'column', gap: '10px' }">
+                    <label :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', fontSize: '12px', color: 'var(--fg-dim)' }">
                         <span>{{ t('files.share_expiry') }}</span>
-                        <select v-model.number="shareHours" class="rounded border border-slate-300 bg-white px-2 py-1 text-sm dark:border-dark-700 dark:bg-dark-800 dark:text-slate-100">
+                        <select
+                            v-model.number="shareHours"
+                            :style="{
+                                background: 'var(--panel2)',
+                                border: '1px solid var(--border)',
+                                color: 'var(--fg)',
+                                borderRadius: '4px',
+                                padding: '4px 8px',
+                                fontSize: '12px',
+                                fontFamily: 'inherit',
+                            }"
+                        >
                             <option :value="1">{{ t('files.share_expiry_hours', { count: 1 }) }}</option>
                             <option :value="24">{{ t('files.share_expiry_hours', { count: 24 }) }}</option>
                             <option :value="72">{{ t('files.share_expiry_days', { count: 3 }) }}</option>
                             <option :value="168">{{ t('files.share_expiry_days', { count: 7 }) }}</option>
                         </select>
                     </label>
-                    <label class="block text-sm">
-                        <span class="mb-1 block">{{ t('files.share_password_optional') }}</span>
+                    <label :style="{ display: 'block', fontSize: '12px', color: 'var(--fg-dim)' }">
+                        <span :style="{ display: 'block', marginBottom: '4px' }">{{ t('files.share_password_optional') }}</span>
                         <input
                             v-model="sharePassword"
                             type="password"
                             autocomplete="new-password"
                             :placeholder="t('files.share_password_placeholder')"
-                            class="w-full rounded border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-dark-700 dark:bg-dark-800 dark:text-slate-100"
+                            :style="{
+                                width: '100%',
+                                background: 'var(--panel2)',
+                                border: '1px solid var(--border)',
+                                color: 'var(--fg)',
+                                borderRadius: '4px',
+                                padding: '6px 10px',
+                                fontSize: '12px',
+                                fontFamily: 'inherit',
+                            }"
                         />
                     </label>
                 </div>
 
-                <div v-else class="space-y-2 text-sm">
-                    <p class="text-emerald-600 dark:text-emerald-400">
-                        <i class="pi pi-check-circle mr-1" />
-                        {{ t('files.share_created_copied') }}
+                <div v-else :style="{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }">
+                    <p :style="{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '5px', margin: 0 }">
+                        <i class="pi pi-check-circle" />
+                        <span>{{ t('files.share_created_copied') }}</span>
                     </p>
-                    <div class="truncate rounded bg-slate-100 px-2 py-1.5 font-mono text-xs text-slate-700 dark:bg-dark-800 dark:text-slate-300">
-                        {{ shareResultUrl }}
-                    </div>
+                    <div
+                        class="cmd-mono"
+                        :style="{
+                            background: 'var(--panel2)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '4px',
+                            padding: '6px 10px',
+                            fontSize: '11px',
+                            color: 'var(--fg-dim)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                        }"
+                    >{{ shareResultUrl }}</div>
                 </div>
 
-                <div class="mt-6 flex justify-end gap-2">
+                <div :style="{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }">
                     <button
                         v-if="shareDialogFile?.type === 'file' && !shareResultUrl"
                         type="button"
-                        class="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-dark-700 dark:text-slate-200 dark:hover:bg-dark-800"
                         @click="quickShare(shareDialogFile)"
-                    >
-                        {{ t('files.quick_link') }}
-                    </button>
+                        class="cmd-ghost-btn"
+                    >{{ t('files.quick_link') }}</button>
                     <button
                         type="button"
-                        class="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-dark-700 dark:text-slate-200 dark:hover:bg-dark-800"
                         @click="shareDialogFile = null"
-                    >
-                        {{ t('common.close') }}
-                    </button>
+                        class="cmd-ghost-btn"
+                    >{{ t('common.close') }}</button>
                     <button
                         v-if="!shareResultUrl"
                         type="button"
                         :disabled="shareCreating"
-                        class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
                         @click="createShare"
+                        :style="{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: 'var(--accent)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '5px',
+                            padding: '5px 12px',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            cursor: shareCreating ? 'not-allowed' : 'pointer',
+                            opacity: shareCreating ? 0.55 : 1,
+                            fontFamily: 'inherit',
+                        }"
                     >
-                        <i class="pi pi-link mr-1" />
-                        {{ t('files.create_share') }}
+                        <i class="pi pi-link" :style="{ fontSize: '11px' }" />
+                        <span>{{ t('files.create_share') }}</span>
                     </button>
                 </div>
             </div>
         </div>
-    </AppLayout>
+    </div>
 </template>
 
 <style scoped>
+.cmd-files-page {
+    position: relative;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+.cmd-ghost-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--panel2);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+.cmd-ghost-btn:hover {
+    background: var(--panel);
+    border-color: var(--accent-border);
+}
+.cmd-file-card:hover {
+    border-color: var(--accent-border) !important;
+}
+.cmd-file-card:hover .cmd-file-actions {
+    opacity: 1;
+}
+.cmd-file-row:hover {
+    background: var(--row-hover) !important;
+}
 .item-fade-move,
 .item-fade-enter-active,
 .item-fade-leave-active {

@@ -1,21 +1,19 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
-import PageHeader from '@/Components/Admin/PageHeader.vue';
-import DataTableShell from '@/Components/Admin/DataTableShell.vue';
-import DataTable from 'primevue/datatable';
-import Column from 'primevue/column';
-import Button from 'primevue/button';
-import Tag from 'primevue/tag';
-import ConfirmDialog from 'primevue/confirmdialog';
-import { useConfirm } from 'primevue/useconfirm';
-import { FilterMatchMode } from '@primevue/core/api';
 import { useI18n } from 'vue-i18n';
+import { useConfirm } from 'primevue/useconfirm';
+import CommandLayout from '@/Layouts/CommandLayout.vue';
+import CmdDataTable, { type Column } from '@/Components/Command/DataTable.vue';
+import Icon from '@/Components/Command/Icon.vue';
+import Dot from '@/Components/Command/Dot.vue';
+import { useCommandToasts } from '@/composables/useCommandToasts';
 
-defineOptions({ layout: AdminLayout });
+defineOptions({ layout: CommandLayout });
 
 const { t } = useI18n();
+const { push } = useCommandToasts();
+const confirmer = useConfirm();
 
 interface CustomerRow {
     id: number;
@@ -31,93 +29,135 @@ interface Paginated<T> {
     current_page: number;
     last_page: number;
     total: number;
+    per_page?: number;
     links: Array<{ url: string | null; label: string; active: boolean }>;
 }
 
-defineProps<{ customers: Paginated<CustomerRow> }>();
+const props = defineProps<{ customers: Paginated<CustomerRow> }>();
 
-const confirm = useConfirm();
-const filters = ref({ global: { value: null as string | null, matchMode: FilterMatchMode.CONTAINS } });
-const searchValue = ref<string>('');
+const search = ref('');
+const sortKey = ref<string>('name');
+const sortDir = ref<'asc' | 'desc'>('asc');
 
-function onSearchInput(v: string) {
-    searchValue.value = v;
-    filters.value.global.value = v || null;
-}
+const columns: Column<CustomerRow>[] = [
+    { key: 'name', label: t('common.name'), sortable: true },
+    { key: 'slug', label: t('admin.customers.slug'), sortable: true, mono: true },
+    { key: 'status', label: t('common.status'), sortable: true, width: '120px' },
+    { key: 'users_count', label: t('admin.customers.members'), sortable: true, width: '100px', align: 'right', mono: true },
+];
 
-function destroy(customer: CustomerRow) {
-    confirm.require({
-        group: 'admin-customers',
-        message: t('admin.customers.confirm_delete', { name: customer.name }),
-        header: t('common.confirm'),
+function destroy(c: CustomerRow) {
+    confirmer.require({
+        group: 'command',
+        message: t('admin.customers.confirm_delete', { name: c.name }),
+        header: t('common.delete'),
         icon: 'pi pi-exclamation-triangle',
         acceptClass: 'p-button-danger',
-        accept: () => router.delete(`/admin/customers/${customer.id}`),
+        acceptLabel: t('common.delete'),
+        rejectLabel: t('common.cancel'),
+        accept: () => {
+            router.delete(`/admin/customers/${c.id}`, {
+                onSuccess: () => push(t('admin.customers.toast_deleted', { name: c.name }), 'danger'),
+            });
+        },
     });
-}
-
-function statusSeverity(s: string) {
-    return s === 'active' ? 'success' : 'warn';
 }
 </script>
 
 <template>
+    <div>
     <Head :title="t('admin.customers.head_title')" />
-    <ConfirmDialog group="admin-customers" />
 
-    <PageHeader :title="t('admin.customers.title')" :description="t('admin.customers.desc')">
-        <template #actions>
-            <Link href="/admin/customers/create">
-                <Button :label="t('admin.customers.new_customer')" icon="pi pi-plus" />
-            </Link>
-        </template>
-    </PageHeader>
-
-    <DataTableShell
-        :count="customers.total"
-        :count-label="t('admin.customers.title').toLowerCase()"
-        :search-placeholder="t('admin.customers.filter')"
-        :search-value="searchValue"
-        @update:search-value="onSearchInput"
-    >
-        <DataTable
-            :value="customers.data"
-            stripedRows
-            removableSort
-            scrollable
-            v-model:filters="filters"
-            :globalFilterFields="['name', 'slug']"
-            class="border-0"
+    <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '14px' }">
+        <div>
+            <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }">
+                {{ t('admin.customers.title') }}
+            </h1>
+            <div
+                class="cmd-mono"
+                :style="{ marginTop: '3px', fontSize: '11.5px', color: 'var(--fg-mute)' }"
+            >{{ props.customers.total }} {{ t('admin.customers.title').toLowerCase() }}</div>
+        </div>
+        <Link
+            href="/admin/customers/create"
+            :style="{
+                background: 'var(--accent)',
+                color: '#fff',
+                border: 'none',
+                padding: '5px 11px',
+                borderRadius: '5px',
+                fontSize: '11.5px',
+                fontWeight: 500,
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+            }"
         >
-            <Column field="name" :header="t('common.name')" sortable>
-                <template #body="{ data }">
-                    <Link
-                        :href="`/admin/customers/${data.id}/edit`"
-                        class="font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline underline-offset-2"
-                    >
-                        {{ data.name }}
-                    </Link>
-                </template>
-            </Column>
-            <Column field="slug" :header="t('admin.customers.slug')" sortable>
-                <template #body="{ data }">
-                    <code class="text-xs bg-gray-100 dark:bg-dark-800 px-1.5 py-0.5 rounded">/c/{{ data.slug }}</code>
-                </template>
-            </Column>
-            <Column field="status" :header="t('common.status')" sortable style="width: 8rem">
-                <template #body="{ data }">
-                    <Tag :value="data.status" :severity="statusSeverity(data.status)" />
-                </template>
-            </Column>
-            <Column field="users_count" :header="t('admin.customers.members')" sortable style="width: 7rem" />
-            <Column :header="t('common.actions')" style="width: 10rem">
-                <template #body="{ data }">
-                    <Link :href="`/admin/customers/${data.id}/edit`">
-                        <Button icon="pi pi-pencil" size="small" severity="secondary" class="mr-2" :title="t('common.edit')" />
-                    </Link>
-                    <Button icon="pi pi-trash" size="small" severity="danger" :title="t('common.delete')" @click="destroy(data)" />
-                </template>
-            </Column>
-        </DataTable>
-    </DataTableShell>
+            <Icon name="plus" :size="12" />
+            {{ t('admin.customers.new_customer') }}
+        </Link>
+    </div>
+
+    <CmdDataTable
+        :rows="customers"
+        :columns="columns"
+        v-model:search="search"
+        v-model:sort-key="sortKey"
+        v-model:sort-dir="sortDir"
+        :search-placeholder="t('admin.customers.filter')"
+        :search-keys="['name', 'slug']"
+    >
+        <template #cell:name="{ row }">
+            <Link
+                :href="`/admin/customers/${row.id}/edit`"
+                :style="{ fontWeight: 500, color: 'var(--fg)', textDecoration: 'none' }"
+            >{{ row.name }}</Link>
+        </template>
+
+        <template #cell:slug="{ row }">
+            <code
+                class="cmd-mono"
+                :style="{
+                    fontSize: '10.5px',
+                    background: 'var(--panel2)',
+                    border: '1px solid var(--border)',
+                    padding: '1px 6px',
+                    borderRadius: '3px',
+                    color: 'var(--fg-dim)',
+                }"
+            >/c/{{ row.slug }}</code>
+        </template>
+
+        <template #cell:status="{ row }">
+            <span :style="{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11.5px' }">
+                <Dot
+                    :color="row.status === 'active' ? 'var(--success)' : 'var(--warning)'"
+                    :size="6"
+                />
+                <span :style="{ color: row.status === 'active' ? 'var(--fg)' : 'var(--fg-dim)' }">
+                    {{ row.status }}
+                </span>
+            </span>
+        </template>
+
+        <template #actions="{ row }">
+            <Link
+                :href="`/admin/customers/${row.id}/edit`"
+                :title="t('common.edit')"
+                :style="{ background: 'transparent', border: 'none', color: 'var(--fg-dim)', cursor: 'pointer', padding: '4px', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }"
+            >
+                <Icon name="edit" :size="12" />
+            </Link>
+            <button
+                type="button"
+                :title="t('common.delete')"
+                @click="destroy(row)"
+                :style="{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '4px', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }"
+            >
+                <Icon name="trash" :size="12" />
+            </button>
+        </template>
+    </CmdDataTable>
+    </div>
 </template>

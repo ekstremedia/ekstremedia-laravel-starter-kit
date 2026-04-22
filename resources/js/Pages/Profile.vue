@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { Head, usePage, useForm, router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
-import { computed, ref, onMounted } from 'vue';
-import { gsap } from 'gsap';
+import { computed, ref } from 'vue';
 import { useToast } from 'primevue/usetoast';
-import AppLayout from '@/Layouts/AppLayout.vue';
-import TextInput from '@/Components/TextInput.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
+import AppLayout from '@/Layouts/CommandLayout.vue';
+import Field from '@/Components/Command/Field.vue';
+import Icon from '@/Components/Command/Icon.vue';
+import Dot from '@/Components/Command/Dot.vue';
 import { useCustomer } from '@/composables/useCustomer';
 import type { PageProps } from '@/types';
 
@@ -16,21 +16,6 @@ const page = usePage<PageProps>();
 const user = computed(() => page.props.auth.user!);
 const { customerUrl } = useCustomer();
 const avatarUrl = computed(() => customerUrl('/profile/avatar'));
-
-const sectionsRef = ref<HTMLElement>();
-
-onMounted(() => {
-    if (sectionsRef.value) {
-        gsap.from(sectionsRef.value.children, {
-            y: 20,
-            opacity: 0,
-            duration: 0.4,
-            stagger: 0.1,
-            ease: 'power2.out',
-            delay: 0.1,
-        });
-    }
-});
 
 // --- Avatar ---
 const avatarInput = ref<HTMLInputElement | null>(null);
@@ -127,7 +112,7 @@ async function confirmPassword(password: string): Promise<boolean> {
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content
-                    ?? document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '',
+                    ?? getToken(),
                 'X-Requested-With': 'XMLHttpRequest',
                 Accept: 'application/json',
             },
@@ -280,262 +265,322 @@ function getToken(): string {
     <Head :title="t('profile.title')" />
 
     <AppLayout>
-        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-8">
-                {{ t('profile.title') }}
-            </h1>
+        <section :style="{ maxWidth: '780px', margin: '0 auto', padding: '32px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }">
+            <header>
+                <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }">
+                    {{ t('profile.title') }}
+                </h1>
+            </header>
 
-            <div ref="sectionsRef" class="space-y-6">
-                <!-- Profile Photo -->
-                <div class="p-6 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('profile.photo_title') }}</h2>
-                    <p class="text-sm text-gray-500 dark:text-dark-400 mt-1 mb-5">
-                        {{ t('profile.photo_desc') }}
-                    </p>
-
-                    <div class="flex items-center gap-6">
-                        <div class="relative">
-                            <img
-                                v-if="avatarPreview"
-                                :src="avatarPreview"
-                                :alt="user.full_name"
-                                class="w-24 h-24 rounded-full object-cover ring-2 ring-gray-200 dark:ring-dark-700"
-                            />
-                            <div
-                                v-else
-                                class="w-24 h-24 rounded-full bg-indigo-600 text-white flex items-center justify-center text-2xl font-semibold ring-2 ring-gray-200 dark:ring-dark-700"
-                            >
-                                {{ avatarInitials }}
-                            </div>
-                            <div
-                                v-if="avatarUploading"
-                                class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center"
-                            >
-                                <i class="pi pi-spin pi-spinner text-white text-xl"></i>
-                            </div>
-                        </div>
-
-                        <div class="flex flex-col gap-2">
-                            <input
-                                ref="avatarInput"
-                                type="file"
-                                accept="image/jpeg,image/png,image/webp,image/gif"
-                                class="hidden"
-                                @change="onAvatarChange"
-                            />
-                            <button
-                                type="button"
-                                :disabled="avatarUploading"
-                                @click="pickAvatar"
-                                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
-                            >
-                                <i class="pi pi-upload mr-2 text-xs"></i>{{ avatarPreview ? t('profile.photo_replace') : t('profile.photo_upload') }}
-                            </button>
-                            <button
-                                v-if="avatarPreview"
-                                type="button"
-                                :disabled="avatarUploading"
-                                @click="removeAvatar"
-                                class="px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                            >
-                                <i class="pi pi-trash mr-2 text-xs"></i>{{ t('profile.photo_remove') }}
-                            </button>
-                        </div>
-                    </div>
+            <!-- Profile Photo -->
+            <div class="cmd-card" :style="{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }">
+                <div>
+                    <h2 :style="{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">{{ t('profile.photo_title') }}</h2>
+                    <p :style="{ fontSize: '11px', color: 'var(--fg-mute)', margin: '3px 0 0' }">{{ t('profile.photo_desc') }}</p>
                 </div>
 
-                <!-- Profile Information -->
-                <div class="p-6 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                        {{ t('profile.info_title') }}
-                    </h2>
-                    <p class="text-sm text-gray-500 dark:text-dark-400 mt-1 mb-5">
-                        {{ t('profile.info_desc') }}
-                    </p>
-
-                    <form @submit.prevent="saveProfile" class="space-y-4">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <TextInput
-                                v-model="profileForm.first_name"
-                                :label="t('auth.first_name')"
-                                :error="profileForm.errors.first_name"
-                            />
-                            <TextInput
-                                v-model="profileForm.last_name"
-                                :label="t('auth.last_name')"
-                                :error="profileForm.errors.last_name"
-                            />
-                        </div>
-                        <TextInput
-                            v-model="profileForm.email"
-                            type="email"
-                            :label="t('auth.email')"
-                            :error="profileForm.errors.email"
+                <div :style="{ display: 'flex', alignItems: 'center', gap: '20px' }">
+                    <div :style="{ position: 'relative', width: '72px', height: '72px' }">
+                        <img
+                            v-if="avatarPreview"
+                            :src="avatarPreview"
+                            :alt="user.full_name"
+                            :style="{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }"
                         />
-                        <div class="flex justify-end">
-                            <button
-                                type="submit"
-                                :disabled="profileForm.processing"
-                                class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
-                            >
-                                {{ t('profile.save') }}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- Password -->
-                <div class="p-6 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                        {{ t('profile.password_title') }}
-                    </h2>
-                    <p class="text-sm text-gray-500 dark:text-dark-400 mt-1 mb-5">
-                        {{ t('profile.password_desc') }}
-                    </p>
-
-                    <form @submit.prevent="updatePassword" class="space-y-4">
-                        <TextInput
-                            v-model="passwordForm.current_password"
-                            type="password"
-                            :label="t('profile.current_password')"
-                            :error="passwordForm.errors.current_password"
-                        />
-                        <TextInput
-                            v-model="passwordForm.password"
-                            type="password"
-                            :label="t('profile.new_password')"
-                            :error="passwordForm.errors.password"
-                        />
-                        <TextInput
-                            v-model="passwordForm.password_confirmation"
-                            type="password"
-                            :label="t('profile.confirm_password')"
-                            :error="passwordForm.errors.password_confirmation"
-                        />
-                        <div class="flex justify-end">
-                            <button
-                                type="submit"
-                                :disabled="passwordForm.processing"
-                                class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
-                            >
-                                {{ t('profile.update_password') }}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- Two-Factor Authentication -->
-                <div class="p-6 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                        {{ t('profile.two_factor_title') }}
-                    </h2>
-                    <p class="text-sm text-gray-500 dark:text-dark-400 mt-1 mb-5">
-                        {{ t('profile.two_factor_desc') }}
-                    </p>
-
-                    <!-- Status -->
-                    <p class="text-sm font-medium mb-4" :class="twoFactorEnabled ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-dark-400'">
-                        {{ twoFactorEnabled ? t('profile.two_factor_enabled') : t('profile.two_factor_not_enabled') }}
-                    </p>
-
-                    <!-- Inline password confirmation -->
-                    <div v-if="showPasswordConfirm" class="mb-4 p-4 rounded-lg bg-gray-50 dark:bg-dark-800 border border-gray-200 dark:border-dark-700 space-y-3">
-                        <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('auth.confirm_password_title') }}</p>
-                        <p class="text-sm text-gray-500 dark:text-dark-400">{{ t('auth.confirm_password_subtitle') }}</p>
-                        <TextInput
-                            v-model="confirmPasswordInput"
-                            type="password"
-                            :label="t('auth.password')"
-                            :error="confirmPasswordError"
-                            autofocus
-                        />
-                        <div class="flex gap-3">
-                            <button
-                                @click="submitPasswordConfirm"
-                                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer"
-                            >
-                                {{ t('auth.confirm_password_submit') }}
-                            </button>
-                            <button
-                                @click="cancelPasswordConfirm"
-                                class="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors cursor-pointer"
-                            >
-                                {{ t('common.cancel') }}
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Enable flow -->
-                    <div v-if="!twoFactorEnabled && !confirming && !showPasswordConfirm">
-                        <button
-                            @click="enableTwoFactor"
-                            :disabled="enabling"
-                            class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                        <div
+                            v-else
+                            class="cmd-mono"
+                            :style="{ width: '72px', height: '72px', borderRadius: '50%', background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', fontWeight: 700 }"
+                        >{{ avatarInitials }}</div>
+                        <div
+                            v-if="avatarUploading"
+                            :style="{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }"
                         >
-                            {{ t('profile.two_factor_enable') }}
-                        </button>
+                            <i class="pi pi-spin pi-spinner" :style="{ color: '#fff', fontSize: '18px' }"></i>
+                        </div>
                     </div>
 
-                    <!-- QR Code + Confirm -->
-                    <div v-if="confirming" class="space-y-4">
-                        <p class="text-sm text-gray-600 dark:text-dark-300">
-                            {{ t('profile.two_factor_qr_instructions') }}
-                        </p>
-                        <div class="flex justify-center p-4 bg-white rounded-lg" v-html="qrCode"></div>
-                        <TextInput
-                            v-model="confirmCode"
-                            :label="t('profile.two_factor_enter_code')"
-                            :error="confirmError"
-                            autocomplete="one-time-code"
-                            inputmode="numeric"
+                    <div :style="{ display: 'flex', flexDirection: 'column', gap: '6px' }">
+                        <input
+                            ref="avatarInput"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            :style="{ display: 'none' }"
+                            @change="onAvatarChange"
                         />
                         <button
-                            @click="confirmTwoFactor"
-                            class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer"
+                            type="button"
+                            :disabled="avatarUploading"
+                            @click="pickAvatar"
+                            :style="{
+                                background: 'var(--accent)',
+                                color: '#fff',
+                                border: 'none',
+                                padding: '6px 12px',
+                                borderRadius: '5px',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                cursor: avatarUploading ? 'not-allowed' : 'pointer',
+                                opacity: avatarUploading ? 0.55 : 1,
+                                fontFamily: 'inherit',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                            }"
                         >
-                            {{ t('profile.two_factor_confirm') }}
+                            <Icon name="plus" :size="11" />
+                            {{ avatarPreview ? t('profile.photo_replace') : t('profile.photo_upload') }}
                         </button>
-                    </div>
-
-                    <!-- Enabled: show recovery codes + disable -->
-                    <div v-if="twoFactorEnabled && !confirming" class="space-y-4">
-                        <!-- Recovery codes -->
-                        <div v-if="showRecovery && recoveryCodes.length" class="space-y-3">
-                            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
-                                {{ t('profile.two_factor_recovery_title') }}
-                            </h3>
-                            <p class="text-sm text-gray-500 dark:text-dark-400">
-                                {{ t('profile.two_factor_recovery_desc') }}
-                            </p>
-                            <div class="grid grid-cols-2 gap-2 p-4 rounded-lg bg-gray-50 dark:bg-dark-800 font-mono text-sm text-gray-700 dark:text-dark-300">
-                                <span v-for="code in recoveryCodes" :key="code">{{ code }}</span>
-                            </div>
-                            <button
-                                @click="regenerateCodes"
-                                class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
-                            >
-                                {{ t('profile.two_factor_regenerate') }}
-                            </button>
-                        </div>
-
-                        <div class="flex gap-3">
-                            <button
-                                @click="showExistingRecoveryCodes"
-                                class="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors cursor-pointer"
-                            >
-                                {{ showRecovery ? t('profile.two_factor_recovery_title') : t('profile.two_factor_recovery_title') }}
-                            </button>
-                            <button
-                                @click="disableTwoFactor"
-                                :disabled="disabling"
-                                class="px-4 py-2 text-sm font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50 cursor-pointer"
-                            >
-                                {{ t('profile.two_factor_disable') }}
-                            </button>
-                        </div>
+                        <button
+                            v-if="avatarPreview"
+                            type="button"
+                            :disabled="avatarUploading"
+                            @click="removeAvatar"
+                            :style="{
+                                background: 'transparent',
+                                border: '1px solid var(--border)',
+                                color: 'var(--danger)',
+                                padding: '6px 12px',
+                                borderRadius: '5px',
+                                fontSize: '12px',
+                                cursor: avatarUploading ? 'not-allowed' : 'pointer',
+                                fontFamily: 'inherit',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                            }"
+                        >
+                            <Icon name="trash" :size="11" />
+                            {{ t('profile.photo_remove') }}
+                        </button>
                     </div>
                 </div>
             </div>
-        </div>
+
+            <!-- Profile Information -->
+            <form @submit.prevent="saveProfile" class="cmd-card" :style="{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }">
+                <div>
+                    <h2 :style="{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">{{ t('profile.info_title') }}</h2>
+                    <p :style="{ fontSize: '11px', color: 'var(--fg-mute)', margin: '3px 0 0' }">{{ t('profile.info_desc') }}</p>
+                </div>
+                <div :style="{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }">
+                    <Field
+                        v-model="profileForm.first_name"
+                        :label="t('auth.first_name')"
+                        :error="profileForm.errors.first_name"
+                        autocomplete="given-name"
+                    />
+                    <Field
+                        v-model="profileForm.last_name"
+                        :label="t('auth.last_name')"
+                        :error="profileForm.errors.last_name"
+                        autocomplete="family-name"
+                    />
+                </div>
+                <Field
+                    v-model="profileForm.email"
+                    type="email"
+                    :label="t('auth.email')"
+                    :error="profileForm.errors.email"
+                    autocomplete="email"
+                />
+                <div :style="{ display: 'flex', justifyContent: 'flex-end' }">
+                    <button
+                        type="submit"
+                        :disabled="profileForm.processing"
+                        :style="{
+                            background: 'var(--accent)',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '7px 14px',
+                            borderRadius: '5px',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            cursor: profileForm.processing ? 'not-allowed' : 'pointer',
+                            opacity: profileForm.processing ? 0.6 : 1,
+                            fontFamily: 'inherit',
+                        }"
+                    >{{ t('profile.save') }}</button>
+                </div>
+            </form>
+
+            <!-- Password -->
+            <form @submit.prevent="updatePassword" class="cmd-card" :style="{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }">
+                <div>
+                    <h2 :style="{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">{{ t('profile.password_title') }}</h2>
+                    <p :style="{ fontSize: '11px', color: 'var(--fg-mute)', margin: '3px 0 0' }">{{ t('profile.password_desc') }}</p>
+                </div>
+                <Field
+                    v-model="passwordForm.current_password"
+                    type="password"
+                    :label="t('profile.current_password')"
+                    :error="passwordForm.errors.current_password"
+                    autocomplete="current-password"
+                />
+                <Field
+                    v-model="passwordForm.password"
+                    type="password"
+                    :label="t('profile.new_password')"
+                    :error="passwordForm.errors.password"
+                    autocomplete="new-password"
+                />
+                <Field
+                    v-model="passwordForm.password_confirmation"
+                    type="password"
+                    :label="t('profile.confirm_password')"
+                    :error="passwordForm.errors.password_confirmation"
+                    autocomplete="new-password"
+                />
+                <div :style="{ display: 'flex', justifyContent: 'flex-end' }">
+                    <button
+                        type="submit"
+                        :disabled="passwordForm.processing"
+                        :style="{
+                            background: 'var(--accent)',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '7px 14px',
+                            borderRadius: '5px',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            cursor: passwordForm.processing ? 'not-allowed' : 'pointer',
+                            opacity: passwordForm.processing ? 0.6 : 1,
+                            fontFamily: 'inherit',
+                        }"
+                    >{{ t('profile.update_password') }}</button>
+                </div>
+            </form>
+
+            <!-- Two-Factor Authentication -->
+            <div class="cmd-card" :style="{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }">
+                <div>
+                    <h2 :style="{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">{{ t('profile.two_factor_title') }}</h2>
+                    <p :style="{ fontSize: '11px', color: 'var(--fg-mute)', margin: '3px 0 0' }">{{ t('profile.two_factor_desc') }}</p>
+                </div>
+
+                <div :style="{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px' }">
+                    <Dot :color="twoFactorEnabled ? 'var(--success)' : 'var(--fg-mute)'" :size="6" />
+                    <span :style="{ color: twoFactorEnabled ? 'var(--success)' : 'var(--fg-dim)', fontWeight: 500 }">
+                        {{ twoFactorEnabled ? t('profile.two_factor_enabled') : t('profile.two_factor_not_enabled') }}
+                    </span>
+                </div>
+
+                <!-- Inline password confirmation -->
+                <div
+                    v-if="showPasswordConfirm"
+                    :style="{ padding: '14px', borderRadius: '6px', background: 'var(--panel2)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '10px' }"
+                >
+                    <div>
+                        <div :style="{ fontSize: '12.5px', fontWeight: 500, color: 'var(--fg)' }">{{ t('auth.confirm_password_title') }}</div>
+                        <p :style="{ fontSize: '11px', color: 'var(--fg-mute)', margin: '3px 0 0' }">{{ t('auth.confirm_password_subtitle') }}</p>
+                    </div>
+                    <Field
+                        v-model="confirmPasswordInput"
+                        type="password"
+                        :label="t('auth.password')"
+                        :error="confirmPasswordError"
+                        autocomplete="current-password"
+                        autofocus
+                    />
+                    <div :style="{ display: 'flex', gap: '6px' }">
+                        <button
+                            type="button"
+                            @click="submitPasswordConfirm"
+                            :style="{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '5px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }"
+                        >{{ t('auth.confirm_password_submit') }}</button>
+                        <button
+                            type="button"
+                            @click="cancelPasswordConfirm"
+                            :style="{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--fg-dim)', padding: '6px 12px', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }"
+                        >{{ t('common.cancel') }}</button>
+                    </div>
+                </div>
+
+                <!-- Enable flow -->
+                <div v-if="!twoFactorEnabled && !confirming && !showPasswordConfirm">
+                    <button
+                        type="button"
+                        @click="enableTwoFactor"
+                        :disabled="enabling"
+                        :style="{
+                            background: 'var(--accent)',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '7px 14px',
+                            borderRadius: '5px',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            cursor: enabling ? 'not-allowed' : 'pointer',
+                            opacity: enabling ? 0.6 : 1,
+                            fontFamily: 'inherit',
+                        }"
+                    >{{ t('profile.two_factor_enable') }}</button>
+                </div>
+
+                <!-- QR Code + Confirm -->
+                <div v-if="confirming" :style="{ display: 'flex', flexDirection: 'column', gap: '12px' }">
+                    <p :style="{ fontSize: '12px', color: 'var(--fg-dim)', margin: 0 }">{{ t('profile.two_factor_qr_instructions') }}</p>
+                    <div :style="{ display: 'flex', justifyContent: 'center', padding: '14px', background: '#fff', borderRadius: '6px', border: '1px solid var(--border)' }" v-html="qrCode"></div>
+                    <Field
+                        v-model="confirmCode"
+                        :label="t('profile.two_factor_enter_code')"
+                        :error="confirmError"
+                        autocomplete="one-time-code"
+                        inputmode="numeric"
+                    />
+                    <button
+                        type="button"
+                        @click="confirmTwoFactor"
+                        :style="{ alignSelf: 'flex-start', background: 'var(--accent)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: '5px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }"
+                    >{{ t('profile.two_factor_confirm') }}</button>
+                </div>
+
+                <!-- Enabled: recovery codes + disable -->
+                <div v-if="twoFactorEnabled && !confirming" :style="{ display: 'flex', flexDirection: 'column', gap: '12px' }">
+                    <div v-if="showRecovery && recoveryCodes.length" :style="{ display: 'flex', flexDirection: 'column', gap: '10px' }">
+                        <div>
+                            <h3 :style="{ margin: 0, fontSize: '12.5px', fontWeight: 600, color: 'var(--fg)' }">{{ t('profile.two_factor_recovery_title') }}</h3>
+                            <p :style="{ fontSize: '11px', color: 'var(--fg-mute)', margin: '3px 0 0' }">{{ t('profile.two_factor_recovery_desc') }}</p>
+                        </div>
+                        <div
+                            class="cmd-mono"
+                            :style="{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '6px', padding: '12px', borderRadius: '5px', background: 'var(--panel2)', border: '1px solid var(--border)', fontSize: '11.5px', color: 'var(--fg)' }"
+                        >
+                            <span v-for="code in recoveryCodes" :key="code">{{ code }}</span>
+                        </div>
+                        <button
+                            type="button"
+                            @click="regenerateCodes"
+                            :style="{ alignSelf: 'flex-start', background: 'transparent', border: 'none', padding: 0, color: 'var(--accent)', fontSize: '11.5px', cursor: 'pointer', fontFamily: 'inherit' }"
+                        >{{ t('profile.two_factor_regenerate') }}</button>
+                    </div>
+
+                    <div :style="{ display: 'flex', gap: '6px' }">
+                        <button
+                            type="button"
+                            @click="showExistingRecoveryCodes"
+                            :style="{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--fg-dim)', padding: '6px 12px', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }"
+                        >{{ t('profile.two_factor_recovery_title') }}</button>
+                        <button
+                            type="button"
+                            @click="disableTwoFactor"
+                            :disabled="disabling"
+                            :style="{
+                                background: 'var(--danger)',
+                                color: '#fff',
+                                border: 'none',
+                                padding: '6px 12px',
+                                borderRadius: '5px',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                cursor: disabling ? 'not-allowed' : 'pointer',
+                                opacity: disabling ? 0.6 : 1,
+                                fontFamily: 'inherit',
+                            }"
+                        >{{ t('profile.two_factor_disable') }}</button>
+                    </div>
+                </div>
+            </div>
+        </section>
     </AppLayout>
 </template>

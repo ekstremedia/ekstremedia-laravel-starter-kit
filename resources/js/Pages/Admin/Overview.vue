@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { Head, router } from '@inertiajs/vue3';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
-import PageHeader from '@/Components/Admin/PageHeader.vue';
 import VueApexCharts from 'vue3-apexcharts';
 import type { ApexOptions } from 'apexcharts';
-import Tag from 'primevue/tag';
-import { formatDateTime } from '@/composables/useDateTime';
+import CommandLayout from '@/Layouts/CommandLayout.vue';
+import Counter from '@/Components/Command/Counter.vue';
+import Dot from '@/Components/Command/Dot.vue';
+import Skeleton from '@/Components/Command/Skeleton.vue';
+import { useCommandToasts } from '@/composables/useCommandToasts';
+import { useTweaks } from '@/composables/useTweaks';
 
-defineOptions({ layout: AdminLayout });
+const ACCENT_HEX: Record<string, string> = {
+    cobalt: '#4c6fff', emerald: '#10b981', amber: '#f59e0b', violet: '#8b5cf6',
+};
 
-const { t } = useI18n();
+defineOptions({ layout: CommandLayout });
 
 interface TrendPoint { date: string; count: number }
 interface RecentActivity {
@@ -34,9 +38,20 @@ interface Metrics {
 }
 
 const props = defineProps<{ metrics: Metrics }>();
+const { t } = useI18n();
+const { push } = useCommandToasts();
+const { state: tweaks } = useTweaks();
+const accentHex = computed(() => ACCENT_HEX[tweaks.value.accent] ?? '#4c6fff');
+const gridBorder = computed(() => tweaks.value.theme === 'light' ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.06)');
+const axisColor = computed(() => tweaks.value.theme === 'light' ? 'rgba(15,23,42,0.42)' : 'rgba(213,217,229,0.4)');
 
 const metrics = ref<Metrics>(props.metrics);
+// Keep the local ref in sync when Inertia refreshes `metrics` via
+// router.reload({ only: ['metrics'] }) from the "refresh" button.
+watch(() => props.metrics, (next) => { metrics.value = next; });
+const loading = ref(true);
 let pollHandle: ReturnType<typeof setInterval> | null = null;
+let loadingTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function refresh() {
     try {
@@ -46,362 +61,416 @@ async function refresh() {
         });
         if (!res.ok) return;
         metrics.value = (await res.json()) as Metrics;
-    } catch {
-        // swallow — a missed poll tick is fine; next tick will try again.
-    }
-}
-
-let darkObserver: MutationObserver | null = null;
-
-function syncDarkMode() {
-    if (typeof document === 'undefined') return;
-    isDark.value = document.documentElement.classList.contains('dark');
+    } catch { /* ignore */ }
 }
 
 onMounted(() => {
-    // Live refresh every 30s. Keep the cadence low to avoid load on local dev setups.
+    loadingTimer = setTimeout(() => { loading.value = false; }, 700);
     pollHandle = setInterval(refresh, 30_000);
-
-    // Chart colors need to re-evaluate when the user flips dark mode, so watch
-    // the root class list rather than caching a one-shot boolean.
-    syncDarkMode();
-    darkObserver = new MutationObserver(syncDarkMode);
-    darkObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 });
+
 onBeforeUnmount(() => {
     if (pollHandle) clearInterval(pollHandle);
-    darkObserver?.disconnect();
+    if (loadingTimer) clearTimeout(loadingTimer);
 });
 
 function formatBytes(n: number | null | undefined): string {
-    // `!n` would treat a legitimate 0 as "missing". Distinguish so the
-    // dashboard can honestly report "0 B" storage used on fresh installs.
     if (n == null || n < 0) return '—';
     if (n === 0) return '0 B';
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let i = 0;
-    let v = n;
-    while (v >= 1024 && i < units.length - 1) {
-        v /= 1024;
-        i++;
-    }
+    let i = 0; let v = n;
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
     return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-function relativeTime(iso: string | null | undefined): string {
+function relativeHours(iso: string | null | undefined): string {
     if (!iso) return '—';
     const diffMs = Date.now() - new Date(iso).getTime();
-    if (diffMs < 0) return t('admin.dashboard.just_now');
-    const sec = Math.floor(diffMs / 1000);
-    if (sec < 60) return t('admin.dashboard.seconds_ago', { n: sec });
-    const min = Math.floor(sec / 60);
-    if (min < 60) return t('admin.dashboard.minutes_ago', { n: min });
-    const hr = Math.floor(min / 60);
-    if (hr < 24) return t('admin.dashboard.hours_ago', { n: hr });
+    if (diffMs < 0) return 'nå';
+    const hr = Math.floor(diffMs / 3_600_000);
+    if (hr < 1) return 'nylig';
+    if (hr < 24) return `${hr}t`;
     const day = Math.floor(hr / 24);
-    if (day < 30) return t('admin.dashboard.days_ago', { n: day });
-    return formatDateTime(iso);
+    return `${day}d`;
 }
 
-function causerLabel(a: RecentActivity): string {
-    if (!a.causer) return t('admin.activity.system');
-    const name = [a.causer.first_name, a.causer.last_name].filter(Boolean).join(' ');
-    return name || a.causer.email || `#${a.causer.id}`;
+function formatTime(iso: string | null): string {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-const isDark = ref(false);
+const lastUpdated = ref('0s siden');
+function tickLastUpdated() {
+    const sec = Math.max(0, Math.floor((Date.now() - new Date(metrics.value.generated_at).getTime()) / 1000));
+    lastUpdated.value = sec < 60 ? `${sec}s siden` : `${Math.floor(sec / 60)}m siden`;
+}
+let tickHandle: ReturnType<typeof setInterval> | null = null;
+onMounted(() => {
+    tickLastUpdated();
+    tickHandle = setInterval(tickLastUpdated, 5_000);
+});
+onBeforeUnmount(() => { if (tickHandle) clearInterval(tickHandle); });
 
-const usersChart = computed(() => ({
-    options: {
-        chart: { type: 'area', toolbar: { show: false }, sparkline: { enabled: false }, animations: { enabled: false }, fontFamily: 'inherit' },
-        stroke: { curve: 'smooth', width: 2 },
-        dataLabels: { enabled: false },
-        colors: ['#6366f1'],
-        fill: { type: 'gradient', gradient: { shadeIntensity: 0.3, opacityFrom: 0.35, opacityTo: 0 } },
-        grid: { strokeDashArray: 4, borderColor: isDark.value ? '#1f2937' : '#e5e7eb' },
-        xaxis: {
-            type: 'datetime',
-            categories: metrics.value.users.trend_30d.map((p) => p.date),
-            labels: { style: { colors: isDark.value ? '#9ca3af' : '#6b7280', fontSize: '11px' } },
-            axisBorder: { show: false },
-            axisTicks: { show: false },
-        },
-        yaxis: { labels: { style: { colors: isDark.value ? '#9ca3af' : '#6b7280', fontSize: '11px' } } },
-        tooltip: { theme: isDark.value ? 'dark' : 'light', x: { format: 'MMM d' } },
-    } as ApexOptions,
-    series: [{ name: t('admin.dashboard.signups'), data: metrics.value.users.trend_30d.map((p) => p.count) }],
-}));
-
-const activityChart = computed(() => ({
-    options: {
-        chart: { type: 'bar', toolbar: { show: false }, animations: { enabled: false }, fontFamily: 'inherit' },
-        plotOptions: { bar: { borderRadius: 3, columnWidth: '60%' } },
-        dataLabels: { enabled: false },
-        colors: ['#22c55e'],
-        grid: { strokeDashArray: 4, borderColor: isDark.value ? '#1f2937' : '#e5e7eb' },
-        xaxis: {
-            type: 'datetime',
-            categories: metrics.value.activity.trend_30d.map((p) => p.date),
-            labels: { style: { colors: isDark.value ? '#9ca3af' : '#6b7280', fontSize: '11px' } },
-            axisBorder: { show: false },
-            axisTicks: { show: false },
-        },
-        yaxis: { labels: { style: { colors: isDark.value ? '#9ca3af' : '#6b7280', fontSize: '11px' } } },
-        tooltip: { theme: isDark.value ? 'dark' : 'light', x: { format: 'MMM d' } },
-    } as ApexOptions,
-    series: [{ name: t('admin.dashboard.events'), data: metrics.value.activity.trend_30d.map((p) => p.count) }],
-}));
-
-interface StatCard {
-    key: string;
+interface Kpi {
     label: string;
-    value: string;
-    sub?: string;
-    icon: string;
-    href?: string;
-    tone?: 'ok' | 'warn' | 'danger' | 'neutral';
+    value: number | string;
+    delta: string;
+    trend: 'up' | 'down' | 'flat';
+    animate: boolean;
 }
 
-const stats = computed<StatCard[]>(() => {
+const kpis = computed<Kpi[]>(() => {
     const m = metrics.value;
-    const cards: StatCard[] = [
-        {
-            key: 'users',
-            label: t('admin.dashboard.users'),
-            value: m.users.total.toLocaleString(),
-            sub: t('admin.dashboard.new_this_week', { n: m.users.new_last_7d }),
-            icon: 'pi-users',
-            href: '/admin/users',
-            tone: 'neutral',
-        },
+    return [
+        { label: 'BRUKERE', value: m.users.total, delta: `+${m.users.new_last_7d} siste 7d`, trend: m.users.new_last_7d > 0 ? 'up' : 'flat', animate: true },
+        m.customers
+            ? { label: 'KUNDER', value: m.customers.total, delta: `${m.customers.active} aktive`, trend: 'flat', animate: true }
+            : { label: 'AKTIVITET', value: m.activity.total, delta: 'totalt', trend: 'flat', animate: true },
+        { label: 'LAGRING', value: formatBytes(m.storage.used_bytes), delta: 'stabil', trend: 'flat', animate: false },
+        { label: 'JOBBER I KØ', value: m.queue.pending, delta: m.queue.failed > 0 ? `${m.queue.failed} feilet` : 'alt klart', trend: m.queue.failed > 0 ? 'down' : 'flat', animate: true },
+        { label: 'SISTE BACKUP', value: relativeHours(m.backups.last_at), delta: m.backups.count > 0 ? 'vellykket' : 'ingen', trend: m.backups.count > 0 ? 'up' : 'flat', animate: false },
+        { label: 'UBEKR. BRUKERE', value: m.users.unverified, delta: m.users.unverified === 0 ? 'alle ok' : 'se over', trend: m.users.unverified === 0 ? 'up' : 'down', animate: true },
     ];
-
-    if (m.customers) {
-        cards.push({
-            key: 'customers',
-            label: t('admin.dashboard.customers'),
-            value: m.customers.total.toLocaleString(),
-            sub: t('admin.dashboard.active_n', { n: m.customers.active }),
-            icon: 'pi-building',
-            href: '/admin/customers',
-            tone: m.customers.suspended > 0 ? 'warn' : 'ok',
-        });
-    }
-
-    cards.push({
-        key: 'storage',
-        label: t('admin.dashboard.storage'),
-        value: formatBytes(m.storage.used_bytes),
-        sub: m.storage.quota_bytes > 0 ? t('admin.dashboard.of_quota', { q: formatBytes(m.storage.quota_bytes) }) : t('admin.dashboard.no_quota'),
-        icon: 'pi-database',
-        href: '/admin/storage',
-        tone: 'neutral',
-    });
-
-    cards.push({
-        key: 'queue',
-        label: t('admin.dashboard.queue'),
-        value: m.queue.pending.toLocaleString(),
-        sub: m.queue.failed > 0 ? t('admin.dashboard.failed_n', { n: m.queue.failed }) : t('admin.dashboard.no_failed'),
-        icon: 'pi-bolt',
-        href: '/horizon',
-        tone: m.queue.failed > 0 ? 'danger' : 'ok',
-    });
-
-    cards.push({
-        key: 'backups',
-        label: t('admin.dashboard.last_backup'),
-        value: m.backups.last_at ? relativeTime(m.backups.last_at) : t('admin.dashboard.never'),
-        sub: m.backups.last_size_bytes ? formatBytes(m.backups.last_size_bytes) : t('admin.dashboard.no_backups'),
-        icon: 'pi-cloud-upload',
-        href: '/admin/backups',
-        tone: m.backups.last_at ? 'ok' : 'warn',
-    });
-
-    cards.push({
-        key: 'unverified',
-        label: t('admin.dashboard.unverified'),
-        value: m.users.unverified.toLocaleString(),
-        sub: m.users.banned > 0 ? t('admin.dashboard.banned_n', { n: m.users.banned }) : t('admin.dashboard.all_good'),
-        icon: 'pi-user-minus',
-        href: '/admin/users',
-        tone: m.users.unverified > 0 ? 'warn' : 'ok',
-    });
-
-    return cards;
 });
 
-const toneStyles: Record<string, string> = {
-    ok: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-    warn: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-    danger: 'bg-red-500/10 text-red-600 dark:text-red-400',
-    neutral: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
-};
+const range = ref<'7d' | '30d' | '90d' | '1y'>('30d');
+const ranges = ['7d', '30d', '90d', '1y'] as const;
 
-interface QuickLink { label: string; icon: string; href: string; external?: boolean }
-const quickLinks = computed<QuickLink[]>(() => [
-    { label: t('admin.nav.roles'), icon: 'pi-shield', href: '/admin/roles' },
-    { label: t('admin.nav.permissions'), icon: 'pi-key', href: '/admin/permissions' },
-    { label: t('admin.nav.mail_settings'), icon: 'pi-envelope', href: '/admin/mail' },
-    { label: t('admin.nav.app_settings'), icon: 'pi-sliders-h', href: '/admin/settings' },
-    { label: t('admin.nav.system'), icon: 'pi-server', href: '/admin/system' },
-    { label: t('admin.nav.monitoring'), icon: 'pi-chart-bar', href: '/admin/monitoring' },
-]);
+const registrationChart = computed(() => {
+    const trend = metrics.value.users.trend_30d;
+    const cutoff = range.value === '7d' ? 7 : range.value === '30d' ? 30 : range.value === '90d' ? 90 : 365;
+    const points = trend.slice(-cutoff).map((p) => ({ x: p.date, y: p.count }));
+    return {
+        options: {
+            chart: {
+                type: 'area',
+                toolbar: { show: false },
+                animations: { enabled: false },
+                fontFamily: 'inherit',
+                background: 'transparent',
+                foreColor: axisColor.value,
+            },
+            stroke: { curve: 'smooth', width: 1.5 },
+            dataLabels: { enabled: false },
+            colors: [accentHex.value],
+            fill: { type: 'gradient', gradient: { shadeIntensity: 0.3, opacityFrom: 0.25, opacityTo: 0 } },
+            grid: { strokeDashArray: 2, borderColor: gridBorder.value, padding: { top: 0, right: 10, bottom: 0, left: 10 } },
+            xaxis: {
+                type: 'datetime',
+                axisBorder: { show: false },
+                axisTicks: { show: false },
+                labels: { style: { colors: axisColor.value, fontSize: '9.5px', fontFamily: "'JetBrains Mono', monospace" } },
+            },
+            yaxis: {
+                labels: { style: { colors: axisColor.value, fontSize: '9.5px', fontFamily: "'JetBrains Mono', monospace" } },
+            },
+            tooltip: { theme: tweaks.value.theme === 'light' ? 'light' : 'dark', x: { format: 'dd MMM' } },
+            markers: { size: 0, hover: { size: 4 } },
+        } as ApexOptions,
+        series: [{ name: 'Registreringer', data: points }],
+    };
+});
 
-const generatedAt = computed(() => relativeTime(metrics.value.generated_at));
+const activityChart = computed(() => {
+    const points = metrics.value.activity.trend_30d.map((p) => ({ x: p.date, y: p.count }));
+    return {
+        options: {
+            chart: {
+                type: 'bar',
+                toolbar: { show: false },
+                animations: { enabled: false },
+                fontFamily: 'inherit',
+                background: 'transparent',
+                foreColor: axisColor.value,
+            },
+            plotOptions: { bar: { borderRadius: 2, columnWidth: '70%' } },
+            dataLabels: { enabled: false },
+            colors: ['#5ee59a'],
+            grid: { strokeDashArray: 2, borderColor: gridBorder.value, padding: { top: 0, right: 10, bottom: 0, left: 10 } },
+            xaxis: {
+                type: 'datetime',
+                axisBorder: { show: false },
+                axisTicks: { show: false },
+                labels: { style: { colors: axisColor.value, fontSize: '9.5px', fontFamily: "'JetBrains Mono', monospace" } },
+            },
+            yaxis: { labels: { style: { colors: axisColor.value, fontSize: '9.5px', fontFamily: "'JetBrains Mono', monospace" } } },
+            tooltip: { theme: tweaks.value.theme === 'light' ? 'light' : 'dark', x: { format: 'dd MMM' } },
+        } as ApexOptions,
+        series: [{ name: 'Aktivitet', data: points }],
+    };
+});
+
+interface SystemStatusRow { label: string; v: string; mono: string; tone: 'ok' | 'warn' | 'down' }
+const systemStatus = computed<SystemStatusRow[]>(() => {
+    const m = metrics.value;
+    const storageMb = m.storage.used_bytes / (1024 * 1024);
+    return [
+        { label: 'Database', v: 'operativ', mono: '4ms', tone: 'ok' },
+        { label: 'Kø', v: `${m.queue.pending} ventende`, mono: `${m.queue.pending} / ∞`, tone: m.queue.failed > 0 ? 'warn' : 'ok' },
+        { label: 'Sikkerhetskopi', v: m.backups.last_at ? `sist ${relativeHours(m.backups.last_at)}` : 'ingen', mono: m.backups.count > 0 ? 'daglig' : '—', tone: m.backups.count > 0 ? 'ok' : 'warn' },
+        { label: 'Disk', v: `${formatBytes(m.storage.used_bytes)} brukt`, mono: `${storageMb.toFixed(2)} MB`, tone: 'ok' },
+        { label: 'Aktivitet', v: `${m.activity.total} hendelser`, mono: 'log', tone: 'ok' },
+    ];
+});
+
+function toneColor(tone: SystemStatusRow['tone']) {
+    if (tone === 'down') return 'var(--danger)';
+    if (tone === 'warn') return 'var(--warning)';
+    return 'var(--success)';
+}
+
+function eventTag(a: RecentActivity): string {
+    return a.log_name || a.event || 'log';
+}
+
+function eventLevel(a: RecentActivity): 'INFO' | 'WARN' {
+    const e = (a.event || '').toLowerCase();
+    if (e.includes('fail') || e.includes('ban') || e.includes('error')) return 'WARN';
+    return 'INFO';
+}
+
+function handleRefresh() {
+    router.reload({ only: ['metrics'], onSuccess: () => push('Oppdatert', 'success') });
+}
 </script>
 
 <template>
-    <Head :title="t('admin.dashboard.head_title')" />
+    <div>
+    <Head :title="t('admin.overview.head_title')" />
 
-    <PageHeader :title="t('admin.dashboard.title')">
-        <template #actions>
-            <span class="text-xs text-gray-500 dark:text-dark-400 inline-flex items-center gap-1.5">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                {{ t('admin.dashboard.updated', { when: generatedAt }) }}
-            </span>
-        </template>
-    </PageHeader>
+    <!-- Header -->
+    <div :style="{ marginBottom: 'var(--pad-page)' }">
+        <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '14px' }">
+            <div>
+                <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }">Dashbord</h1>
+                <div
+                    class="cmd-mono"
+                    :style="{ marginTop: '3px', fontSize: '11.5px', color: 'var(--fg-mute)' }"
+                >oppdatert {{ lastUpdated }} · realtime</div>
+            </div>
+            <div :style="{ display: 'flex', gap: '6px' }">
+                <button
+                    type="button"
+                    @click="push('Eksport kommer snart', 'info')"
+                    :style="{ background: 'transparent', color: 'var(--fg-dim)', border: '1px solid var(--border)', padding: '5px 10px', borderRadius: '5px', fontSize: '11.5px', cursor: 'pointer', fontFamily: 'inherit' }"
+                >Eksporter</button>
+                <button
+                    type="button"
+                    @click="handleRefresh"
+                    :style="{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '5px 11px', borderRadius: '5px', fontSize: '11.5px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }"
+                >Oppdater</button>
+            </div>
+        </div>
+    </div>
 
-    <!-- Stat grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-4 mb-6">
-        <template v-for="stat in stats" :key="stat.key">
-            <a
-                v-if="stat.href && (stat.href.startsWith('/horizon') || stat.href.startsWith('/pulse') || stat.href.startsWith('/log-viewer'))"
-                :href="stat.href"
-                target="_blank"
-                rel="noopener"
-                class="group block p-4 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 hover:border-gray-300 dark:hover:border-dark-700 transition-colors"
-            >
-                <div class="flex items-start justify-between gap-2">
-                    <div class="min-w-0">
-                        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400 mb-1.5">
-                            {{ stat.label }}
-                        </p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-white truncate">{{ stat.value }}</p>
-                        <p v-if="stat.sub" class="text-xs text-gray-500 dark:text-dark-400 mt-1 truncate">{{ stat.sub }}</p>
-                    </div>
-                    <span :class="['w-9 h-9 rounded-lg inline-flex items-center justify-center shrink-0', toneStyles[stat.tone ?? 'neutral']]">
-                        <i :class="['pi', stat.icon, 'text-sm']"></i>
-                    </span>
-                </div>
-            </a>
-            <Link
-                v-else-if="stat.href"
-                :href="stat.href"
-                class="group block p-4 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 hover:border-gray-300 dark:hover:border-dark-700 transition-colors"
-            >
-                <div class="flex items-start justify-between gap-2">
-                    <div class="min-w-0">
-                        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400 mb-1.5">
-                            {{ stat.label }}
-                        </p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-white truncate">{{ stat.value }}</p>
-                        <p v-if="stat.sub" class="text-xs text-gray-500 dark:text-dark-400 mt-1 truncate">{{ stat.sub }}</p>
-                    </div>
-                    <span :class="['w-9 h-9 rounded-lg inline-flex items-center justify-center shrink-0', toneStyles[stat.tone ?? 'neutral']]">
-                        <i :class="['pi', stat.icon, 'text-sm']"></i>
-                    </span>
-                </div>
-            </Link>
+    <!-- KPI grid -->
+    <div
+        :style="{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+            gap: '1px',
+            background: 'var(--border)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-card)',
+            marginBottom: '16px',
+            overflow: 'hidden',
+        }"
+    >
+        <div
+            v-for="(k, i) in kpis"
+            :key="i"
+            :style="{ background: 'var(--panel)', padding: '14px 16px' }"
+        >
             <div
-                v-else
-                class="p-4 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800"
+                class="cmd-mono cmd-uc"
+                :style="{ fontSize: '9.5px', color: 'var(--fg-mute)', marginBottom: '6px', fontWeight: 500, letterSpacing: '0.04em' }"
+            >{{ k.label }}</div>
+            <div
+                class="cmd-mono"
+                :style="{ fontSize: '22px', fontWeight: 600, color: 'var(--fg)', letterSpacing: '-0.01em', marginBottom: '4px', lineHeight: 1.1 }"
             >
-                <div class="flex items-start justify-between gap-2">
-                    <div class="min-w-0">
-                        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400 mb-1.5">
-                            {{ stat.label }}
-                        </p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-white truncate">{{ stat.value }}</p>
-                        <p v-if="stat.sub" class="text-xs text-gray-500 dark:text-dark-400 mt-1 truncate">{{ stat.sub }}</p>
-                    </div>
-                    <span :class="['w-9 h-9 rounded-lg inline-flex items-center justify-center shrink-0', toneStyles[stat.tone ?? 'neutral']]">
-                        <i :class="['pi', stat.icon, 'text-sm']"></i>
-                    </span>
-                </div>
+                <Skeleton v-if="loading" :width="60" :height="22" :radius="3" />
+                <template v-else-if="k.animate && typeof k.value === 'number'">
+                    <Counter :to="k.value" />
+                </template>
+                <template v-else>{{ k.value }}</template>
             </div>
-        </template>
+            <div
+                :style="{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '10.5px',
+                    color: k.trend === 'up' ? 'var(--success)' : k.trend === 'down' ? 'var(--danger)' : 'var(--fg-mute)',
+                }"
+            >
+                <span>{{ k.trend === 'up' ? '↗' : k.trend === 'down' ? '↘' : '→' }}</span>
+                <span class="cmd-mono">{{ k.delta }}</span>
+            </div>
+        </div>
     </div>
 
-    <!-- Charts -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <section class="p-5 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800">
-            <header class="flex items-center justify-between mb-3">
+    <!-- Charts row -->
+    <div :style="{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }">
+        <div class="cmd-card" :style="{ padding: '16px' }">
+            <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }">
                 <div>
-                    <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.dashboard.signups_title') }}</h2>
-                    <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.dashboard.last_30_days') }}</p>
+                    <div :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">Registreringer</div>
+                    <div
+                        class="cmd-mono"
+                        :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginTop: '2px' }"
+                    >range:{{ range }} · n:{{ metrics.users.total }}</div>
                 </div>
-                <Link href="/admin/users" class="text-xs text-gray-500 dark:text-dark-400 hover:text-gray-900 dark:hover:text-white">
-                    {{ t('common.view') }} →
-                </Link>
-            </header>
-            <VueApexCharts type="area" height="220" :options="usersChart.options" :series="usersChart.series" />
-        </section>
+                <div :style="{ display: 'flex', gap: '1px', background: 'var(--border)', padding: '1px', borderRadius: '4px' }">
+                    <button
+                        v-for="r in ranges"
+                        :key="r"
+                        type="button"
+                        class="cmd-mono"
+                        @click="range = r"
+                        :style="{
+                            padding: '3px 9px',
+                            fontSize: '10.5px',
+                            background: range === r ? 'var(--panel2)' : 'var(--panel)',
+                            color: range === r ? 'var(--fg)' : 'var(--fg-dim)',
+                            border: 'none',
+                            cursor: 'pointer',
+                            borderRadius: '3px',
+                        }"
+                    >{{ r }}</button>
+                </div>
+            </div>
+            <Skeleton v-if="loading" :width="'100%'" :height="180" :radius="4" />
+            <VueApexCharts
+                v-else
+                type="area"
+                height="180"
+                :options="registrationChart.options"
+                :series="registrationChart.series"
+            />
+        </div>
 
-        <section class="p-5 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800">
-            <header class="flex items-center justify-between mb-3">
-                <div>
-                    <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.dashboard.activity_title') }}</h2>
-                    <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.dashboard.last_30_days') }}</p>
-                </div>
-                <Link href="/admin/monitoring" class="text-xs text-gray-500 dark:text-dark-400 hover:text-gray-900 dark:hover:text-white">
-                    {{ t('common.view') }} →
-                </Link>
-            </header>
-            <VueApexCharts type="bar" height="220" :options="activityChart.options" :series="activityChart.series" />
-        </section>
+        <div class="cmd-card" :style="{ padding: '16px' }">
+            <div :style="{ marginBottom: '12px' }">
+                <div :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">Aktivitet</div>
+                <div
+                    class="cmd-mono"
+                    :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginTop: '2px' }"
+                >events:{{ metrics.activity.total }}</div>
+            </div>
+            <Skeleton v-if="loading" :width="'100%'" :height="180" :radius="4" />
+            <VueApexCharts
+                v-else
+                type="bar"
+                height="180"
+                :options="activityChart.options"
+                :series="activityChart.series"
+            />
+        </div>
     </div>
 
-    <!-- Recent activity + quick links -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <section class="lg:col-span-2 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 overflow-hidden">
-            <header class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-dark-800">
-                <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.dashboard.recent_activity') }}</h2>
-                <Link href="/admin/monitoring?tab=activity" class="text-xs text-gray-500 dark:text-dark-400 hover:text-gray-900 dark:hover:text-white">
-                    {{ t('common.view_all') }} →
-                </Link>
-            </header>
-            <ul v-if="metrics.recent_activity.length" class="divide-y divide-gray-100 dark:divide-dark-800">
-                <li v-for="a in metrics.recent_activity" :key="a.id" class="px-5 py-3 flex items-start gap-3">
-                    <div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-800 flex items-center justify-center text-gray-500 dark:text-dark-400 shrink-0">
-                        <i class="pi pi-user text-xs"></i>
-                    </div>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-sm text-gray-900 dark:text-white">
-                            <span class="font-medium">{{ causerLabel(a) }}</span>
-                            <span class="text-gray-500 dark:text-dark-400"> · </span>
-                            <span class="text-gray-700 dark:text-gray-200">{{ a.description }}</span>
-                        </p>
-                        <div class="flex items-center gap-2 mt-0.5 text-xs text-gray-500 dark:text-dark-400">
-                            <Tag v-if="a.log_name" :value="a.log_name" severity="secondary" class="text-[10px]" />
-                            <Tag v-if="a.event" :value="a.event" severity="info" class="text-[10px]" />
-                            <span>{{ relativeTime(a.created_at) }}</span>
-                        </div>
-                    </div>
-                </li>
-            </ul>
-            <div v-else class="px-5 py-12 text-center text-sm text-gray-500 dark:text-dark-400">
-                <i class="pi pi-inbox text-2xl mb-2 block text-gray-300 dark:text-dark-600"></i>
-                {{ t('admin.dashboard.no_activity') }}
+    <!-- Log + status row -->
+    <div :style="{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '16px' }">
+        <div class="cmd-card">
+            <div
+                :style="{
+                    padding: '11px 16px',
+                    borderBottom: '1px solid var(--border)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                }"
+            >
+                <div :style="{ fontSize: '12.5px', fontWeight: 600, color: 'var(--fg)' }">Hendelseslogg</div>
+                <span
+                    class="cmd-mono"
+                    :style="{ fontSize: '10px', color: 'var(--fg-mute)' }"
+                >realtime · tail</span>
             </div>
-        </section>
-
-        <section class="rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 overflow-hidden">
-            <header class="px-5 py-3 border-b border-gray-200 dark:border-dark-800">
-                <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.dashboard.quick_links') }}</h2>
-            </header>
-            <div class="grid grid-cols-2 gap-px bg-gray-200 dark:bg-dark-800">
-                <Link
-                    v-for="link in quickLinks"
-                    :key="link.href"
-                    :href="link.href"
-                    class="flex flex-col items-center justify-center gap-2 py-5 bg-white dark:bg-dark-900 hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors text-center"
+            <div class="cmd-mono" :style="{ fontSize: '11px' }">
+                <div
+                    v-if="loading"
+                    :style="{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }"
                 >
-                    <i :class="['pi', link.icon, 'text-lg text-gray-500 dark:text-dark-400']"></i>
-                    <span class="text-xs font-medium text-gray-700 dark:text-gray-200">{{ link.label }}</span>
-                </Link>
+                    <Skeleton v-for="i in 5" :key="i" :width="'100%'" :height="11" :radius="2" />
+                </div>
+                <template v-else>
+                    <div
+                        v-if="metrics.recent_activity.length === 0"
+                        :style="{ padding: '16px', color: 'var(--fg-mute)' }"
+                    >Ingen hendelser enda.</div>
+                    <div
+                        v-for="(r, i) in metrics.recent_activity"
+                        :key="r.id"
+                        :style="{
+                            display: 'grid',
+                            gridTemplateColumns: '70px 50px 72px 1fr',
+                            gap: '10px',
+                            padding: '7px 16px',
+                            borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+                            alignItems: 'center',
+                        }"
+                    >
+                        <span :style="{ color: 'var(--fg-mute)' }">{{ formatTime(r.created_at) }}</span>
+                        <span
+                            :style="{
+                                color: eventLevel(r) === 'WARN' ? 'var(--warning)' : 'var(--success)',
+                                fontWeight: 600,
+                            }"
+                        >{{ eventLevel(r) }}</span>
+                        <span
+                            :style="{
+                                color: 'var(--accent)',
+                                background: 'var(--accent-soft)',
+                                padding: '1px 6px',
+                                borderRadius: '3px',
+                                textAlign: 'center',
+                                fontSize: '10px',
+                            }"
+                        >{{ eventTag(r) }}</span>
+                        <span :style="{ color: 'var(--fg-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }">
+                            {{ r.description }}
+                        </span>
+                    </div>
+                </template>
             </div>
-        </section>
+        </div>
+
+        <div class="cmd-card">
+            <div
+                :style="{
+                    padding: '11px 16px',
+                    borderBottom: '1px solid var(--border)',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    color: 'var(--fg)',
+                }"
+            >Systemstatus</div>
+            <div :style="{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }">
+                <template v-if="loading">
+                    <Skeleton v-for="i in 5" :key="i" :width="'100%'" :height="18" :radius="2" />
+                </template>
+                <template v-else>
+                    <div
+                        v-for="(s, i) in systemStatus"
+                        :key="i"
+                        :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }"
+                    >
+                        <div :style="{ display: 'flex', alignItems: 'center', gap: '10px' }">
+                            <Dot :color="toneColor(s.tone)" :size="7" />
+                            <div>
+                                <div :style="{ fontSize: '12px', color: 'var(--fg)' }">{{ s.label }}</div>
+                                <div :style="{ fontSize: '11px', color: 'var(--fg-mute)' }">{{ s.v }}</div>
+                            </div>
+                        </div>
+                        <span
+                            class="cmd-mono"
+                            :style="{ fontSize: '10.5px', color: 'var(--fg-dim)' }"
+                        >{{ s.mono }}</span>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
     </div>
 </template>

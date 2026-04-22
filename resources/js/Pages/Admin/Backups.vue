@@ -1,23 +1,20 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
-import PageHeader from '@/Components/Admin/PageHeader.vue';
-import DataTableShell from '@/Components/Admin/DataTableShell.vue';
-import { formatDateTime } from '@/composables/useDateTime';
-import DataTable from 'primevue/datatable';
-import Column from 'primevue/column';
-import Button from 'primevue/button';
-import Tag from 'primevue/tag';
-import Dialog from 'primevue/dialog';
-import InputText from 'primevue/inputtext';
 import { useI18n } from 'vue-i18n';
+import CommandLayout from '@/Layouts/CommandLayout.vue';
+import CmdDataTable, { type Column } from '@/Components/Command/DataTable.vue';
+import Icon from '@/Components/Command/Icon.vue';
+import Dot from '@/Components/Command/Dot.vue';
+import { useCommandToasts } from '@/composables/useCommandToasts';
+import { formatDateTime } from '@/composables/useDateTime';
 
-defineOptions({ layout: AdminLayout });
+defineOptions({ layout: CommandLayout });
 
 const { t } = useI18n();
+const { push } = useCommandToasts();
 
-interface Backup { disk: string; path: string; size: number; date: string }
+interface Backup { id?: string; disk: string; path: string; size: number; date: string }
 interface Summary { disk: string; count: number; used_bytes: number; newest_at: string | null; error?: boolean }
 interface BackupConfig {
     includes: string[];
@@ -39,6 +36,22 @@ const props = defineProps<{
     config: BackupConfig;
 }>();
 
+// Rows need a stable id for the shared table. Use disk:path as the key.
+const rows = computed(() =>
+    props.backups.map((b) => ({ ...b, id: `${b.disk}:${b.path}` })),
+);
+
+const columns: Column<(Backup & { id: string })>[] = [
+    { key: 'date', label: t('admin.backups.date'), sortable: true, width: '180px', mono: true },
+    { key: 'disk', label: t('admin.backups.disk'), sortable: true, width: '120px' },
+    { key: 'path', label: t('admin.backups.file'), sortable: true, mono: true },
+    { key: 'size', label: t('admin.backups.size'), sortable: true, width: '120px', align: 'right', mono: true },
+];
+
+const search = ref('');
+const sortKey = ref('date');
+const sortDir = ref<'asc' | 'desc'>('desc');
+
 function humanSize(bytes: number | null | undefined): string {
     if (!bytes || bytes <= 0) return '0 B';
     if (bytes < 1024) return `${bytes} B`;
@@ -48,10 +61,16 @@ function humanSize(bytes: number | null | undefined): string {
 }
 
 function runBackup() {
-    router.post('/admin/backups/run', {}, { preserveScroll: true });
+    router.post('/admin/backups/run', {}, {
+        preserveScroll: true,
+        onSuccess: () => push(t('admin.backups.toast_started'), 'success'),
+    });
 }
 function runClean() {
-    router.post('/admin/backups/clean', {}, { preserveScroll: true });
+    router.post('/admin/backups/clean', {}, {
+        preserveScroll: true,
+        onSuccess: () => push(t('admin.backups.toast_clean_started'), 'info'),
+    });
 }
 
 function downloadUrl(b: Backup): string {
@@ -59,7 +78,7 @@ function downloadUrl(b: Backup): string {
     return `/admin/backups/download?${params.toString()}`;
 }
 
-const infoOpen = ref(true);
+const infoOpen = ref(false);
 
 const restoreTarget = ref<Backup | null>(null);
 const restoreConfirmText = ref('');
@@ -68,9 +87,7 @@ const restoreFilename = computed(() =>
     restoreTarget.value ? restoreTarget.value.path.split('/').pop() ?? '' : '',
 );
 
-const restoreValid = computed(
-    () => restoreConfirmText.value.trim() === restoreFilename.value,
-);
+const restoreValid = computed(() => restoreConfirmText.value.trim() === restoreFilename.value);
 
 function openRestore(b: Backup) {
     restoreTarget.value = b;
@@ -86,208 +103,271 @@ function submitRestore() {
     if (!restoreTarget.value || !restoreValid.value) return;
     router.post(
         '/admin/backups/prepare-restore',
-        {
-            disk: restoreTarget.value.disk,
-            path: restoreTarget.value.path,
-            confirm: restoreConfirmText.value.trim(),
-        },
-        {
-            preserveScroll: true,
-            // onSuccess (not onFinish) so validation errors keep the dialog
-            // open — otherwise the modal closes on server error and the
-            // admin has to reopen + retype the filename with no visual cue.
-            onSuccess: cancelRestore,
-        },
+        { disk: restoreTarget.value.disk, path: restoreTarget.value.path, confirm: restoreConfirmText.value.trim() },
+        { preserveScroll: true, onSuccess: cancelRestore },
     );
 }
 </script>
 
 <template>
     <div>
-        <Head :title="t('admin.backups.head_title')" />
+    <Head :title="t('admin.backups.head_title')" />
 
-        <PageHeader :title="t('admin.backups.title')" :description="t('admin.backups.subtitle')">
-        <template #actions>
-            <Button :label="t('admin.backups.run_now')" icon="pi pi-play" @click="runBackup" />
-            <Button :label="t('admin.backups.clean')" icon="pi pi-trash" severity="secondary" @click="runClean" />
-        </template>
-    </PageHeader>
-
-    <!-- Summary strip -->
-    <div v-if="summaries.length" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div
-            v-for="s in summaries"
-            :key="s.disk"
-            class="p-4 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800"
-        >
-            <div class="flex items-center justify-between mb-2">
-                <Tag :value="s.disk" severity="info" />
-                <span class="text-xs text-gray-500 dark:text-dark-400">{{ s.count }} {{ t('admin.backups.files') }}</span>
-            </div>
-            <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ humanSize(s.used_bytes) }}</p>
-            <p class="text-xs text-gray-500 dark:text-dark-400 mt-0.5">
-                {{ s.newest_at ? t('admin.backups.newest_at', { when: formatDateTime(s.newest_at) }) : t('admin.backups.no_backups_yet') }}
-            </p>
+    <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '14px' }">
+        <div>
+            <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }">
+                {{ t('admin.backups.title') }}
+            </h1>
+            <div
+                class="cmd-mono"
+                :style="{ marginTop: '3px', fontSize: '11.5px', color: 'var(--fg-mute)' }"
+            >{{ t('admin.backups.subtitle') }}</div>
+        </div>
+        <div :style="{ display: 'flex', gap: '6px' }">
+            <button
+                type="button"
+                @click="runClean"
+                :style="{ background: 'transparent', color: 'var(--fg-dim)', border: '1px solid var(--border)', padding: '5px 10px', borderRadius: '5px', fontSize: '11.5px', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: '5px' }"
+            >
+                <Icon name="trash" :size="12" />
+                {{ t('admin.backups.clean') }}
+            </button>
+            <button
+                type="button"
+                @click="runBackup"
+                :style="{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '5px 11px', borderRadius: '5px', fontSize: '11.5px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: '5px' }"
+            >
+                <Icon name="arrow" :size="12" />
+                {{ t('admin.backups.run_now') }}
+            </button>
         </div>
     </div>
 
-    <!-- Info / how it works -->
-    <section class="mb-6 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 overflow-hidden">
+    <!-- Summary strip -->
+    <div
+        v-if="summaries.length"
+        :style="{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            gap: '1px',
+            background: 'var(--border)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-card)',
+            overflow: 'hidden',
+            marginBottom: '16px',
+        }"
+    >
+        <div
+            v-for="s in summaries"
+            :key="s.disk"
+            :style="{ background: 'var(--panel)', padding: '14px 16px' }"
+        >
+            <div
+                class="cmd-mono cmd-uc"
+                :style="{ fontSize: '9.5px', color: 'var(--fg-mute)', marginBottom: '6px', fontWeight: 500, letterSpacing: '0.04em', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }"
+            >
+                <span>{{ s.disk }}</span>
+                <span>{{ s.count }} {{ t('admin.backups.files') }}</span>
+            </div>
+            <div
+                class="cmd-mono"
+                :style="{ fontSize: '22px', fontWeight: 600, color: 'var(--fg)', letterSpacing: '-0.01em', marginBottom: '4px', lineHeight: 1.1 }"
+            >{{ humanSize(s.used_bytes) }}</div>
+            <div
+                :style="{ fontSize: '10.5px', color: 'var(--fg-mute)', display: 'flex', alignItems: 'center', gap: '6px' }"
+            >
+                <Dot :color="s.error ? 'var(--danger)' : s.newest_at ? 'var(--success)' : 'var(--warning)'" :size="5" />
+                <span>{{ s.newest_at ? t('admin.backups.newest_at', { when: formatDateTime(s.newest_at) }) : t('admin.backups.no_backups_yet') }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info panel (collapsed by default) -->
+    <div
+        class="cmd-card"
+        :style="{ marginBottom: '16px' }"
+    >
         <button
             type="button"
-            class="w-full flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-dark-800 cursor-pointer text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-            :aria-expanded="infoOpen"
-            aria-controls="backup-info-panel"
             @click="infoOpen = !infoOpen"
+            :style="{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '11px 16px',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: infoOpen ? '1px solid var(--border)' : 'none',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+            }"
         >
-            <div class="flex items-center gap-2">
-                <i class="pi pi-info-circle text-gray-400"></i>
-                <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.backups.how_it_works') }}</h2>
-            </div>
-            <i :class="['pi text-xs', infoOpen ? 'pi-chevron-up' : 'pi-chevron-down']"></i>
+            <span :style="{ fontSize: '12.5px', fontWeight: 600, color: 'var(--fg)' }">
+                {{ t('admin.backups.how_it_works') }}
+            </span>
+            <span :style="{ display: 'flex', transform: infoOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.12s', color: 'var(--fg-mute)' }">
+                <Icon name="chevD" :size="11" />
+            </span>
         </button>
-        <div v-if="infoOpen" id="backup-info-panel" class="px-5 py-5 grid gap-6 md:grid-cols-2 text-sm">
+        <div
+            v-if="infoOpen"
+            :style="{ padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '24px', fontSize: '12px', color: 'var(--fg-dim)' }"
+        >
             <div>
-                <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400 mb-2">
-                    {{ t('admin.backups.info_whats_included') }}
-                </h3>
-                <p class="text-gray-700 dark:text-gray-200 mb-3">
-                    {{ t('admin.backups.info_whats_included_desc') }}
-                </p>
-                <dl class="space-y-2 text-xs">
-                    <div v-if="config.databases.length" class="flex gap-2">
-                        <dt class="w-24 shrink-0 text-gray-500 dark:text-dark-400">{{ t('admin.backups.databases') }}</dt>
-                        <dd class="text-gray-800 dark:text-gray-100">
-                            <code v-for="db in config.databases" :key="db" class="inline-block mr-1 px-1.5 py-0.5 bg-gray-100 dark:bg-dark-800 rounded">{{ db }}</code>
-                        </dd>
-                    </div>
-                    <div v-if="config.includes.length" class="flex gap-2">
-                        <dt class="w-24 shrink-0 text-gray-500 dark:text-dark-400">{{ t('admin.backups.includes') }}</dt>
-                        <dd class="text-gray-800 dark:text-gray-100 break-all">
-                            <code v-for="p in config.includes" :key="p" class="inline-block mr-1 px-1.5 py-0.5 bg-gray-100 dark:bg-dark-800 rounded">{{ p }}</code>
-                        </dd>
-                    </div>
-                    <div v-if="config.excludes.length" class="flex gap-2">
-                        <dt class="w-24 shrink-0 text-gray-500 dark:text-dark-400">{{ t('admin.backups.excludes') }}</dt>
-                        <dd class="text-gray-800 dark:text-gray-100 break-all">
-                            <code v-for="p in config.excludes" :key="p" class="inline-block mr-1 px-1.5 py-0.5 bg-gray-100 dark:bg-dark-800 rounded">{{ p }}</code>
-                        </dd>
-                    </div>
-                </dl>
+                <div
+                    class="cmd-mono cmd-uc"
+                    :style="{ fontSize: '9.5px', color: 'var(--fg-mute)', marginBottom: '6px' }"
+                >{{ t('admin.backups.info_whats_included') }}</div>
+                <p :style="{ color: 'var(--fg)', marginBottom: '10px' }">{{ t('admin.backups.info_whats_included_desc') }}</p>
+                <div v-if="config.databases.length" :style="{ fontSize: '11px', marginBottom: '4px' }">
+                    <span :style="{ color: 'var(--fg-mute)', marginRight: '6px' }">{{ t('admin.backups.databases') }}:</span>
+                    <code v-for="db in config.databases" :key="db" class="cmd-mono" :style="{ padding: '1px 6px', background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '3px', marginRight: '3px', fontSize: '10.5px' }">{{ db }}</code>
+                </div>
             </div>
-
             <div>
-                <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400 mb-2">
-                    {{ t('admin.backups.info_retention') }}
-                </h3>
-                <ul class="space-y-1.5 text-xs text-gray-700 dark:text-gray-200">
+                <div
+                    class="cmd-mono cmd-uc"
+                    :style="{ fontSize: '9.5px', color: 'var(--fg-mute)', marginBottom: '6px' }"
+                >{{ t('admin.backups.info_retention') }}</div>
+                <ul :style="{ listStyle: 'none', padding: 0, margin: 0, fontSize: '11.5px', lineHeight: 1.8, color: 'var(--fg)' }">
                     <li>{{ t('admin.backups.retention_daily', { n: config.retention_daily_keep }) }}</li>
                     <li>{{ t('admin.backups.retention_weekly', { n: config.retention_weekly_keep }) }}</li>
                     <li>{{ t('admin.backups.retention_monthly', { n: config.retention_monthly_keep }) }}</li>
                     <li>{{ t('admin.backups.retention_yearly', { n: config.retention_yearly_keep }) }}</li>
-                    <li>{{ t('admin.backups.retention_max', { n: config.max_storage_mb }) }}</li>
                 </ul>
-                <p class="text-xs text-gray-500 dark:text-dark-400 mt-3">
-                    {{ t('admin.backups.powered_by_spatie') }}
-                    <a href="https://spatie.be/docs/laravel-backup" target="_blank" rel="noopener" class="text-indigo-600 dark:text-indigo-400 hover:underline">spatie/laravel-backup</a>.
-                </p>
-            </div>
-
-            <div class="md:col-span-2 border-t border-gray-100 dark:border-dark-800 pt-5">
-                <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400 mb-2">
-                    {{ t('admin.backups.info_how_to_restore') }}
-                </h3>
-                <ol class="space-y-2 text-sm text-gray-700 dark:text-gray-200 list-decimal list-inside">
-                    <li>{{ t('admin.backups.restore_step_1') }}</li>
-                    <li>{{ t('admin.backups.restore_step_2') }}</li>
-                    <li>
-                        {{ t('admin.backups.restore_step_3') }}
-                        <code class="block mt-1 p-2 text-xs bg-gray-100 dark:bg-dark-800 rounded">mysql -u root -p {{ config.databases[0] ?? 'your_db' }} &lt; storage/app/backup-restores/&lt;timestamp&gt;/db-dumps/&lt;file&gt;.sql</code>
-                    </li>
-                    <li>{{ t('admin.backups.restore_step_4') }}</li>
-                </ol>
-                <p class="text-xs text-amber-600 dark:text-amber-400 mt-3 flex items-start gap-1.5">
-                    <i class="pi pi-exclamation-triangle text-xs mt-0.5"></i>
-                    {{ t('admin.backups.restore_warning') }}
-                </p>
             </div>
         </div>
-    </section>
+    </div>
 
-    <!-- Backups table -->
-    <DataTableShell hide-search :count="backups.length" :count-label="t('admin.backups.files')">
-        <DataTable :value="backups" stripedRows removableSort scrollable class="border-0">
-            <Column field="date" :header="t('admin.backups.date')" style="width: 14rem" sortable>
-                <template #body="{ data }">{{ formatDateTime(data.date) }}</template>
-            </Column>
-            <Column field="disk" :header="t('admin.backups.disk')" style="width: 8rem" sortable>
-                <template #body="{ data }"><Tag :value="data.disk" severity="info" /></template>
-            </Column>
-            <Column field="path" :header="t('admin.backups.file')" sortable>
-                <template #body="{ data }">
-                    <code class="text-xs text-gray-600 dark:text-dark-300 break-all">{{ data.path }}</code>
-                </template>
-            </Column>
-            <Column field="size" :header="t('admin.backups.size')" style="width: 8rem" sortable>
-                <template #body="{ data }">{{ humanSize(data.size) }}</template>
-            </Column>
-            <Column :header="t('common.actions')" style="width: 14rem">
-                <template #body="{ data }">
-                    <Button
-                        as="a"
-                        :href="downloadUrl(data)"
-                        icon="pi pi-download"
-                        size="small"
-                        severity="secondary"
-                        class="mr-2"
-                        :title="t('admin.backups.download')"
-                    />
-                    <Button
-                        icon="pi pi-replay"
-                        size="small"
-                        severity="warn"
-                        :title="t('admin.backups.prepare_restore')"
-                        @click="openRestore(data)"
-                    />
-                </template>
-            </Column>
-            <template #empty>
-                <div class="px-6 py-10 text-center text-sm text-gray-500 dark:text-dark-400">
-                    <i class="pi pi-cloud-upload text-2xl mb-2 block text-gray-300 dark:text-dark-600"></i>
-                    {{ t('admin.backups.empty') }}
-                </div>
-            </template>
-        </DataTable>
-    </DataTableShell>
-
-    <Dialog
-        :visible="!!restoreTarget"
-        modal
-        :header="t('admin.backups.restore_dialog_title')"
-        :style="{ width: '32rem' }"
-        @update:visible="(v) => { if (!v) cancelRestore() }"
+    <CmdDataTable
+        :rows="rows"
+        :columns="columns"
+        v-model:search="search"
+        v-model:sort-key="sortKey"
+        v-model:sort-dir="sortDir"
+        :search-placeholder="t('admin.backups.search_placeholder')"
+        :search-keys="['path', 'disk']"
+        :empty-text="t('admin.backups.empty')"
+        action-column-width="100px"
     >
-        <p class="text-sm text-gray-700 dark:text-gray-200 mb-3">
-            {{ t('admin.backups.restore_dialog_body') }}
-        </p>
-        <div class="p-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-xs text-amber-800 dark:text-amber-200 mb-4">
-            <p class="font-medium mb-1">{{ t('admin.backups.restore_dialog_warning_title') }}</p>
-            <p>{{ t('admin.backups.restore_dialog_warning_body') }}</p>
-        </div>
-        <label class="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1.5">
-            {{ t('admin.backups.restore_dialog_confirm_label', { name: restoreFilename }) }}
-        </label>
-        <InputText v-model="restoreConfirmText" class="w-full" autocomplete="off" />
-        <template #footer>
-            <Button :label="t('common.cancel')" severity="secondary" @click="cancelRestore" />
-            <Button
-                :label="t('admin.backups.prepare_restore')"
-                icon="pi pi-replay"
-                severity="warn"
-                :disabled="!restoreValid"
-                @click="submitRestore"
-            />
+        <template #cell:date="{ row }">{{ formatDateTime(row.date) }}</template>
+        <template #cell:disk="{ row }">
+            <span
+                class="cmd-mono"
+                :style="{ fontSize: '10.5px', color: 'var(--accent)', background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', padding: '1px 7px', borderRadius: '3px' }"
+            >{{ row.disk }}</span>
         </template>
-    </Dialog>
+        <template #cell:path="{ row }">
+            <code :style="{ color: 'var(--fg-dim)', fontSize: '10.5px' }">{{ row.path }}</code>
+        </template>
+        <template #cell:size="{ row }">{{ humanSize(row.size) }}</template>
+
+        <template #actions="{ row }">
+            <a
+                :href="downloadUrl(row)"
+                :title="t('admin.backups.download')"
+                :style="{ background: 'transparent', border: 'none', color: 'var(--fg-dim)', cursor: 'pointer', padding: '4px', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }"
+            >
+                <Icon name="arrow" :size="12" />
+            </a>
+            <button
+                type="button"
+                :title="t('admin.backups.prepare_restore')"
+                @click="openRestore(row)"
+                :style="{ background: 'transparent', border: 'none', color: 'var(--warning)', cursor: 'pointer', padding: '4px', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }"
+            >
+                <Icon name="restore" :size="12" />
+            </button>
+        </template>
+    </CmdDataTable>
+
+    <!-- Restore confirmation dialog -->
+    <div
+        v-if="restoreTarget"
+        @click.self="cancelRestore"
+        :style="{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            paddingTop: '12vh',
+        }"
+    >
+        <div
+            :style="{
+                width: '520px',
+                maxWidth: '94vw',
+                background: 'var(--panel)',
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                padding: '20px',
+                boxShadow: 'var(--shadow-palette)',
+            }"
+        >
+            <div :style="{ fontSize: '14px', fontWeight: 600, color: 'var(--fg)', marginBottom: '10px' }">
+                {{ t('admin.backups.restore_dialog_title') }}
+            </div>
+            <p :style="{ fontSize: '12.5px', color: 'var(--fg-dim)', marginBottom: '12px', lineHeight: 1.5 }">
+                {{ t('admin.backups.restore_dialog_body') }}
+            </p>
+            <div
+                :style="{ padding: '10px 12px', borderRadius: '5px', background: 'rgba(251,191,36,0.10)', border: '1px solid rgba(251,191,36,0.33)', marginBottom: '14px' }"
+            >
+                <div :style="{ fontSize: '11.5px', fontWeight: 600, color: 'var(--warning)', marginBottom: '4px' }">
+                    {{ t('admin.backups.restore_dialog_warning_title') }}
+                </div>
+                <div :style="{ fontSize: '11.5px', color: 'var(--fg-dim)' }">
+                    {{ t('admin.backups.restore_dialog_warning_body') }}
+                </div>
+            </div>
+            <label
+                class="cmd-mono cmd-uc"
+                :style="{ display: 'block', fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '6px', fontWeight: 500 }"
+            >{{ t('admin.backups.restore_dialog_confirm_label', { name: restoreFilename }) }}</label>
+            <input
+                v-model="restoreConfirmText"
+                autocomplete="off"
+                :style="{
+                    width: '100%',
+                    background: 'var(--panel2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '5px',
+                    padding: '8px 10px',
+                    color: 'var(--fg)',
+                    fontSize: '12.5px',
+                    outline: 'none',
+                    fontFamily: 'var(--font-mono)',
+                }"
+            />
+            <div :style="{ display: 'flex', justifyContent: 'flex-end', gap: '6px', marginTop: '16px' }">
+                <button
+                    type="button"
+                    @click="cancelRestore"
+                    :style="{ background: 'transparent', color: 'var(--fg-dim)', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }"
+                >{{ t('common.cancel') }}</button>
+                <button
+                    type="button"
+                    :disabled="!restoreValid"
+                    @click="submitRestore"
+                    :style="{
+                        background: restoreValid ? 'var(--warning)' : 'var(--panel2)',
+                        color: restoreValid ? '#0a0c12' : 'var(--fg-mute)',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '5px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: restoreValid ? 'pointer' : 'not-allowed',
+                        fontFamily: 'inherit',
+                    }"
+                >{{ t('admin.backups.prepare_restore') }}</button>
+            </div>
+        </div>
+    </div>
     </div>
 </template>

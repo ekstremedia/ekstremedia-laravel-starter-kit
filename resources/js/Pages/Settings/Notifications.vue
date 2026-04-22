@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
-import { ref, onMounted } from 'vue';
-import { gsap } from 'gsap';
-import ToggleSwitch from 'primevue/toggleswitch';
-import AppLayout from '@/Layouts/AppLayout.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
+import AppLayout from '@/Layouts/CommandLayout.vue';
+import Toggle from '@/Components/Command/Toggle.vue';
+import Icon, { type IconName } from '@/Components/Command/Icon.vue';
 
 const props = defineProps<{
     preferences: {
@@ -29,27 +27,21 @@ const form = useForm({
     notification_storage_alerts: props.preferences.notification_storage_alerts,
 });
 
-const sectionsRef = ref<HTMLElement>();
+const digestOptions = [
+    { value: 'none', label: t('notifications.settings.digest_none') },
+    { value: 'daily', label: t('notifications.settings.digest_daily') },
+    { value: 'weekly', label: t('notifications.settings.digest_weekly') },
+];
 
-onMounted(() => {
-    if (!sectionsRef.value) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    gsap.from(sectionsRef.value.children, {
-        y: 20,
-        opacity: 0,
-        duration: 0.4,
-        stagger: 0.1,
-        ease: 'power2.out',
-        delay: 0.1,
-    });
-});
+const perType: { key: 'notification_chat_messages' | 'notification_account_updates' | 'notification_system_alerts' | 'notification_storage_alerts'; icon: IconName; label: string }[] = [
+    { key: 'notification_chat_messages', icon: 'mail', label: t('notifications.settings.chat_messages') },
+    { key: 'notification_account_updates', icon: 'user', label: t('notifications.settings.account_updates') },
+    { key: 'notification_system_alerts', icon: 'bell', label: t('notifications.settings.system_alerts') },
+    { key: 'notification_storage_alerts', icon: 'disk', label: t('notifications.settings.storage_alerts') },
+];
 
 function submit() {
-    // Flash success from the server is surfaced by useFlashToast globally —
-    // no local toast.add here, to avoid duplicates.
-    form.put('/settings/notifications', {
-        preserveScroll: true,
-    });
+    form.put('/settings/notifications', { preserveScroll: true });
 }
 </script>
 
@@ -57,84 +49,106 @@ function submit() {
     <AppLayout>
         <Head :title="t('notifications.settings.title')" />
 
-        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <h1 class="text-2xl font-bold mb-2">{{ t('notifications.settings.title') }}</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mb-8">{{ t('notifications.settings.desc') }}</p>
+        <section :style="{ maxWidth: '780px', margin: '0 auto', padding: '32px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }">
+            <header>
+                <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }">
+                    {{ t('notifications.settings.title') }}
+                </h1>
+                <p
+                    class="cmd-mono"
+                    :style="{ marginTop: '4px', fontSize: '11.5px', color: 'var(--fg-mute)' }"
+                >{{ t('notifications.settings.desc') }}</p>
+            </header>
 
-            <form @submit.prevent="submit" ref="sectionsRef" class="space-y-6">
+            <form @submit.prevent="submit" :style="{ display: 'flex', flexDirection: 'column', gap: '16px' }">
                 <!-- Email delivery -->
-                <div class="bg-white dark:bg-dark-900 rounded-2xl border border-gray-200 dark:border-dark-700 p-6 space-y-5">
-                    <h2 class="text-lg font-semibold">{{ t('notifications.settings.email_delivery') }}</h2>
+                <div class="cmd-card" :style="{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }">
+                    <h2 :style="{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">
+                        {{ t('notifications.settings.email_delivery') }}
+                    </h2>
 
-                    <!-- Immediate emails -->
-                    <label class="flex items-start justify-between gap-3 cursor-pointer">
-                        <div>
-                            <span class="text-sm font-medium">{{ t('notifications.settings.email_on_new') }}</span>
-                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ t('notifications.settings.email_on_new_desc') }}</p>
+                    <label :style="{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', cursor: 'pointer' }">
+                        <div :style="{ minWidth: 0 }">
+                            <div :style="{ fontSize: '12.5px', fontWeight: 500, color: 'var(--fg)' }">
+                                {{ t('notifications.settings.email_on_new') }}
+                            </div>
+                            <p :style="{ fontSize: '11px', color: 'var(--fg-mute)', margin: '3px 0 0' }">
+                                {{ t('notifications.settings.email_on_new_desc') }}
+                            </p>
                         </div>
-                        <ToggleSwitch v-model="form.notification_email_immediate" />
+                        <Toggle v-model="form.notification_email_immediate" :label="t('notifications.settings.email_on_new')" />
                     </label>
 
-                    <!-- Digest frequency -->
                     <div>
-                        <label for="notification-digest" class="text-sm font-medium block mb-2">{{ t('notifications.settings.digest') }}</label>
-                        <select
-                            id="notification-digest"
-                            v-model="form.notification_digest"
-                            class="w-full sm:w-64 rounded-xl border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-800 px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer"
-                        >
-                            <option value="none">{{ t('notifications.settings.digest_none') }}</option>
-                            <option value="daily">{{ t('notifications.settings.digest_daily') }}</option>
-                            <option value="weekly">{{ t('notifications.settings.digest_weekly') }}</option>
-                        </select>
+                        <label
+                            for="notification-digest"
+                            class="cmd-mono cmd-uc"
+                            :style="{ display: 'block', fontSize: '10px', fontWeight: 500, letterSpacing: '0.06em', color: 'var(--fg-mute)', marginBottom: '6px' }"
+                        >{{ t('notifications.settings.digest') }}</label>
+                        <div :style="{ display: 'flex', gap: '6px', flexWrap: 'wrap' }">
+                            <button
+                                v-for="opt in digestOptions"
+                                :key="opt.value"
+                                type="button"
+                                @click="form.notification_digest = opt.value"
+                                :style="{
+                                    padding: '5px 11px',
+                                    fontSize: '11.5px',
+                                    borderRadius: '5px',
+                                    cursor: 'pointer',
+                                    fontFamily: 'inherit',
+                                    background: form.notification_digest === opt.value ? 'var(--accent-soft)' : 'transparent',
+                                    border: `1px solid ${form.notification_digest === opt.value ? 'var(--accent-border)' : 'var(--border)'}`,
+                                    color: form.notification_digest === opt.value ? 'var(--fg)' : 'var(--fg-dim)',
+                                }"
+                            >{{ opt.label }}</button>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Per-type toggles -->
-                <div class="bg-white dark:bg-dark-900 rounded-2xl border border-gray-200 dark:border-dark-700 p-6 space-y-4">
-                    <h2 class="text-lg font-semibold">{{ t('notifications.settings.per_type_title') }}</h2>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('notifications.settings.per_type_desc') }}</p>
+                <div class="cmd-card" :style="{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }">
+                    <div>
+                        <h2 :style="{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">
+                            {{ t('notifications.settings.per_type_title') }}
+                        </h2>
+                        <p :style="{ fontSize: '11px', color: 'var(--fg-mute)', margin: '3px 0 0' }">
+                            {{ t('notifications.settings.per_type_desc') }}
+                        </p>
+                    </div>
 
-                    <label class="flex items-center justify-between gap-3 cursor-pointer">
-                        <div class="flex items-center gap-2">
-                            <i class="pi pi-comments text-sm text-indigo-500"></i>
-                            <span class="text-sm">{{ t('notifications.settings.chat_messages') }}</span>
+                    <label
+                        v-for="row in perType"
+                        :key="row.key"
+                        :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', cursor: 'pointer' }"
+                    >
+                        <div :style="{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }">
+                            <Icon :name="row.icon" :size="13" :style="{ color: 'var(--accent)' }" />
+                            <span :style="{ fontSize: '12.5px', color: 'var(--fg)' }">{{ row.label }}</span>
                         </div>
-                        <ToggleSwitch v-model="form.notification_chat_messages" />
-                    </label>
-
-                    <label class="flex items-center justify-between gap-3 cursor-pointer">
-                        <div class="flex items-center gap-2">
-                            <i class="pi pi-user text-sm text-indigo-500"></i>
-                            <span class="text-sm">{{ t('notifications.settings.account_updates') }}</span>
-                        </div>
-                        <ToggleSwitch v-model="form.notification_account_updates" />
-                    </label>
-
-                    <label class="flex items-center justify-between gap-3 cursor-pointer">
-                        <div class="flex items-center gap-2">
-                            <i class="pi pi-bell text-sm text-indigo-500"></i>
-                            <span class="text-sm">{{ t('notifications.settings.system_alerts') }}</span>
-                        </div>
-                        <ToggleSwitch v-model="form.notification_system_alerts" />
-                    </label>
-
-                    <label class="flex items-center justify-between gap-3 cursor-pointer">
-                        <div class="flex items-center gap-2">
-                            <i class="pi pi-database text-sm text-indigo-500"></i>
-                            <span class="text-sm">{{ t('notifications.settings.storage_alerts') }}</span>
-                        </div>
-                        <ToggleSwitch v-model="form.notification_storage_alerts" />
+                        <Toggle v-model="form[row.key]" :label="row.label" />
                     </label>
                 </div>
 
-                <!-- Save button -->
-                <div class="flex justify-end">
-                    <PrimaryButton :disabled="form.processing">
-                        {{ t('notifications.settings.save') }}
-                    </PrimaryButton>
+                <div :style="{ display: 'flex', justifyContent: 'flex-end' }">
+                    <button
+                        type="submit"
+                        :disabled="form.processing"
+                        :style="{
+                            background: 'var(--accent)',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '7px 14px',
+                            borderRadius: '5px',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            cursor: form.processing ? 'not-allowed' : 'pointer',
+                            opacity: form.processing ? 0.6 : 1,
+                            fontFamily: 'inherit',
+                        }"
+                    >{{ t('notifications.settings.save') }}</button>
                 </div>
             </form>
-        </div>
+        </section>
     </AppLayout>
 </template>

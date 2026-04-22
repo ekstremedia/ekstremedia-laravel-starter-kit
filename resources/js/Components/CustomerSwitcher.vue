@@ -21,7 +21,7 @@ const { t } = useI18n();
 const page = usePage<PageProps>();
 
 const current = computed<Customer | null>(() => page.props.customer ?? null);
-const list = computed<Customer[]>(() => page.props.customers ?? []);
+const list = computed<Customer[]>(() => page.props.available_customers ?? []);
 
 const open = ref(false);
 const rootRef = ref<HTMLElement | null>(null);

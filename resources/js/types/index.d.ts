@@ -22,6 +22,10 @@ export interface User {
 
 export type NotificationDigestFrequency = 'none' | 'daily' | 'weekly';
 
+export type CommandTheme = 'dark' | 'hc' | 'light';
+export type CommandAccent = 'cobalt' | 'emerald' | 'amber' | 'violet';
+export type CommandDensity = 'compact' | 'comfortable' | 'relaxed';
+
 export interface UserSettings {
     locale: string;
     dark_mode: boolean;
@@ -30,6 +34,12 @@ export interface UserSettings {
     notification_chat_messages: boolean;
     notification_account_updates: boolean;
     notification_system_alerts: boolean;
+    // Command-design tweaks (client-only; not synced to server).
+    theme?: CommandTheme;
+    accent?: CommandAccent;
+    density?: CommandDensity;
+    show_kbd_hints?: boolean;
+    rail_expanded?: boolean;
     [key: string]: UserSettingValue;
 }
 
@@ -70,5 +80,5 @@ export interface PageProps extends InertiaPageProps {
         announcement?: { text: string; severity: string } | null;
     };
     customer: Customer | null;
-    customers: Customer[];
+    available_customers: Customer[];
 }

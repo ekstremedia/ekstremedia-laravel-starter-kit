@@ -1,127 +1,158 @@
 <script setup lang="ts">
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
-import { computed, onMounted, ref } from 'vue';
-import { gsap } from 'gsap';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import { computed } from 'vue';
+import AppLayout from '@/Layouts/CommandLayout.vue';
+import Dot from '@/Components/Command/Dot.vue';
+import Icon from '@/Components/Command/Icon.vue';
 import { useCustomer } from '@/composables/useCustomer';
 import { formatDate } from '@/composables/useDateTime';
 import type { PageProps } from '@/types';
 
-const { t, locale } = useI18n();
+const { t } = useI18n();
 const page = usePage<PageProps>();
 const user = computed(() => page.props.auth.user!);
+const customer = computed(() => page.props.customer);
 const { customerUrl } = useCustomer();
 const profileUrl = computed(() => customerUrl('/profile'));
+const primaryRole = computed(() => user.value.roles?.[0] ?? 'User');
 
-const cardsRef = ref<HTMLElement>();
+function roleTone(r: string) {
+    if (r === 'Admin') return { color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.33)' };
+    if (r === 'Editor') return { color: 'var(--warning)', bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.33)' };
+    return { color: 'var(--accent)', bg: 'var(--accent-soft)', border: 'var(--accent-border)' };
+}
 
-const roleBadgeClass = computed(() => {
-    const role = user.value.roles?.[0];
-    switch (role) {
-        case 'Admin':
-            return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400';
-        case 'Editor':
-            return 'bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-400';
-        default:
-            return 'bg-slate-100 text-slate-600 dark:bg-dark-800 dark:text-dark-400';
-    }
-});
-
-onMounted(() => {
-    if (cardsRef.value) {
-        gsap.from(cardsRef.value.children, {
-            y: 20,
-            opacity: 0,
-            duration: 0.4,
-            stagger: 0.08,
-            ease: 'power2.out',
-            delay: 0.1,
-        });
-    }
+const headerMeta = computed(() => {
+    const now = new Date();
+    const date = now.toLocaleDateString('nb-NO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const time = now.toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+    const tenant = customer.value?.name ?? '';
+    return tenant ? `${date} · ${time} · ${tenant}` : `${date} · ${time}`;
 });
 </script>
 
 <template>
-    <Head :title="t('nav.dashboard')" />
-
     <AppLayout>
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-            <!-- Header -->
-            <div class="mb-8">
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                    {{ t('dashboard.welcome', { name: user.first_name }) }}
-                </h1>
-                <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">
-                    {{ t('dashboard.subtitle') }}
-                </p>
+        <Head :title="t('nav.dashboard')" />
+
+        <div :style="{ maxWidth: '780px', margin: '0 auto', padding: '32px 16px' }">
+            <div
+                class="cmd-mono"
+                :style="{
+                    fontSize: '10.5px',
+                    color: 'var(--fg-mute)',
+                    marginBottom: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                }"
+            >
+                <span>{{ headerMeta }}</span>
+                <span>·</span>
+                <span :style="{ display: 'flex', alignItems: 'center', gap: '4px' }">
+                    <Dot color="var(--success)" :size="5" />{{ t('home.all_operational') }}
+                </span>
             </div>
 
-            <!-- Stats cards -->
-            <div ref="cardsRef" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <!-- Role -->
-                <div class="p-5 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700">
-                    <p class="text-xs font-medium text-gray-500 dark:text-dark-400 uppercase tracking-wider mb-2">
-                        {{ t('dashboard.role') }}
-                    </p>
-                    <span class="inline-block px-2.5 py-1 text-xs font-semibold rounded-full" :class="roleBadgeClass">
-                        {{ user.roles?.[0] ?? 'User' }}
-                    </span>
-                </div>
+            <h1
+                :style="{
+                    margin: 0,
+                    fontSize: '32px',
+                    fontWeight: 700,
+                    letterSpacing: '-0.02em',
+                    color: 'var(--fg)',
+                }"
+            >{{ t('dashboard.welcome', { name: user.first_name }) }}</h1>
+            <p :style="{ fontSize: '13px', color: 'var(--fg-dim)', margin: '8px 0 0' }">
+                {{ t('dashboard.subtitle') }}
+            </p>
 
-                <!-- Email status -->
-                <div class="p-5 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700">
-                    <p class="text-xs font-medium text-gray-500 dark:text-dark-400 uppercase tracking-wider mb-2">
-                        {{ t('dashboard.email_status') }}
-                    </p>
+            <div
+                :style="{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '1px',
+                    background: 'var(--border)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-card)',
+                    marginTop: '24px',
+                    overflow: 'hidden',
+                }"
+            >
+                <div :style="{ background: 'var(--panel)', padding: '14px 16px' }">
+                    <div
+                        class="cmd-mono cmd-uc"
+                        :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '8px', fontWeight: 500 }"
+                    >{{ t('dashboard.role') }}</div>
                     <span
-                        class="inline-flex items-center gap-1.5 text-sm font-medium"
-                        :class="user.email_verified_at
-                            ? 'text-green-600 dark:text-green-400'
-                            : 'text-amber-600 dark:text-amber-400'"
-                    >
-                        <span class="w-2 h-2 rounded-full" :class="user.email_verified_at ? 'bg-green-500' : 'bg-amber-500'"></span>
-                        {{ user.email_verified_at ? t('dashboard.verified') : t('dashboard.unverified') }}
-                    </span>
+                        class="cmd-mono"
+                        :style="{
+                            fontSize: '11px',
+                            color: roleTone(primaryRole).color,
+                            background: roleTone(primaryRole).bg,
+                            border: `1px solid ${roleTone(primaryRole).border}`,
+                            padding: '2px 8px',
+                            borderRadius: '3px',
+                        }"
+                    >{{ primaryRole }}</span>
                 </div>
 
-                <!-- 2FA status -->
-                <div class="p-5 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700">
-                    <p class="text-xs font-medium text-gray-500 dark:text-dark-400 uppercase tracking-wider mb-2">
-                        {{ t('dashboard.two_factor_status') }}
-                    </p>
-                    <span
-                        class="inline-flex items-center gap-1.5 text-sm font-medium"
-                        :class="user.two_factor_enabled
-                            ? 'text-green-600 dark:text-green-400'
-                            : 'text-gray-500 dark:text-dark-400'"
-                    >
-                        <span class="w-2 h-2 rounded-full" :class="user.two_factor_enabled ? 'bg-green-500' : 'bg-gray-400 dark:bg-dark-500'"></span>
-                        {{ user.two_factor_enabled ? t('dashboard.enabled') : t('dashboard.disabled') }}
-                    </span>
+                <div :style="{ background: 'var(--panel)', padding: '14px 16px' }">
+                    <div
+                        class="cmd-mono cmd-uc"
+                        :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '8px', fontWeight: 500 }"
+                    >{{ t('dashboard.email_status') }}</div>
+                    <div :style="{ display: 'flex', alignItems: 'center', gap: '7px' }">
+                        <Dot :color="user.email_verified_at ? 'var(--success)' : 'var(--warning)'" :size="6" />
+                        <span :style="{ fontSize: '13px', color: 'var(--fg)' }">
+                            {{ user.email_verified_at ? t('dashboard.verified') : t('dashboard.unverified') }}
+                        </span>
+                    </div>
                 </div>
 
-                <!-- Member since -->
-                <div class="p-5 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700">
-                    <p class="text-xs font-medium text-gray-500 dark:text-dark-400 uppercase tracking-wider mb-2">
-                        {{ t('dashboard.member_since') }}
-                    </p>
-                    <p class="text-sm font-medium text-gray-900 dark:text-white">
+                <div :style="{ background: 'var(--panel)', padding: '14px 16px' }">
+                    <div
+                        class="cmd-mono cmd-uc"
+                        :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '8px', fontWeight: 500 }"
+                    >{{ t('dashboard.two_factor_status') }}</div>
+                    <div :style="{ display: 'flex', alignItems: 'center', gap: '7px' }">
+                        <Dot :color="user.two_factor_enabled ? 'var(--success)' : 'var(--warning)'" :size="6" />
+                        <span :style="{ fontSize: '13px', color: 'var(--fg)' }">
+                            {{ user.two_factor_enabled ? t('dashboard.enabled') : t('dashboard.disabled') }}
+                        </span>
+                    </div>
+                </div>
+
+                <div :style="{ background: 'var(--panel)', padding: '14px 16px' }">
+                    <div
+                        class="cmd-mono cmd-uc"
+                        :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '8px', fontWeight: 500 }"
+                    >{{ t('dashboard.member_since') }}</div>
+                    <div class="cmd-mono" :style="{ fontSize: '16px', color: 'var(--fg)' }">
                         {{ formatDate(user.created_at) }}
-                    </p>
+                    </div>
                 </div>
             </div>
 
-            <!-- Quick link -->
-            <div class="mt-6">
+            <div :style="{ marginTop: '24px' }">
                 <Link
                     :href="profileUrl"
-                    class="inline-flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+                    :style="{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: 'var(--accent)',
+                        color: '#fff',
+                        padding: '7px 12px',
+                        borderRadius: '5px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        textDecoration: 'none',
+                    }"
                 >
                     {{ t('dashboard.manage_profile') }}
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                    </svg>
+                    <Icon name="arrow" :size="12" />
                 </Link>
             </div>
         </div>

@@ -3,7 +3,7 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import ConfirmDialog from 'primevue/confirmdialog';
 import { useConfirm } from 'primevue/useconfirm';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import AppLayout from '@/Layouts/CommandLayout.vue';
 import { useCustomer } from '@/composables/useCustomer';
 
 interface FileItem {

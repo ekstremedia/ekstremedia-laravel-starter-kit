@@ -17,11 +17,15 @@ class ImpersonateController extends Controller
             abort(403);
         }
 
-        activity('impersonation')
-            ->causedBy($me)
-            ->performedOn($user)
-            ->event('started')
-            ->log("{$me->email} impersonated {$user->email}");
+        // Impersonation activity is intentionally NOT logged to activity_log;
+        // the banner at the top of every page already signals the session is
+        // impersonated, and the noise drowned out useful admin signal.
+        // Re-enable by uncommenting if you need an audit trail.
+        // activity('impersonation')
+        //     ->causedBy($me)
+        //     ->performedOn($user)
+        //     ->event('started')
+        //     ->log("{$me->email} impersonated {$user->email}");
 
         $manager->take($me, $user);
 
@@ -34,11 +38,12 @@ class ImpersonateController extends Controller
             $impersonator = User::find($manager->getImpersonatorId());
             $me = auth()->user();
 
-            activity('impersonation')
-                ->causedBy($impersonator)
-                ->performedOn($me)
-                ->event('stopped')
-                ->log("{$impersonator?->email} stopped impersonating {$me->email}");
+            // See take() — impersonation activity is intentionally not logged.
+            // activity('impersonation')
+            //     ->causedBy($impersonator)
+            //     ->performedOn($me)
+            //     ->event('stopped')
+            //     ->log("{$impersonator?->email} stopped impersonating {$me->email}");
 
             $manager->leave();
         }

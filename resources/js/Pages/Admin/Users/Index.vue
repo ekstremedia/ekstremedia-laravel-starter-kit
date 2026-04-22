@@ -1,19 +1,14 @@
 <script setup lang="ts">
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
-import PageHeader from '@/Components/Admin/PageHeader.vue';
-import DataTableShell from '@/Components/Admin/DataTableShell.vue';
-import PaginationLinks from '@/Components/Admin/PaginationLinks.vue';
-import DataTable from 'primevue/datatable';
-import Column from 'primevue/column';
-import Button from 'primevue/button';
-import Tag from 'primevue/tag';
-import ConfirmDialog from 'primevue/confirmdialog';
 import { useConfirm } from 'primevue/useconfirm';
+import CommandLayout from '@/Layouts/CommandLayout.vue';
+import Icon from '@/Components/Command/Icon.vue';
+import Skeleton from '@/Components/Command/Skeleton.vue';
+import { useCommandToasts } from '@/composables/useCommandToasts';
 
-defineOptions({ layout: AdminLayout });
+defineOptions({ layout: CommandLayout });
 
 interface UserRow {
     id: number;
@@ -21,210 +16,631 @@ interface UserRow {
     last_name: string;
     email: string;
     created_at: string;
+    last_login_at?: string | null;
     avatar_thumb_url: string | null;
     roles: { id: number; name: string }[];
     storage_used_bytes: number;
     storage_quota_bytes: number | null;
+    banned_at?: string | null;
 }
 
-function initials(u: UserRow) {
-    return ((u.first_name?.[0] ?? '') + (u.last_name?.[0] ?? '')).toUpperCase();
+interface Props {
+    users: { data: UserRow[]; links: Array<{ url: string | null; label: string; active: boolean }>; current_page?: number; last_page?: number; total?: number; per_page?: number };
+    filters: { search: string; sort?: string; direction?: string };
+    allRoles: string[];
+    userStats: { total: number; active: number };
 }
 
-function formatBytes(n: number): string {
-    if (!n) return '0 B';
+const props = defineProps<Props>();
+const { push } = useCommandToasts();
+const { t } = useI18n();
+const confirmer = useConfirm();
+
+const search = ref(props.filters?.search ?? '');
+const sortKey = computed(() => props.filters?.sort ?? 'id');
+const sortDir = computed(() => props.filters?.direction ?? 'desc');
+
+function sortBy(key: 'first_name' | 'email' | 'storage_used_bytes') {
+    // Toggle direction when clicking the active column; otherwise default to asc.
+    const nextDir = sortKey.value === key && sortDir.value === 'asc' ? 'desc' : 'asc';
+    router.get(
+        '/admin/users',
+        { search: search.value || undefined, sort: key, direction: nextDir },
+        { preserveState: true, preserveScroll: true, replace: true, only: ['users', 'filters', 'userStats'] },
+    );
+}
+const selected = ref<Set<number>>(new Set());
+const hoverId = ref<number | null>(null);
+const editingId = ref<number | null>(null);
+const editValue = ref<string>('');
+const selectRef = ref<HTMLSelectElement | null>(null);
+// Data is always pre-rendered by Inertia (and the controller caches the
+// payload), so no client-side loading state is needed — the skeleton shimmer
+// was purely cosmetic and added a 700ms stutter on every reload.
+const loading = ref(false);
+
+const rows = computed(() => props.users?.data ?? []);
+const selectedCount = computed(() => selected.value.size);
+const allSelected = computed(() => rows.value.length > 0 && rows.value.every((u) => selected.value.has(u.id)));
+
+function initials(u: UserRow): string {
+    return ((u.first_name?.[0] ?? '') + (u.last_name?.[0] ?? '')).toUpperCase() || '??';
+}
+
+const AVATAR_PALETTE = ['#4c6fff', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#14b8a6', '#a855f7', '#f97316'];
+function avatarColor(u: UserRow): string {
+    return AVATAR_PALETTE[u.id % AVATAR_PALETTE.length];
+}
+
+function primaryRole(u: UserRow): string {
+    return u.roles?.[0]?.name ?? 'User';
+}
+
+function roleToneColor(r: string): string {
+    if (r === 'Admin') return '#8b5cf6';
+    if (r === 'Editor') return 'var(--warning)';
+    return 'var(--accent)';
+}
+
+function roleToneBg(r: string): string {
+    if (r === 'Admin') return 'rgba(139,92,246,0.12)';
+    if (r === 'Editor') return 'rgba(251,191,36,0.12)';
+    return 'var(--accent-soft)';
+}
+
+function roleToneBorder(r: string): string {
+    if (r === 'Admin') return 'rgba(139,92,246,0.33)';
+    if (r === 'Editor') return 'rgba(251,191,36,0.33)';
+    return 'var(--accent-border)';
+}
+
+function formatBytes(n: number | null | undefined): string {
+    if (n == null || n < 0) return '—';
+    if (n === 0) return '0 B';
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
     let i = 0; let v = n;
     while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
     return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-function quotaLabel(u: UserRow): string {
-    if (u.storage_quota_bytes === null) return t('admin.storage.quota_unlimited');
-    if (u.storage_quota_bytes === 0) return t('admin.storage.quota_disabled');
-    return formatBytes(u.storage_quota_bytes);
+function storageRatio(u: UserRow): number {
+    if (u.storage_quota_bytes && u.storage_quota_bytes > 0) {
+        return Math.min(1, (u.storage_used_bytes ?? 0) / u.storage_quota_bytes);
+    }
+    // Unlimited quota — fill by using an arbitrary ceiling so the bar shows something.
+    const ceiling = 1024 * 1024 * 1024; // 1 GB visual ceiling
+    return Math.min(1, (u.storage_used_bytes ?? 0) / ceiling);
 }
 
-interface Props {
-    users: { data: UserRow[]; links: any; meta?: any; current_page?: number; last_page?: number; total?: number };
-    filters: { search: string; sort?: string; direction?: string };
+function lastSeen(u: UserRow): string {
+    const iso = u.last_login_at ?? u.created_at;
+    if (!iso) return '—';
+    const diff = Date.now() - new Date(iso).getTime();
+    if (diff < 0) return t('admin.users.last_seen.now');
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return t('admin.users.last_seen.just_now');
+    if (min < 60) return t('admin.users.last_seen.minutes', { n: min });
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return t('admin.users.last_seen.hours', { n: hr });
+    const day = Math.floor(hr / 24);
+    if (day < 7) return t('admin.users.last_seen.days', { n: day });
+    const week = Math.floor(day / 7);
+    if (week < 52) return t('admin.users.last_seen.weeks', { n: week });
+    return t('admin.users.last_seen.years', { n: Math.floor(day / 365) });
 }
-const props = defineProps<Props>();
 
-const { t } = useI18n();
-const search = ref(props.filters.search ?? '');
-const confirm = useConfirm();
+let searchDebounce: ReturnType<typeof setTimeout> | null = null;
+watch(search, (v) => {
+    if (searchDebounce) clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => {
+        router.get(
+            '/admin/users',
+            { search: v },
+            { preserveState: true, replace: true, preserveScroll: true, only: ['users', 'filters', 'userStats'] },
+        );
+    }, 280);
+});
 
-const quotaDialogUser = ref<UserRow | null>(null);
-const quotaPreset = ref<'unlimited' | 'disabled' | 'gb'>('gb');
-const quotaGb = ref(1);
+onBeforeUnmount(() => {
+    // Prevent post-unmount router.get from snapping the user back to /admin/users
+    // when they navigate away while the debounce is still pending.
+    if (searchDebounce) clearTimeout(searchDebounce);
+});
 
-function doSearch() {
-    router.get('/admin/users', { search: search.value }, { preserveState: true, replace: true });
+function toggleOne(u: UserRow) {
+    const next = new Set(selected.value);
+    if (next.has(u.id)) next.delete(u.id); else next.add(u.id);
+    selected.value = next;
 }
 
-function openQuotaDialog(u: UserRow) {
-    quotaDialogUser.value = u;
-    if (u.storage_quota_bytes === null) { quotaPreset.value = 'unlimited'; }
-    else if (u.storage_quota_bytes === 0) { quotaPreset.value = 'disabled'; }
-    else {
-        quotaPreset.value = 'gb';
-        quotaGb.value = Math.max(1, Math.round(u.storage_quota_bytes / (1024 * 1024 * 1024)));
+function toggleAll() {
+    if (allSelected.value) {
+        selected.value = new Set();
+    } else {
+        selected.value = new Set(rows.value.map((u) => u.id));
     }
 }
 
-function saveQuota() {
-    const u = quotaDialogUser.value;
-    if (!u) return;
-    let bytes: number | null;
-    if (quotaPreset.value === 'unlimited') bytes = null;
-    else if (quotaPreset.value === 'disabled') bytes = 0;
-    else bytes = Math.max(0, quotaGb.value) * 1024 * 1024 * 1024;
-
-    router.patch(`/admin/users/${u.id}/quota`, { storage_quota_bytes: bytes }, {
-        preserveScroll: true,
-        onSuccess: () => { quotaDialogUser.value = null; },
-    });
+function startEdit(u: UserRow) {
+    editingId.value = u.id;
+    editValue.value = primaryRole(u);
+    nextTick(() => selectRef.value?.focus());
 }
 
-function destroy(u: UserRow) {
-    confirm.require({
-        group: 'admin-users',
-        message: t('admin.users.confirm_delete', { email: u.email }),
-        header: t('common.confirm'),
+function commitEdit(u: UserRow) {
+    if (editingId.value !== u.id) return;
+    const role = editValue.value;
+    const previous = primaryRole(u);
+    editingId.value = null;
+    if (role === previous) return;
+    router.patch(
+        `/admin/users/${u.id}/role`,
+        { role },
+        {
+            preserveState: true,
+            preserveScroll: true,
+            only: ['users', 'flash'],
+            onSuccess: () => push(t('admin.users.toast_role_updated', { name: `${u.first_name} ${u.last_name}` }), 'success'),
+            onError: () => push(t('admin.users.toast_role_update_failed'), 'danger'),
+        },
+    );
+}
+
+function deleteOne(u: UserRow) {
+    confirmer.require({
+        group: 'command',
+        message: t('admin.users.confirm_delete', { name: `${u.first_name} ${u.last_name}` }),
+        header: t('common.delete'),
         icon: 'pi pi-exclamation-triangle',
         acceptClass: 'p-button-danger',
-        accept: () => router.delete(`/admin/users/${u.id}`),
+        acceptLabel: t('common.delete'),
+        rejectLabel: t('common.cancel'),
+        accept: () => {
+            router.delete(`/admin/users/${u.id}`, {
+                preserveScroll: true,
+                onSuccess: () => push(t('admin.users.toast_deleted', { name: `${u.first_name} ${u.last_name}` }), 'danger'),
+            });
+        },
     });
 }
 
-function impersonate(u: UserRow) {
-    router.post(`/admin/users/${u.id}/impersonate`);
+function sendTest(u: UserRow) {
+    router.post(`/admin/users/${u.id}/notify-test`, {}, {
+        preserveScroll: true,
+        onSuccess: () => push(t('admin.users.toast_test_notification_sent'), 'success'),
+    });
 }
 
-function canImpersonate(u: UserRow) {
-    return ! (u.roles ?? []).some((r: any) => (typeof r === 'string' ? r : r.name) === 'Admin');
+function unban(u: UserRow) {
+    if (!u.banned_at) { push(t('admin.users.toast_not_banned'), 'info'); return; }
+    router.post(`/admin/users/${u.id}/unban`, {}, {
+        preserveScroll: true,
+        onSuccess: () => push(t('admin.users.toast_restored', { name: u.first_name }), 'success'),
+    });
 }
+
+function pageStart(): number {
+    const n = rows.value.length;
+    if (n === 0) return 0;
+    const current = props.users?.current_page ?? 1;
+    const per = props.users?.per_page ?? 15;
+    return (current - 1) * per + 1;
+}
+function pageEnd(): number {
+    const current = props.users?.current_page ?? 1;
+    const per = props.users?.per_page ?? 15;
+    return Math.min((props.users?.total ?? 0), (current - 1) * per + rows.value.length);
+}
+
+function goToPage(url: string | null) {
+    if (!url) return;
+    router.visit(url, { preserveState: true, preserveScroll: true, only: ['users', 'filters'] });
+}
+
+const prevLink = computed(() => (props.users?.links ?? []).find((l) => l.label.includes('Previous') || l.label.includes('«'))?.url ?? null);
+const nextLink = computed(() => (props.users?.links ?? []).find((l) => l.label.includes('Next') || l.label.includes('»'))?.url ?? null);
+
+const rowPadVar = 'var(--pad-row)';
+const gridCols = '32px 32px 2fr 2.2fr 1fr 1.2fr 1fr 120px';
 </script>
 
 <template>
+    <div>
     <Head :title="t('admin.users.head_title')" />
-    <ConfirmDialog group="admin-users" />
 
-    <PageHeader :title="t('admin.users.title')">
-        <template #actions>
-            <Link href="/admin/users/create">
-                <Button :label="t('admin.users.new_user')" icon="pi pi-plus" />
+    <!-- Header -->
+    <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '14px' }">
+        <div>
+            <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }">{{ t('admin.users.title') }}</h1>
+            <div
+                class="cmd-mono"
+                :style="{ marginTop: '3px', fontSize: '11.5px', color: 'var(--fg-mute)' }"
+            >
+                {{ t('admin.users.summary', { total: userStats?.total ?? 0, active: userStats?.active ?? 0, selected: selectedCount }) }}
+            </div>
+        </div>
+        <div :style="{ display: 'flex', gap: '6px' }">
+            <div :style="{ position: 'relative' }">
+                <Icon
+                    name="search"
+                    :size="12"
+                    :style="{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--fg-mute)' }"
+                />
+                <input
+                    v-model="search"
+                    :placeholder="t('common.search') + '…'"
+                    :style="{
+                        background: 'var(--panel2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '5px',
+                        padding: '5px 10px 5px 28px',
+                        color: 'var(--fg)',
+                        fontSize: '11.5px',
+                        width: '220px',
+                        outline: 'none',
+                        fontFamily: 'inherit',
+                    }"
+                />
+            </div>
+            <Link
+                href="/admin/users/create"
+                :style="{
+                    background: 'var(--accent)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '5px 11px',
+                    borderRadius: '5px',
+                    fontSize: '11.5px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    textDecoration: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                }"
+            >
+                <Icon name="plus" :size="12" />
+                {{ t('admin.users.new_user') }}
             </Link>
-        </template>
-    </PageHeader>
-
-    <DataTableShell
-        :count="users.total ?? users.data.length"
-        :count-label="t('admin.users.title').toLowerCase()"
-        :search-placeholder="t('admin.users.search_placeholder')"
-        v-model:search-value="search"
-        @search-submit="doSearch"
-    >
-        <DataTable :value="users.data" stripedRows removableSort scrollable class="border-0">
-            <Column header="" style="width: 4rem">
-                <template #body="{ data }">
-                    <Link :href="`/admin/users/${data.id}`" class="inline-block">
-                        <img v-if="data.avatar_thumb_url" :src="data.avatar_thumb_url" :alt="`${data.first_name} ${data.last_name}`"
-                             class="w-9 h-9 rounded-full object-cover ring-1 ring-indigo-500/20" />
-                        <div v-else class="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-semibold">
-                            {{ initials(data) }}
-                        </div>
-                    </Link>
-                </template>
-            </Column>
-            <Column :header="t('common.name')" field="first_name" sortable>
-                <template #body="{ data }">
-                    <Link
-                        :href="`/admin/users/${data.id}`"
-                        class="font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline underline-offset-2"
-                    >
-                        {{ data.first_name }} {{ data.last_name }}
-                    </Link>
-                </template>
-            </Column>
-            <Column field="email" :header="t('auth.email')" sortable />
-            <Column :header="t('admin.roles.title')">
-                <template #body="{ data }">
-                    <Tag v-for="r in data.roles" :key="r.id" :value="r.name" class="mr-1" severity="info" />
-                </template>
-            </Column>
-            <Column field="storage_used_bytes" :header="t('admin.storage.storage_used')" sortable style="width: 11rem">
-                <template #body="{ data }">
-                    <div class="flex flex-col text-xs">
-                        <span class="font-medium">{{ formatBytes(data.storage_used_bytes ?? 0) }}</span>
-                        <span class="text-gray-500 dark:text-gray-400">{{ quotaLabel(data) }}</span>
-                    </div>
-                </template>
-            </Column>
-            <Column :header="t('common.actions')" style="width: 14rem">
-                <template #body="{ data }">
-                    <Link :href="`/admin/users/${data.id}/edit`">
-                        <Button icon="pi pi-pencil" size="small" severity="secondary" class="mr-1" :title="t('common.edit')" />
-                    </Link>
-                    <Button icon="pi pi-database" size="small" severity="help" class="mr-1" :title="t('admin.storage.set_quota')" @click="openQuotaDialog(data)" />
-                    <Button
-                        v-if="canImpersonate(data)"
-                        icon="pi pi-user-edit"
-                        size="small"
-                        severity="warn"
-                        class="mr-1"
-                        :title="t('admin.users.impersonate')"
-                        @click="impersonate(data)"
-                    />
-                    <Button icon="pi pi-trash" size="small" severity="danger" :title="t('common.delete')" @click="destroy(data)" />
-                </template>
-            </Column>
-        </DataTable>
-    </DataTableShell>
-
-    <!-- Quota dialog — simple overlay since PrimeVue Dialog adds another boot dep -->
-    <div
-        v-if="quotaDialogUser"
-        class="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="quota-dialog-title"
-        tabindex="-1"
-        @click.self="quotaDialogUser = null"
-        @keydown.esc="quotaDialogUser = null"
-    >
-        <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-dark-900">
-            <h2 id="quota-dialog-title" class="mb-4 text-lg font-semibold text-slate-800 dark:text-slate-100">
-                {{ t('admin.storage.set_quota_for_user', { name: quotaDialogUser.first_name + ' ' + quotaDialogUser.last_name }) }}
-            </h2>
-            <div class="space-y-3 text-sm">
-                <label class="flex items-center gap-2">
-                    <input type="radio" v-model="quotaPreset" value="unlimited" />
-                    <span>{{ t('admin.storage.quota_unlimited') }}</span>
-                </label>
-                <label class="flex items-center gap-2">
-                    <input type="radio" v-model="quotaPreset" value="disabled" />
-                    <span>{{ t('admin.storage.quota_disabled') }}</span>
-                </label>
-                <label class="flex items-center gap-2">
-                    <input type="radio" v-model="quotaPreset" value="gb" />
-                    <span class="flex-1">{{ t('admin.storage.quota_label_gb') }}</span>
-                    <input
-                        v-model.number="quotaGb"
-                        type="number"
-                        min="0"
-                        class="w-24 rounded border border-slate-300 px-2 py-1 dark:border-dark-700 dark:bg-dark-800"
-                        :disabled="quotaPreset !== 'gb'"
-                    />
-                </label>
-            </div>
-            <div class="mt-6 flex justify-end gap-2">
-                <Button :label="t('common.cancel')" severity="secondary" @click="quotaDialogUser = null" />
-                <Button :label="t('common.save')" @click="saveQuota" />
-            </div>
         </div>
     </div>
 
-    <PaginationLinks :links="users.links" />
+    <!-- Bulk bar -->
+    <div
+        v-if="selectedCount > 0"
+        :style="{
+            padding: '8px 12px',
+            background: 'var(--accent-soft)',
+            border: '1px solid var(--accent-border)',
+            borderRadius: '5px',
+            marginBottom: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '11.5px',
+        }"
+    >
+        <span :style="{ color: 'var(--fg)' }">{{ t('admin.users.bulk.selected', { n: selectedCount }) }}</span>
+        <button
+            type="button"
+            @click="push(t('admin.users.bulk.change_role_soon'), 'info')"
+            :style="{ background: 'transparent', color: 'var(--fg-dim)', border: '1px solid var(--border)', padding: '3px 8px', borderRadius: '5px', fontSize: '11.5px', cursor: 'pointer', fontFamily: 'inherit' }"
+        >{{ t('admin.users.bulk.change_role') }}</button>
+        <button
+            type="button"
+            @click="push(t('admin.users.bulk.email_soon'), 'info')"
+            :style="{ background: 'transparent', color: 'var(--fg-dim)', border: '1px solid var(--border)', padding: '3px 8px', borderRadius: '5px', fontSize: '11.5px', cursor: 'pointer', fontFamily: 'inherit' }"
+        >{{ t('admin.users.bulk.email') }}</button>
+        <button
+            type="button"
+            @click="push(t('admin.users.bulk.delete_soon'), 'warning')"
+            :style="{ background: 'transparent', color: 'var(--danger)', border: '1px solid #ff8a8a55', padding: '3px 8px', borderRadius: '5px', fontSize: '11.5px', cursor: 'pointer', fontFamily: 'inherit' }"
+        >{{ t('admin.users.bulk.delete') }}</button>
+        <div :style="{ flex: 1 }"></div>
+        <button
+            type="button"
+            @click="selected = new Set()"
+            :style="{ background: 'transparent', color: 'var(--fg-dim)', border: '1px solid var(--border)', padding: '3px 8px', borderRadius: '5px', fontSize: '11.5px', cursor: 'pointer', fontFamily: 'inherit' }"
+        >{{ t('common.cancel') }}</button>
+    </div>
+
+    <!-- Table -->
+    <div class="cmd-card">
+        <div
+            class="cmd-mono cmd-uc"
+            :style="{
+                display: 'grid',
+                gridTemplateColumns: gridCols,
+                padding: '8px 16px',
+                fontSize: '10px',
+                color: 'var(--fg-mute)',
+                fontWeight: 500,
+                borderBottom: '1px solid var(--border)',
+                letterSpacing: '0.06em',
+                alignItems: 'center',
+            }"
+        >
+            <div>
+                <input
+                    type="checkbox"
+                    :checked="allSelected"
+                    @change="toggleAll"
+                    :style="{ accentColor: 'var(--accent)' }"
+                />
+            </div>
+            <div></div>
+            <div
+                role="button"
+                tabindex="0"
+                :aria-sort="sortKey === 'first_name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'"
+                :style="{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', userSelect: 'none' }"
+                @click="sortBy('first_name')"
+                @keydown.enter.prevent="sortBy('first_name')"
+                @keydown.space.prevent="sortBy('first_name')"
+            >
+                <span>Navn</span>
+                <Icon
+                    v-if="sortKey === 'first_name'"
+                    name="chevD"
+                    :size="9"
+                    :style="{ color: 'var(--accent)', transform: sortDir === 'asc' ? 'rotate(180deg)' : 'rotate(0deg)' }"
+                />
+            </div>
+            <div
+                role="button"
+                tabindex="0"
+                :aria-sort="sortKey === 'email' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'"
+                :style="{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', userSelect: 'none' }"
+                @click="sortBy('email')"
+                @keydown.enter.prevent="sortBy('email')"
+                @keydown.space.prevent="sortBy('email')"
+            >
+                <span>E-post</span>
+                <Icon
+                    v-if="sortKey === 'email'"
+                    name="chevD"
+                    :size="9"
+                    :style="{ color: 'var(--accent)', transform: sortDir === 'asc' ? 'rotate(180deg)' : 'rotate(0deg)' }"
+                />
+            </div>
+            <div>Rolle</div>
+            <div
+                role="button"
+                tabindex="0"
+                :aria-sort="sortKey === 'storage_used_bytes' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'"
+                :style="{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', userSelect: 'none' }"
+                @click="sortBy('storage_used_bytes')"
+                @keydown.enter.prevent="sortBy('storage_used_bytes')"
+                @keydown.space.prevent="sortBy('storage_used_bytes')"
+            >
+                <span>Lagring</span>
+                <Icon
+                    v-if="sortKey === 'storage_used_bytes'"
+                    name="chevD"
+                    :size="9"
+                    :style="{ color: 'var(--accent)', transform: sortDir === 'asc' ? 'rotate(180deg)' : 'rotate(0deg)' }"
+                />
+            </div>
+            <div>Sist sett</div>
+            <div :style="{ textAlign: 'right' }">Handlinger</div>
+        </div>
+
+        <div
+            v-if="loading"
+            :style="{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }"
+        >
+            <Skeleton v-for="i in 6" :key="i" :width="'100%'" :height="20" :radius="3" />
+        </div>
+
+        <template v-else>
+            <div
+                v-if="rows.length === 0"
+                :style="{ padding: '28px 16px', textAlign: 'center', color: 'var(--fg-mute)', fontSize: '12px' }"
+            >Ingen brukere funnet.</div>
+
+            <div
+                v-for="u in rows"
+                :key="u.id"
+                @mouseenter="hoverId = u.id"
+                @mouseleave="hoverId = null"
+                :style="{
+                    display: 'grid',
+                    gridTemplateColumns: gridCols,
+                    padding: `${rowPadVar} 16px`,
+                    alignItems: 'center',
+                    fontSize: '12px',
+                    borderBottom: '1px solid var(--border)',
+                    background: selected.has(u.id) ? 'var(--accent-soft)' : hoverId === u.id ? 'var(--row-hover)' : 'transparent',
+                    transition: 'background 0.1s',
+                }"
+            >
+                <div>
+                    <input
+                        type="checkbox"
+                        :checked="selected.has(u.id)"
+                        @change="toggleOne(u)"
+                        :style="{ accentColor: 'var(--accent)' }"
+                    />
+                </div>
+                <div
+                    :style="{
+                        width: '22px',
+                        height: '22px',
+                        borderRadius: '4px',
+                        background: avatarColor(u) + '22',
+                        color: avatarColor(u),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '9.5px',
+                        fontWeight: 700,
+                        fontFamily: 'var(--font-mono)',
+                    }"
+                >{{ initials(u) }}</div>
+                <Link
+                    :href="`/admin/users/${u.id}`"
+                    :style="{ color: 'var(--fg)', fontWeight: 500, textDecoration: 'none' }"
+                >{{ u.first_name }} {{ u.last_name }}</Link>
+                <span
+                    class="cmd-mono"
+                    :style="{ color: 'var(--fg-dim)', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }"
+                >{{ u.email }}</span>
+                <div>
+                    <select
+                        v-if="editingId === u.id"
+                        ref="selectRef"
+                        v-model="editValue"
+                        @blur="commitEdit(u)"
+                        @change="commitEdit(u)"
+                        @keydown.enter.prevent="commitEdit(u)"
+                        @keydown.escape="editingId = null"
+                        class="cmd-mono"
+                        :style="{
+                            background: 'var(--panel2)',
+                            color: 'var(--fg)',
+                            border: '1px solid var(--accent)',
+                            padding: '2px 6px',
+                            borderRadius: '3px',
+                            fontSize: '11px',
+                            outline: 'none',
+                        }"
+                    >
+                        <option v-for="r in (allRoles ?? [])" :key="r" :value="r">{{ r }}</option>
+                    </select>
+                    <span
+                        v-else
+                        class="cmd-mono"
+                        @click="startEdit(u)"
+                        :style="{
+                            fontSize: '10.5px',
+                            cursor: 'pointer',
+                            padding: '2px 7px',
+                            borderRadius: '3px',
+                            color: roleToneColor(primaryRole(u)),
+                            background: roleToneBg(primaryRole(u)),
+                            border: `1px solid ${roleToneBorder(primaryRole(u))}`,
+                        }"
+                    >{{ primaryRole(u) }}</span>
+                </div>
+                <div :style="{ display: 'flex', alignItems: 'center', gap: '8px' }">
+                    <div
+                        :style="{
+                            width: '40px',
+                            height: '3px',
+                            background: 'var(--border)',
+                            borderRadius: '2px',
+                            overflow: 'hidden',
+                            flexShrink: 0,
+                        }"
+                    >
+                        <div
+                            :style="{
+                                width: `${storageRatio(u) * 100}%`,
+                                height: '100%',
+                                background: 'var(--accent)',
+                            }"
+                        />
+                    </div>
+                    <span
+                        class="cmd-mono"
+                        :style="{ fontSize: '10.5px', color: 'var(--fg-dim)' }"
+                    >{{ formatBytes(u.storage_used_bytes) }}</span>
+                </div>
+                <div
+                    class="cmd-mono"
+                    :style="{ fontSize: '11px', color: 'var(--fg-dim)' }"
+                >{{ lastSeen(u) }}</div>
+                <div
+                    :style="{
+                        display: 'flex',
+                        gap: '2px',
+                        justifyContent: 'flex-end',
+                        opacity: hoverId === u.id ? 1 : 0.35,
+                        transition: 'opacity 0.1s',
+                    }"
+                >
+                    <Link
+                        :href="`/admin/users/${u.id}/edit`"
+                        :title="'Rediger'"
+                        :style="{ background: 'transparent', border: 'none', color: 'var(--fg-dim)', cursor: 'pointer', padding: '4px', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }"
+                    >
+                        <Icon name="edit" :size="12" />
+                    </Link>
+                    <button
+                        type="button"
+                        :title="'Send testnotifikasjon'"
+                        @click="sendTest(u)"
+                        :style="{ background: 'transparent', border: 'none', color: 'var(--fg-dim)', cursor: 'pointer', padding: '4px', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }"
+                    >
+                        <Icon name="mail" :size="12" />
+                    </button>
+                    <button
+                        type="button"
+                        :title="'Gjenopprett utestengt bruker'"
+                        @click="unban(u)"
+                        :style="{ background: 'transparent', border: 'none', color: 'var(--fg-dim)', cursor: 'pointer', padding: '4px', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }"
+                    >
+                        <Icon name="restore" :size="12" />
+                    </button>
+                    <button
+                        type="button"
+                        :title="'Slett'"
+                        @click="deleteOne(u)"
+                        :style="{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '4px', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }"
+                    >
+                        <Icon name="trash" :size="12" />
+                    </button>
+                </div>
+            </div>
+        </template>
+
+        <!-- Footer / pagination -->
+        <div
+            class="cmd-mono"
+            :style="{
+                padding: '10px 16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: '10.5px',
+                color: 'var(--fg-mute)',
+            }"
+        >
+            <span>rows {{ pageStart() }}–{{ pageEnd() }} / {{ users.total ?? rows.length }}</span>
+            <div :style="{ display: 'flex', gap: '4px', alignItems: 'center' }">
+                <span>page {{ users.current_page ?? 1 }} / {{ users.last_page ?? 1 }}</span>
+                <button
+                    type="button"
+                    :disabled="!prevLink"
+                    @click="goToPage(prevLink)"
+                    :style="{
+                        background: 'transparent',
+                        color: prevLink ? 'var(--fg-dim)' : 'var(--fg-mute)',
+                        border: '1px solid var(--border)',
+                        padding: '2px 7px',
+                        borderRadius: '5px',
+                        fontSize: '11.5px',
+                        cursor: prevLink ? 'pointer' : 'not-allowed',
+                        fontFamily: 'inherit',
+                    }"
+                >‹</button>
+                <button
+                    type="button"
+                    :disabled="!nextLink"
+                    @click="goToPage(nextLink)"
+                    :style="{
+                        background: 'transparent',
+                        color: nextLink ? 'var(--fg-dim)' : 'var(--fg-mute)',
+                        border: '1px solid var(--border)',
+                        padding: '2px 7px',
+                        borderRadius: '5px',
+                        fontSize: '11.5px',
+                        cursor: nextLink ? 'pointer' : 'not-allowed',
+                        fontFamily: 'inherit',
+                    }"
+                >›</button>
+            </div>
+        </div>
+    </div>
+    </div>
 </template>

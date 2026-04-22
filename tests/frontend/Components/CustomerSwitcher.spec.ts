@@ -20,7 +20,7 @@ function setPage(
 ) {
     pageProps.props = {
         tenancy: { enabled: tenancyEnabled },
-        customers,
+        available_customers: customers,
         customer: current,
     };
 }
