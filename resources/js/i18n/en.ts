@@ -457,6 +457,8 @@ export default {
             suspended_hint: 'Suspended customers reject all member traffic.',
             files_enabled: 'Personal file system',
             files_enabled_hint: 'When on, members of this customer see the Files nav and can upload to /files.',
+            files_global_disabled_hint: 'The Files feature is disabled globally. Enable it in {appSettings} before turning it on per customer.',
+            app_settings_link: 'App Settings',
             member_count: 'Members ({count})',
             add_member_placeholder: "existing-user{'@'}example.com",
             no_members: 'No members yet. Add an existing user by email above.',

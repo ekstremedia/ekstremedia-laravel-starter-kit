@@ -457,6 +457,8 @@ export default {
             suspended_hint: 'Suspenderte kunder avviser all brukertrafikk.',
             files_enabled: 'Personlig filsystem',
             files_enabled_hint: 'Når aktivert, ser medlemmer av denne kunden Filer i menyen og kan laste opp til /files.',
+            files_global_disabled_hint: 'Filer-funksjonen er deaktivert globalt. Aktiver den i {appSettings} før du slår den på per kunde.',
+            app_settings_link: 'Appinnstillinger',
             member_count: 'Medlemmer ({count})',
             add_member_placeholder: "eksisterende-bruker{'@'}eksempel.no",
             no_members: 'Ingen medlemmer ennå. Legg til en eksisterende bruker med e-post ovenfor.',

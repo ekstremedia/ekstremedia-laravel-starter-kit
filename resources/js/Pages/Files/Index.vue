@@ -309,8 +309,12 @@ function onDropOnFolder(target: FileItem | null, event: DragEvent) {
     externalDragOver.value = false;
     externalDragCounter = 0;
 
-    // External files coming from the OS — hand them off to the upload dialog.
-    if (hasExternalFiles(event)) {
+    // Internal drag wins: if we initiated a drag from inside the app, treat it
+    // as a move even when the browser also reports a "Files" dataTransfer type
+    // (some browsers/OS combos surface both for native HTML5 drags).
+    const internalId = draggingId.value;
+
+    if (internalId === null && hasExternalFiles(event)) {
         const files = event.dataTransfer?.files;
         if (files && files.length > 0 && canUpload.value) {
             openUploadWithFiles(Array.from(files));
@@ -318,7 +322,7 @@ function onDropOnFolder(target: FileItem | null, event: DragEvent) {
         return;
     }
 
-    const id = draggingId.value;
+    const id = internalId;
     draggingId.value = null;
     if (id === null) return;
     if (target && target.type !== 'folder') return;
@@ -341,12 +345,14 @@ function hasExternalFiles(event: DragEvent): boolean {
 }
 
 function onAreaDragEnter(event: DragEvent) {
+    if (draggingId.value !== null) return;
     if (!hasExternalFiles(event)) return;
     externalDragCounter++;
     externalDragOver.value = true;
 }
 
 function onAreaDragLeave(event: DragEvent) {
+    if (draggingId.value !== null) return;
     if (!hasExternalFiles(event)) return;
     externalDragCounter = Math.max(0, externalDragCounter - 1);
     if (externalDragCounter === 0) externalDragOver.value = false;
