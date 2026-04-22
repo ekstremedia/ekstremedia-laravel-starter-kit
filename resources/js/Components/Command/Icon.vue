@@ -1,3 +1,10 @@
+<script lang="ts">
+export type IconName =
+    | 'home' | 'users' | 'user' | 'customer' | 'role' | 'key' | 'cog'
+    | 'mail' | 'disk' | 'shield' | 'server' | 'log' | 'bell' | 'search'
+    | 'chevR' | 'chevD' | 'plus' | 'edit' | 'trash' | 'restore' | 'arrow';
+</script>
+
 <script setup lang="ts">
 /*
  * Inline SVG icon set ported verbatim from the handoff's shared.jsx.
@@ -10,11 +17,6 @@ interface Props {
     name: IconName;
     size?: number;
 }
-
-export type IconName =
-    | 'home' | 'users' | 'user' | 'customer' | 'role' | 'key' | 'cog'
-    | 'mail' | 'disk' | 'shield' | 'server' | 'log' | 'bell' | 'search'
-    | 'chevR' | 'chevD' | 'plus' | 'edit' | 'trash' | 'restore' | 'arrow';
 
 const props = withDefaults(defineProps<Props>(), { size: 14 });
 const side = computed(() => props.size);

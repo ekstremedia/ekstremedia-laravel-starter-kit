@@ -45,6 +45,7 @@ function create() {
 
 function destroy(p: Permission) {
     confirmer.require({
+        group: 'command',
         message: t('admin.permissions.confirm_delete', { name: p.name }),
         header: t('common.delete'),
         icon: 'pi pi-exclamation-triangle',

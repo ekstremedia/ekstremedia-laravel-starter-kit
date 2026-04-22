@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useConfirm } from 'primevue/useconfirm';
 import CommandLayout from '@/Layouts/CommandLayout.vue';
@@ -36,17 +36,30 @@ const { push } = useCommandToasts();
 const { t } = useI18n();
 const confirmer = useConfirm();
 
-const search = ref(props.filters.search ?? '');
+const search = ref(props.filters?.search ?? '');
+const sortKey = computed(() => props.filters?.sort ?? 'id');
+const sortDir = computed(() => props.filters?.direction ?? 'desc');
+
+function sortBy(key: 'first_name' | 'email' | 'storage_used_bytes') {
+    // Toggle direction when clicking the active column; otherwise default to asc.
+    const nextDir = sortKey.value === key && sortDir.value === 'asc' ? 'desc' : 'asc';
+    router.get(
+        '/admin/users',
+        { search: search.value || undefined, sort: key, direction: nextDir },
+        { preserveState: true, preserveScroll: true, replace: true, only: ['users', 'filters', 'userStats'] },
+    );
+}
 const selected = ref<Set<number>>(new Set());
 const hoverId = ref<number | null>(null);
 const editingId = ref<number | null>(null);
 const editValue = ref<string>('');
 const selectRef = ref<HTMLSelectElement | null>(null);
-const loading = ref(true);
+// Data is always pre-rendered by Inertia (and the controller caches the
+// payload), so no client-side loading state is needed — the skeleton shimmer
+// was purely cosmetic and added a 700ms stutter on every reload.
+const loading = ref(false);
 
-setTimeout(() => { loading.value = false; }, 700);
-
-const rows = computed(() => props.users.data);
+const rows = computed(() => props.users?.data ?? []);
 const selectedCount = computed(() => selected.value.size);
 const allSelected = computed(() => rows.value.length > 0 && rows.value.every((u) => selected.value.has(u.id)));
 
@@ -128,6 +141,12 @@ watch(search, (v) => {
     }, 280);
 });
 
+onBeforeUnmount(() => {
+    // Prevent post-unmount router.get from snapping the user back to /admin/users
+    // when they navigate away while the debounce is still pending.
+    if (searchDebounce) clearTimeout(searchDebounce);
+});
+
 function toggleOne(u: UserRow) {
     const next = new Set(selected.value);
     if (next.has(u.id)) next.delete(u.id); else next.add(u.id);
@@ -169,6 +188,7 @@ function commitEdit(u: UserRow) {
 
 function deleteOne(u: UserRow) {
     confirmer.require({
+        group: 'command',
         message: t('admin.users.confirm_delete', { name: `${u.first_name} ${u.last_name}` }),
         header: t('common.delete'),
         icon: 'pi pi-exclamation-triangle',
@@ -202,14 +222,14 @@ function unban(u: UserRow) {
 function pageStart(): number {
     const n = rows.value.length;
     if (n === 0) return 0;
-    const current = props.users.current_page ?? 1;
-    const per = props.users.per_page ?? 15;
+    const current = props.users?.current_page ?? 1;
+    const per = props.users?.per_page ?? 15;
     return (current - 1) * per + 1;
 }
 function pageEnd(): number {
-    const current = props.users.current_page ?? 1;
-    const per = props.users.per_page ?? 15;
-    return Math.min((props.users.total ?? 0), (current - 1) * per + rows.value.length);
+    const current = props.users?.current_page ?? 1;
+    const per = props.users?.per_page ?? 15;
+    return Math.min((props.users?.total ?? 0), (current - 1) * per + rows.value.length);
 }
 
 function goToPage(url: string | null) {
@@ -217,8 +237,8 @@ function goToPage(url: string | null) {
     router.visit(url, { preserveState: true, preserveScroll: true, only: ['users', 'filters'] });
 }
 
-const prevLink = computed(() => props.users.links.find((l) => l.label.includes('Previous') || l.label.includes('«'))?.url ?? null);
-const nextLink = computed(() => props.users.links.find((l) => l.label.includes('Next') || l.label.includes('»'))?.url ?? null);
+const prevLink = computed(() => (props.users?.links ?? []).find((l) => l.label.includes('Previous') || l.label.includes('«'))?.url ?? null);
+const nextLink = computed(() => (props.users?.links ?? []).find((l) => l.label.includes('Next') || l.label.includes('»'))?.url ?? null);
 
 const rowPadVar = 'var(--pad-row)';
 const gridCols = '32px 32px 2fr 2.2fr 1fr 1.2fr 1fr 120px';
@@ -236,7 +256,7 @@ const gridCols = '32px 32px 2fr 2.2fr 1fr 1.2fr 1fr 120px';
                 class="cmd-mono"
                 :style="{ marginTop: '3px', fontSize: '11.5px', color: 'var(--fg-mute)' }"
             >
-                {{ t('admin.users.summary', { total: userStats.total, active: userStats.active, selected: selectedCount }) }}
+                {{ t('admin.users.summary', { total: userStats?.total ?? 0, active: userStats?.active ?? 0, selected: selectedCount }) }}
             </div>
         </div>
         <div :style="{ display: 'flex', gap: '6px' }">
@@ -349,10 +369,58 @@ const gridCols = '32px 32px 2fr 2.2fr 1fr 1.2fr 1fr 120px';
                 />
             </div>
             <div></div>
-            <div>Navn</div>
-            <div>E-post</div>
+            <div
+                role="button"
+                tabindex="0"
+                :aria-sort="sortKey === 'first_name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'"
+                :style="{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', userSelect: 'none' }"
+                @click="sortBy('first_name')"
+                @keydown.enter.prevent="sortBy('first_name')"
+                @keydown.space.prevent="sortBy('first_name')"
+            >
+                <span>Navn</span>
+                <Icon
+                    v-if="sortKey === 'first_name'"
+                    name="chevD"
+                    :size="9"
+                    :style="{ color: 'var(--accent)', transform: sortDir === 'asc' ? 'rotate(180deg)' : 'rotate(0deg)' }"
+                />
+            </div>
+            <div
+                role="button"
+                tabindex="0"
+                :aria-sort="sortKey === 'email' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'"
+                :style="{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', userSelect: 'none' }"
+                @click="sortBy('email')"
+                @keydown.enter.prevent="sortBy('email')"
+                @keydown.space.prevent="sortBy('email')"
+            >
+                <span>E-post</span>
+                <Icon
+                    v-if="sortKey === 'email'"
+                    name="chevD"
+                    :size="9"
+                    :style="{ color: 'var(--accent)', transform: sortDir === 'asc' ? 'rotate(180deg)' : 'rotate(0deg)' }"
+                />
+            </div>
             <div>Rolle</div>
-            <div>Lagring</div>
+            <div
+                role="button"
+                tabindex="0"
+                :aria-sort="sortKey === 'storage_used_bytes' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'"
+                :style="{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', userSelect: 'none' }"
+                @click="sortBy('storage_used_bytes')"
+                @keydown.enter.prevent="sortBy('storage_used_bytes')"
+                @keydown.space.prevent="sortBy('storage_used_bytes')"
+            >
+                <span>Lagring</span>
+                <Icon
+                    v-if="sortKey === 'storage_used_bytes'"
+                    name="chevD"
+                    :size="9"
+                    :style="{ color: 'var(--accent)', transform: sortDir === 'asc' ? 'rotate(180deg)' : 'rotate(0deg)' }"
+                />
+            </div>
             <div>Sist sett</div>
             <div :style="{ textAlign: 'right' }">Handlinger</div>
         </div>
@@ -437,7 +505,7 @@ const gridCols = '32px 32px 2fr 2.2fr 1fr 1.2fr 1fr 120px';
                             outline: 'none',
                         }"
                     >
-                        <option v-for="r in allRoles" :key="r" :value="r">{{ r }}</option>
+                        <option v-for="r in (allRoles ?? [])" :key="r" :value="r">{{ r }}</option>
                     </select>
                     <span
                         v-else

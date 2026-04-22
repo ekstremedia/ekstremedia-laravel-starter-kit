@@ -248,6 +248,7 @@ export default {
     },
     palette: {
         input_placeholder: 'Søk eller kjør kommando…',
+        shortcuts_hint: '⌘K: kommandopalett · G D: Dashbord · G U: Brukere · G A: Innstillinger · G H: Min side',
         group_nav: 'Navigasjon',
         group_actions: 'Handlinger',
         group_theme: 'Tema',
@@ -641,6 +642,11 @@ export default {
             description: 'Beskrivelse',
             subject: 'Emne',
             system: 'system',
+            user_all: 'Bruker — alle',
+            log_name_all: 'Loggnavn — alle',
+            event_all: 'Hendelse — alle',
+            search_placeholder: 'Søk i aktivitetslogg…',
+            empty: 'Ingen aktivitet.',
         },
         monitoring: {
             title: 'Logger og overvåking',
@@ -743,6 +749,9 @@ export default {
         backups: {
             title: 'Sikkerhetskopier',
             head_title: 'Sikkerhetskopier · Admin',
+            toast_started: 'Sikkerhetskopi startet',
+            toast_clean_started: 'Opprydding startet',
+            search_placeholder: 'Søk i sikkerhetskopier…',
             subtitle: 'Planlagt daglig · database + filer · drevet av spatie/laravel-backup.',
             schedule: 'Planlagt daglig kl. 02:00 · opprydding 01:30 · overvåkning 06:00.',
             stored_to: 'Lagres til',

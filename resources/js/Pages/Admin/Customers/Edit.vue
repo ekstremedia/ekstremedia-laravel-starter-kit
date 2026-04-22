@@ -31,7 +31,9 @@ const props = defineProps<{ customer: CustomerData; global_files_feature_enabled
 const form = useForm({
     name: props.customer.name,
     status: props.customer.status,
-    files_feature_enabled: props.customer.files_feature_enabled,
+    // Coerce the per-customer flag to false whenever the global feature is
+    // off so a stale `true` can't be submitted while the toggle is disabled.
+    files_feature_enabled: props.global_files_feature_enabled && props.customer.files_feature_enabled,
 });
 
 const statusOpen = ref(false);
@@ -57,6 +59,7 @@ function attach() {
 
 function detach(member: Member) {
     confirmer.require({
+        group: 'command',
         message: t('admin.customers.confirm_detach', { email: member.email, name: props.customer.name }),
         header: t('admin.customers.detach'),
         icon: 'pi pi-exclamation-triangle',
@@ -74,9 +77,10 @@ function detach(member: Member) {
 </script>
 
 <template>
-    <Head :title="`${customer.name} · Admin`" />
+    <div>
+        <Head :title="`${customer.name} · Admin`" />
 
-    <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '18px', gap: '16px' }">
+        <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '18px', gap: '16px' }">
         <div :style="{ minWidth: 0 }">
             <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }">
                 {{ customer.name }}
@@ -200,6 +204,7 @@ function detach(member: Member) {
                     <Toggle
                         v-model="form.files_feature_enabled"
                         :disabled="!global_files_feature_enabled"
+                        :label="t('admin.customers.files_feature')"
                     />
                 </div>
                 <p v-if="form.errors.files_feature_enabled" :style="{ fontSize: '11px', color: 'var(--danger)', marginTop: '-6px' }">
@@ -321,6 +326,7 @@ function detach(member: Member) {
                 {{ t('admin.customers.no_members') }}
             </p>
         </section>
+    </div>
     </div>
 </template>
 

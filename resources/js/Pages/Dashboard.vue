@@ -33,9 +33,9 @@ const headerMeta = computed(() => {
 </script>
 
 <template>
-    <Head :title="t('nav.dashboard')" />
-
     <AppLayout>
+        <Head :title="t('nav.dashboard')" />
+
         <div :style="{ maxWidth: '780px', margin: '0 auto', padding: '32px 16px' }">
             <div
                 class="cmd-mono"

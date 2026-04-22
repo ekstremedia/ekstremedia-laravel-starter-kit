@@ -34,12 +34,13 @@ function easyLogin() {
 </script>
 
 <template>
-    <Head :title="t('nav.login')" />
+    <div>
+        <Head :title="t('nav.login')" />
 
-    <AuthCard
-        :eyebrow="t('auth.login_title')"
-        :title="t('auth.login_subtitle')"
-    >
+        <AuthCard
+            :eyebrow="t('auth.login_title')"
+            :title="t('auth.login_subtitle')"
+        >
         <form @submit.prevent="submit" :style="{ display: 'flex', flexDirection: 'column', gap: '14px' }">
             <Field
                 v-model="form.email"
@@ -171,4 +172,5 @@ function easyLogin() {
             </Link>
         </p>
     </AuthCard>
+    </div>
 </template>

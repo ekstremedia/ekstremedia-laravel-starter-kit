@@ -63,13 +63,13 @@ function humanSize(bytes: number | null | undefined): string {
 function runBackup() {
     router.post('/admin/backups/run', {}, {
         preserveScroll: true,
-        onSuccess: () => push('Sikkerhetskopi startet', 'success'),
+        onSuccess: () => push(t('admin.backups.toast_started'), 'success'),
     });
 }
 function runClean() {
     router.post('/admin/backups/clean', {}, {
         preserveScroll: true,
-        onSuccess: () => push('Opprydding startet', 'info'),
+        onSuccess: () => push(t('admin.backups.toast_clean_started'), 'info'),
     });
 }
 
@@ -246,7 +246,7 @@ function submitRestore() {
         v-model:search="search"
         v-model:sort-key="sortKey"
         v-model:sort-dir="sortDir"
-        :search-placeholder="'Søk i sikkerhetskopier…'"
+        :search-placeholder="t('admin.backups.search_placeholder')"
         :search-keys="['path', 'disk']"
         :empty-text="t('admin.backups.empty')"
         action-column-width="100px"

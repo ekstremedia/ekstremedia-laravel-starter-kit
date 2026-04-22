@@ -66,10 +66,11 @@ function openProfile() {
 </script>
 
 <template>
-    <Head :title="t('home.title')" />
+    <div>
+        <Head :title="t('home.title')" />
 
-    <div :style="{ padding: '32px 40px' }">
-        <div :style="{ maxWidth: '780px', margin: '0 auto' }">
+        <div :style="{ padding: '32px 40px' }">
+            <div :style="{ maxWidth: '780px', margin: '0 auto' }">
             <div
                 class="cmd-mono"
                 :style="{
@@ -238,5 +239,6 @@ function openProfile() {
                 </div>
             </div>
         </div>
+    </div>
     </div>
 </template>

@@ -48,6 +48,7 @@ const columns: Column<CustomerRow>[] = [
 
 function destroy(c: CustomerRow) {
     confirmer.require({
+        group: 'command',
         message: t('admin.customers.confirm_delete', { name: c.name }),
         header: t('common.delete'),
         icon: 'pi pi-exclamation-triangle',

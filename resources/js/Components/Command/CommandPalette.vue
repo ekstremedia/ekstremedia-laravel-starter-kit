@@ -23,7 +23,11 @@ const page = usePage<PageProps>();
 const isAdmin = computed(() => (page.props.auth?.user?.roles ?? []).includes('Admin'));
 const chatEnabled = computed(() => page.props.chat?.enabled ?? false);
 const customerSlug = computed(() => page.props.customer?.slug ?? null);
-const filesEnabled = computed(() => page.props.customer?.files_feature_enabled ?? false);
+const globalFilesEnabled = computed(() => page.props.app_settings?.files_feature_enabled ?? false);
+const filesTarget = computed(() => {
+    if (page.props.customer?.files_feature_enabled) return page.props.customer;
+    return (page.props.available_customers ?? []).find((c) => c.files_feature_enabled) ?? null;
+});
 
 interface Cmd {
     id: string;
@@ -46,7 +50,9 @@ const commands = computed<Cmd[]>(() => {
     ];
     if (customerSlug.value) {
         nav.push({ id: 'go-cdash', label: t('palette.go_dashboard'), group: gNav, fn: () => router.visit(`/c/${customerSlug.value}/dashboard`) });
-        if (filesEnabled.value) nav.push({ id: 'go-files', label: t('palette.go_files'), group: gNav, fn: () => router.visit(`/c/${customerSlug.value}/files`) });
+    }
+    if (globalFilesEnabled.value && filesTarget.value) {
+        nav.push({ id: 'go-files', label: t('palette.go_files'), group: gNav, fn: () => router.visit(`/c/${filesTarget.value!.slug}/files`) });
     }
     if (chatEnabled.value) nav.push({ id: 'go-chat', label: t('palette.go_chat'), group: gNav, fn: () => router.visit('/chat') });
 

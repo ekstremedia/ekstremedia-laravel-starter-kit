@@ -191,7 +191,7 @@ const roleOpen = ref(false);
                                         Slår av &amp; på service. Administratorer har alltid tilgang.
                                     </div>
                                 </div>
-                                <Toggle v-model="form.site_up" />
+                                <Toggle v-model="form.site_up" label="Nettstedet er oppe" />
                             </div>
 
                             <div>
@@ -226,7 +226,7 @@ const roleOpen = ref(false);
                                         La alle brukerinnlogginger skje som vanlig.
                                     </div>
                                 </div>
-                                <Toggle v-model="form.login_enabled" />
+                                <Toggle v-model="form.login_enabled" label="Innlogging aktivert" />
                             </div>
 
                             <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }">
@@ -236,7 +236,7 @@ const roleOpen = ref(false);
                                         Tillat nye brukerregistreringer.
                                     </div>
                                 </div>
-                                <Toggle v-model="form.registration_open" />
+                                <Toggle v-model="form.registration_open" label="Registrering åpen" />
                             </div>
 
                             <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }">
@@ -246,7 +246,7 @@ const roleOpen = ref(false);
                                         Brukere må verifisere e-post før tilgang.
                                     </div>
                                 </div>
-                                <Toggle v-model="form.require_email_verification" />
+                                <Toggle v-model="form.require_email_verification" label="Krev e-postverifisering" />
                             </div>
                         </div>
                     </section>
@@ -323,7 +323,7 @@ const roleOpen = ref(false);
                                         Admin uten 2FA blokkeres til det er aktivert.
                                     </div>
                                 </div>
-                                <Toggle v-model="form.require_2fa_for_admins" />
+                                <Toggle v-model="form.require_2fa_for_admins" label="Krev 2FA for administratorer" />
                             </div>
 
                             <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }">
@@ -333,7 +333,7 @@ const roleOpen = ref(false);
                                         Send e-post ved registrering.
                                     </div>
                                 </div>
-                                <Toggle v-model="form.send_welcome_notification" />
+                                <Toggle v-model="form.send_welcome_notification" label="Send velkomstvarsling" />
                             </div>
                         </div>
                     </section>
@@ -409,7 +409,7 @@ const roleOpen = ref(false);
                                         Gi brukere et privat lagringsområde.
                                     </div>
                                 </div>
-                                <Toggle v-model="form.files_feature_enabled" />
+                                <Toggle v-model="form.files_feature_enabled" label="Aktiver personlig filsystem" />
                             </div>
 
                             <div>

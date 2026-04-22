@@ -28,12 +28,25 @@ function sanitizePartial(partial: Partial<UserSettings>): Record<string, UserSet
     );
 }
 
+// Merge-write so we don't clobber keys owned by other composables
+// (useTweaks writes theme/accent/density/show_kbd_hints/rail_expanded into
+// the same localStorage key).
+function mergeWrite(next: Record<string, unknown>) {
+    try {
+        const existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...existing, ...next }));
+    } catch {
+        // localStorage blocked or corrupt — best-effort write
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    }
+}
+
 export function useSettings() {
     const page = usePage<PageProps>();
 
     function syncFromServer(serverSettings?: UserSettings) {
         settings.value = { ...defaults, ...serverSettings };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings.value));
+        mergeWrite(settings.value);
     }
 
     if (!initialized) {
@@ -70,7 +83,7 @@ export function useSettings() {
         const sanitizedPartial = sanitizePartial(partial);
 
         settings.value = { ...settings.value, ...sanitizedPartial };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings.value));
+        mergeWrite(settings.value);
 
         // Only sync to DB if the user is authenticated
         if (page.props.auth?.user) {

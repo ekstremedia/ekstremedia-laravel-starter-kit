@@ -248,6 +248,7 @@ export default {
     },
     palette: {
         input_placeholder: 'Search or run command…',
+        shortcuts_hint: '⌘K: palette · G D: Dashboard · G U: Users · G A: Settings · G H: Home',
         group_nav: 'Navigation',
         group_actions: 'Actions',
         group_theme: 'Theme',
@@ -641,6 +642,11 @@ export default {
             description: 'Description',
             subject: 'Subject',
             system: 'system',
+            user_all: 'User — all',
+            log_name_all: 'Log name — all',
+            event_all: 'Event — all',
+            search_placeholder: 'Search activity log…',
+            empty: 'No activity.',
         },
         monitoring: {
             title: 'Logs & Monitoring',
@@ -743,6 +749,9 @@ export default {
         backups: {
             title: 'Backups',
             head_title: 'Backups · Admin',
+            toast_started: 'Backup started',
+            toast_clean_started: 'Cleanup started',
+            search_placeholder: 'Search backups…',
             subtitle: 'Scheduled daily · database + files · powered by spatie/laravel-backup.',
             schedule: 'Scheduled daily at 02:00 · cleanup 01:30 · monitored 06:00.',
             stored_to: 'Stored to',

@@ -64,9 +64,6 @@ useCommandKeyboard({
 </script>
 
 <template>
-    <Toast position="top-right" />
-    <ConfirmDialog />
-
     <div
         class="cmd-shell"
         :style="{
@@ -77,6 +74,8 @@ useCommandKeyboard({
             position: 'relative',
         }"
     >
+        <Toast position="top-right" />
+        <ConfirmDialog group="command" />
         <!-- Announcement banner (global, controlled from Appinnstillinger). -->
         <div
             v-if="announcement && announcement.text"

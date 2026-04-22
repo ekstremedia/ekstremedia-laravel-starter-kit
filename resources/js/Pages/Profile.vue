@@ -112,7 +112,7 @@ async function confirmPassword(password: string): Promise<boolean> {
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content
-                    ?? document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '',
+                    ?? getToken(),
                 'X-Requested-With': 'XMLHttpRequest',
                 Accept: 'application/json',
             },

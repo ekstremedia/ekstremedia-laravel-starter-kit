@@ -4,85 +4,35 @@
  * expanded via the chevron at the bottom. Expanded state persists to
  * starter_kit_settings → rail_expanded.
  *
- * Active item: accent-soft tile + 2×20 px accent bar at left: -10 when
- * collapsed. Hover tooltip appears only in collapsed mode; in expanded
- * mode the labels sit inline next to each icon.
+ * The item list is owned by `useSidebarItems()` — edit that composable to
+ * add / remove / reorder entries. This component only handles presentation:
+ * active-state, hover tooltip, collapse toggle, logo, profile tile.
  */
 import { computed, ref } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import type { PageProps } from '@/types';
 import { useTweaks } from '@/composables/useTweaks';
-import Icon, { type IconName } from './Icon.vue';
-
-interface RailItem {
-    id: string;
-    href: string;
-    label: string;
-    icon: IconName;
-    kb?: string;
-    match: (path: string) => boolean;
-    hideWhen?: () => boolean;
-}
-
-type RailEntry = RailItem | { separator: true; key: string };
+import { useSidebarItems } from '@/composables/useSidebarItems';
+import { isSidebarItem } from '@/types/sidebar';
+import type { SidebarEntry } from '@/types/sidebar';
+import Icon from './Icon.vue';
 
 const { t } = useI18n();
 const page = usePage<PageProps>();
 const currentPath = computed(() => page.url.split('?')[0]);
-const tenancyEnabled = computed(() => page.props.tenancy?.enabled ?? false);
 const user = computed(() => page.props.auth?.user);
-const isAdmin = computed(() => (user.value?.roles ?? []).includes('Admin'));
-const chatEnabled = computed(() => page.props.chat?.enabled ?? false);
-const customer = computed(() => page.props.customer);
-const customerSlug = computed(() => customer.value?.slug ?? null);
-const filesEnabled = computed(() => customer.value?.files_feature_enabled ?? false);
 const { state, toggleRail } = useTweaks();
 const expanded = computed(() => state.value.railExpanded);
+const { visible } = useSidebarItems();
 
 const initials = computed(() =>
     ((user.value?.first_name?.[0] ?? '') + (user.value?.last_name?.[0] ?? '')).toUpperCase() || '??',
 );
 
-const items = computed<RailEntry[]>(() => {
-    const dashboardHref = customerSlug.value ? `/c/${customerSlug.value}/dashboard` : '/app';
-    const filesHref = customerSlug.value ? `/c/${customerSlug.value}/files` : '/app';
-
-    const entries: RailEntry[] = [
-        { id: 'home', href: '/home', label: t('rail.home'), icon: 'user', kb: 'H', match: (p) => p === '/home' || p === '/' },
-        { id: 'my-dashboard', href: dashboardHref, label: t('rail.dashboard'), icon: 'home', match: (p) => p.startsWith('/c/') && p.includes('/dashboard') },
-        { id: 'files', href: filesHref, label: t('rail.files'), icon: 'disk', match: (p) => p.startsWith('/c/') && p.includes('/files'), hideWhen: () => !customerSlug.value || !filesEnabled.value },
-        { id: 'chat', href: '/chat', label: t('rail.chat'), icon: 'mail', match: (p) => p.startsWith('/chat'), hideWhen: () => !chatEnabled.value },
-    ];
-
-    if (isAdmin.value) {
-        entries.push(
-            { separator: true, key: 's1' },
-            { id: 'dashboard', href: '/admin', label: t('rail.admin_overview'), icon: 'home', kb: 'D', match: (p) => p === '/admin' },
-            { id: 'users', href: '/admin/users', label: t('rail.users'), icon: 'users', kb: 'U', match: (p) => p.startsWith('/admin/users') },
-            { id: 'customers', href: '/admin/customers', label: t('rail.customers'), icon: 'customer', match: (p) => p.startsWith('/admin/customers'), hideWhen: () => !tenancyEnabled.value },
-            { id: 'roles', href: '/admin/roles', label: t('rail.roles'), icon: 'role', match: (p) => p.startsWith('/admin/roles') },
-            { id: 'perms', href: '/admin/permissions', label: t('rail.permissions'), icon: 'key', match: (p) => p.startsWith('/admin/permissions') },
-            { separator: true, key: 's2' },
-            { id: 'settings', href: '/admin/settings', label: t('rail.app_settings'), icon: 'cog', kb: 'A', match: (p) => p === '/admin/settings' },
-            { id: 'mail', href: '/admin/mail', label: t('rail.mail'), icon: 'mail', match: (p) => p.startsWith('/admin/mail') },
-            { id: 'storage', href: '/admin/storage', label: t('rail.storage'), icon: 'disk', match: (p) => p.startsWith('/admin/storage') },
-            { id: 'backups', href: '/admin/backups', label: t('rail.backups'), icon: 'shield', match: (p) => p.startsWith('/admin/backups') },
-            { id: 'server', href: '/admin/system', label: t('rail.server'), icon: 'server', match: (p) => p.startsWith('/admin/system') || p.startsWith('/admin/health') },
-            { separator: true, key: 's3' },
-            { id: 'logs', href: '/admin/monitoring', label: t('rail.logs'), icon: 'log', match: (p) => p.startsWith('/admin/monitoring') || p.startsWith('/admin/activity') },
-        );
-    }
-
-    return entries;
-});
-
-const visibleItems = computed(() =>
-    items.value.filter((entry) => ('separator' in entry) ? true : !entry.hideWhen?.()),
-);
-
 const hoverId = ref<string | null>(null);
-const isItem = (entry: RailEntry): entry is RailItem => !('separator' in entry);
+const isItem = isSidebarItem;
+type Entry = SidebarEntry;
 </script>
 
 <template>
@@ -136,7 +86,7 @@ const isItem = (entry: RailEntry): entry is RailItem => !('separator' in entry);
             >Starter Kit</span>
         </Link>
 
-        <template v-for="entry in visibleItems" :key="isItem(entry) ? entry.id : entry.key">
+        <template v-for="entry in (visible as Entry[])" :key="isItem(entry) ? entry.id : entry.key">
             <div
                 v-if="!isItem(entry)"
                 :style="{ height: '1px', background: 'var(--border)', margin: '6px 0', width: expanded ? '100%' : '20px', alignSelf: expanded ? 'stretch' : 'center' }"
@@ -181,7 +131,6 @@ const isItem = (entry: RailEntry): entry is RailItem => !('separator' in entry);
                     }"
                 />
 
-                <!-- Inline label when expanded. -->
                 <span
                     v-if="expanded"
                     :style="{
@@ -207,7 +156,6 @@ const isItem = (entry: RailEntry): entry is RailItem => !('separator' in entry);
                     }"
                 >G {{ entry.kb }}</kbd>
 
-                <!-- Floating tooltip only in collapsed mode. -->
                 <span
                     v-if="!expanded && hoverId === entry.id"
                     :style="{
@@ -249,7 +197,6 @@ const isItem = (entry: RailEntry): entry is RailItem => !('separator' in entry);
 
         <div style="flex: 1" />
 
-        <!-- Expand / collapse toggle pinned above the avatar. -->
         <button
             type="button"
             @click="toggleRail"

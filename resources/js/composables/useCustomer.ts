@@ -17,7 +17,7 @@ export function useCustomer() {
     const page = usePage<PageProps>();
 
     const customer = computed<Customer | null>(() => page.props.customer ?? null);
-    const customers = computed<Customer[]>(() => page.props.customers ?? []);
+    const customers = computed<Customer[]>(() => page.props.available_customers ?? []);
     const tenancyEnabled = computed<boolean>(() => page.props.tenancy?.enabled ?? false);
 
     function customerUrl(path: string): string {

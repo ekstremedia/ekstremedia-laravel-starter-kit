@@ -14,6 +14,7 @@
 
 import { onMounted, onBeforeUnmount } from 'vue';
 import { router } from '@inertiajs/vue3';
+import { useI18n } from 'vue-i18n';
 import { useCommandToasts } from './useCommandToasts';
 
 interface Options {
@@ -37,6 +38,7 @@ function isTypingTarget(el: EventTarget | null): boolean {
 
 export function useCommandKeyboard(opts: Options) {
     const { push } = useCommandToasts();
+    const { t } = useI18n();
     let seq = '';
     let seqTimer: number | null = null;
 
@@ -69,7 +71,7 @@ export function useCommandKeyboard(opts: Options) {
         const key = e.key.toLowerCase();
 
         if (key === '?') {
-            push('⌘K: kommandopalett · G D: Dashbord · G U: Brukere · G A: Innstillinger · G H: Min side', 'info', 4500);
+            push(t('palette.shortcuts_hint'), 'info', 4500);
             return;
         }
 

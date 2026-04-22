@@ -135,9 +135,10 @@ const inputStyle = {
 </script>
 
 <template>
-    <Head :title="t('admin.monitoring.head_title')" />
+    <div>
+        <Head :title="t('admin.monitoring.head_title')" />
 
-    <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '14px' }">
+        <div :style="{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '14px' }">
         <div>
             <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--fg)' }">
                 {{ t('admin.monitoring.title') }}
@@ -193,15 +194,15 @@ const inputStyle = {
             }"
         >
             <select v-model="f.user_id" :style="inputStyle">
-                <option :value="null">{{ t('admin.activity.user') }} — alle</option>
+                <option :value="null">{{ t('admin.activity.user_all') }}</option>
                 <option v-for="u in users" :key="u.id" :value="u.id">{{ u.email }}</option>
             </select>
             <select v-model="f.log_name" :style="inputStyle">
-                <option :value="null">{{ t('admin.activity.log_name') }} — alle</option>
+                <option :value="null">{{ t('admin.activity.log_name_all') }}</option>
                 <option v-for="l in logNames" :key="l" :value="l">{{ l }}</option>
             </select>
             <select v-model="f.event" :style="inputStyle">
-                <option :value="null">{{ t('admin.activity.event') }} — alle</option>
+                <option :value="null">{{ t('admin.activity.event_all') }}</option>
                 <option v-for="e in events" :key="e" :value="e">{{ e }}</option>
             </select>
             <input type="date" v-model="f.date_from" :placeholder="t('admin.activity.from')" :style="inputStyle" />
@@ -221,14 +222,14 @@ const inputStyle = {
         </div>
 
         <CmdDataTable
-            :rows="activities ?? rows"
+            :rows="rows"
             :columns="columns"
             v-model:search="search"
             v-model:sort-key="sortKey"
             v-model:sort-dir="sortDir"
-            :search-placeholder="'Søk i aktivitetslogg…'"
+            :search-placeholder="t('admin.activity.search_placeholder')"
             :search-keys="['description', 'event', 'log_name']"
-            :empty-text="t('admin.activity.empty') ?? 'Ingen aktivitet.'"
+            :empty-text="t('admin.activity.empty')"
             :local-sort="false"
             :local-search="true"
         >
@@ -291,5 +292,6 @@ const inputStyle = {
             :style="{ width: '100%', height: 'calc(100vh - 16rem)', minHeight: '520px', background: '#fff', border: 'none' }"
             loading="lazy"
         />
+    </div>
     </div>
 </template>

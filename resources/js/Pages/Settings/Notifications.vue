@@ -76,7 +76,7 @@ function submit() {
                                 {{ t('notifications.settings.email_on_new_desc') }}
                             </p>
                         </div>
-                        <Toggle v-model="form.notification_email_immediate" />
+                        <Toggle v-model="form.notification_email_immediate" :label="t('notifications.settings.email_on_new')" />
                     </label>
 
                     <div>
@@ -126,7 +126,7 @@ function submit() {
                             <Icon :name="row.icon" :size="13" :style="{ color: 'var(--accent)' }" />
                             <span :style="{ fontSize: '12.5px', color: 'var(--fg)' }">{{ row.label }}</span>
                         </div>
-                        <Toggle v-model="form[row.key]" />
+                        <Toggle v-model="form[row.key]" :label="row.label" />
                     </label>
                 </div>
 

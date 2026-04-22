@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Lab404\Impersonate\Models\Impersonate;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
@@ -41,6 +42,41 @@ class User extends Authenticatable implements HasLocalePreference, HasMedia, Mus
 
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasRoles, Impersonate, InteractsWithMedia, LogsActivity, Notifiable, Searchable, TwoFactorAuthenticatable;
+
+    public const USERS_LIST_CACHE_KEY = 'admin.users.index';
+
+    public const USERS_LIST_VERSION_KEY = 'admin.users.index.version';
+
+    protected static function booted(): void
+    {
+        // Any CRUD event on a user row bumps the version counter baked into
+        // the Admin Users index cache key, invalidating stale entries on the
+        // next read without relying on tagged cache drivers.
+        static::created(fn () => self::bumpUsersListVersion());
+        static::updated(fn () => self::bumpUsersListVersion());
+        static::deleted(fn () => self::bumpUsersListVersion());
+        if (method_exists(static::class, 'restored')) {
+            static::restored(fn () => self::bumpUsersListVersion());
+        }
+    }
+
+    public static function usersListVersion(): int
+    {
+        // Redis stores incremented values as strings — coerce before returning
+        // so the version key stays stable (both cache stores considered).
+        $v = Cache::get(self::USERS_LIST_VERSION_KEY);
+
+        return is_numeric($v) ? (int) $v : 1;
+    }
+
+    public static function bumpUsersListVersion(): void
+    {
+        // Seed before increment — Laravel's database/file stores require the
+        // key to exist for increment() to apply. add() is a no-op when the
+        // key already holds a value.
+        Cache::add(self::USERS_LIST_VERSION_KEY, 1);
+        Cache::increment(self::USERS_LIST_VERSION_KEY);
+    }
 
     /**
      * User rows live in the central schema — pin so queries don't follow the

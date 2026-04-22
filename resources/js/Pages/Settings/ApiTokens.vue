@@ -38,6 +38,7 @@ function create() {
 
 function revoke(token: Token) {
     confirmer.require({
+        group: 'command',
         message: t('settings.tokens.confirm_revoke', { name: token.name }),
         header: t('settings.tokens.revoke'),
         icon: 'pi pi-exclamation-triangle',

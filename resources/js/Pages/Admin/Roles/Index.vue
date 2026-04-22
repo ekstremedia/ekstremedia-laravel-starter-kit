@@ -35,6 +35,7 @@ const columns: Column<Role>[] = [
 
 function destroy(r: Role) {
     confirmer.require({
+        group: 'command',
         message: t('admin.roles.confirm_delete', { name: r.name }),
         header: t('common.delete'),
         icon: 'pi pi-exclamation-triangle',

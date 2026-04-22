@@ -80,5 +80,5 @@ export interface PageProps extends InertiaPageProps {
         announcement?: { text: string; severity: string } | null;
     };
     customer: Customer | null;
-    customers: Customer[];
+    available_customers: Customer[];
 }

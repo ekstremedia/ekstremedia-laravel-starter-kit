@@ -58,16 +58,33 @@ function toggle(event: MouseEvent) {
     menuRef.value?.toggle(event);
 }
 
-const triggerClass = computed(() => props.variant === 'inline'
-    ? 'rounded p-1.5 text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-dark-800'
-    : 'rounded-full bg-slate-900/70 p-1.5 text-white transition hover:bg-slate-900');
+const triggerStyle = computed(() => props.variant === 'inline'
+    ? {
+        background: 'transparent',
+        border: '1px solid transparent',
+        color: 'var(--fg-mute)',
+        borderRadius: '4px',
+        padding: '4px 6px',
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+    }
+    : {
+        background: 'rgba(10,12,18,0.7)',
+        border: 'none',
+        color: '#fff',
+        borderRadius: '9999px',
+        padding: '5px 7px',
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+    });
 </script>
 
 <template>
-    <span class="inline-flex">
+    <span :style="{ display: 'inline-flex' }">
         <button
             type="button"
-            :class="triggerClass"
+            class="cmd-file-menu-trigger"
+            :style="triggerStyle"
             :title="t('common.actions')"
             :aria-label="t('common.actions')"
             @click.stop="toggle"
@@ -79,12 +96,16 @@ const triggerClass = computed(() => props.variant === 'inline'
 </template>
 
 <style>
+.cmd-file-menu-trigger:hover {
+    background: var(--row-hover) !important;
+    color: var(--fg) !important;
+}
 .file-action-danger .p-menuitem-link,
 .file-action-danger .p-menuitem-icon,
 .file-action-danger .p-menuitem-text {
-    color: rgb(244, 63, 94);
+    color: var(--danger);
 }
 .file-action-danger .p-menuitem-link:hover {
-    background-color: rgba(244, 63, 94, 0.12);
+    background-color: rgba(255, 138, 138, 0.12);
 }
 </style>

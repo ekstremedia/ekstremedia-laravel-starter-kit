@@ -1,3 +1,15 @@
+<script lang="ts">
+export interface Column<T = any> {
+    key: string;
+    label: string;
+    width?: string;
+    sortable?: boolean;
+    align?: 'left' | 'right' | 'center';
+    mono?: boolean;
+    getter?: (row: T) => unknown;
+}
+</script>
+
 <script setup lang="ts" generic="Row extends { id: number | string }">
 /*
  * Command-styled data table — the same look used on /admin/users, extracted
@@ -20,16 +32,6 @@ import { computed, ref, useSlots, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import Icon from './Icon.vue';
 import Skeleton from './Skeleton.vue';
-
-export interface Column<T = any> {
-    key: string;
-    label: string;
-    width?: string;
-    sortable?: boolean;
-    align?: 'left' | 'right' | 'center';
-    mono?: boolean;
-    getter?: (row: T) => unknown;
-}
 
 type SortDir = 'asc' | 'desc';
 
@@ -268,6 +270,11 @@ function colAlign(col: Column<Row>) {
                 <div
                     v-for="col in columns"
                     :key="col.key"
+                    :role="col.sortable ? 'button' : undefined"
+                    :tabindex="col.sortable ? 0 : undefined"
+                    :aria-sort="col.sortable
+                        ? (sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none')
+                        : undefined"
                     :style="{
                         textAlign: colAlign(col),
                         cursor: col.sortable ? 'pointer' : 'default',
@@ -278,6 +285,8 @@ function colAlign(col: Column<Row>) {
                         userSelect: 'none',
                     }"
                     @click="toggleSort(col)"
+                    @keydown.enter.prevent="toggleSort(col)"
+                    @keydown.space.prevent="toggleSort(col)"
                 >
                     <span>{{ col.label }}</span>
                     <span

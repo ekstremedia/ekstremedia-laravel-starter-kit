@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import VueApexCharts from 'vue3-apexcharts';
 import type { ApexOptions } from 'apexcharts';
@@ -46,6 +46,9 @@ const gridBorder = computed(() => tweaks.value.theme === 'light' ? 'rgba(15,23,4
 const axisColor = computed(() => tweaks.value.theme === 'light' ? 'rgba(15,23,42,0.42)' : 'rgba(213,217,229,0.4)');
 
 const metrics = ref<Metrics>(props.metrics);
+// Keep the local ref in sync when Inertia refreshes `metrics` via
+// router.reload({ only: ['metrics'] }) from the "refresh" button.
+watch(() => props.metrics, (next) => { metrics.value = next; });
 const loading = ref(true);
 let pollHandle: ReturnType<typeof setInterval> | null = null;
 let loadingTimer: ReturnType<typeof setTimeout> | null = null;

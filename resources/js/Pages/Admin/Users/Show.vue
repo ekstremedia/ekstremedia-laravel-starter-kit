@@ -70,6 +70,7 @@ function submitNotify() {
 
 function confirmDestructive(message: string, path: string) {
     confirm.require({
+        group: 'command',
         message, header: 'Confirm', icon: 'pi pi-exclamation-triangle',
         acceptClass: 'p-button-danger', accept: () => action(path),
     });
@@ -77,6 +78,7 @@ function confirmDestructive(message: string, path: string) {
 
 function destroy() {
     confirm.require({
+        group: 'command',
         message: `Permanently delete ${props.user.email}?`,
         header: 'Delete user', icon: 'pi pi-exclamation-triangle',
         acceptClass: 'p-button-danger',

@@ -15,6 +15,8 @@ use App\Notifications\CustomerMemberRemovedNotification;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Schema;
@@ -31,6 +33,7 @@ class UserController extends Controller
         $search = $request->string('search')->toString();
         $sort = $request->string('sort')->toString() ?: 'id';
         $direction = $request->string('direction')->toString() === 'asc' ? 'asc' : 'desc';
+        $page = (int) $request->input('page', 1);
 
         // Only allow sorting on a known allowlist; defaults to id desc.
         $allowedSort = ['id', 'first_name', 'last_name', 'email', 'storage_used_bytes'];
@@ -38,51 +41,71 @@ class UserController extends Controller
             $sort = 'id';
         }
 
-        $users = User::query()
-            ->with(['roles:id,name', 'media', 'setting'])
-            ->when($search !== '', function ($q) use ($search) {
-                $driver = $q->getModel()->getConnection()->getDriverName();
-                $op = $driver === 'pgsql' ? 'ilike' : 'like';
-                $needle = '%'.mb_strtolower($search).'%';
+        // Cache the full payload (paginator + filters + role list + counts).
+        // A version counter on the User model invalidates every entry on
+        // create/update/delete/restore, so stale reads self-heal on the next
+        // request without needing a tagged cache driver.
+        $version = User::usersListVersion();
+        $key = User::USERS_LIST_CACHE_KEY.':v'.$version.':'.md5(implode('|', [$search, $sort, $direction, $page]));
 
-                $q->where(function ($q) use ($op, $needle, $driver) {
-                    if ($driver === 'pgsql') {
-                        $q->where('email', $op, $needle)
-                            ->orWhere('first_name', $op, $needle)
-                            ->orWhere('last_name', $op, $needle);
-                    } else {
-                        $q->whereRaw('LOWER(email) LIKE ?', [$needle])
-                            ->orWhereRaw('LOWER(first_name) LIKE ?', [$needle])
-                            ->orWhereRaw('LOWER(last_name) LIKE ?', [$needle]);
-                    }
-                });
-            })
-            ->orderBy($sort, $direction)
-            ->paginate(15)
-            ->withQueryString();
+        // Cache a plain array payload (not the paginator object). Storing the
+        // paginator directly breaks round-trip through serialized cache drivers
+        // — the unserialized instance loses its LazyCollection wiring and the
+        // Inertia response renders empty. Array shape is identical to what
+        // Inertia produces from a paginator, so the Vue page is unchanged.
+        $payload = Cache::remember($key, 300, function () use ($search, $sort, $direction) {
+            $users = User::query()
+                ->with(['roles:id,name', 'media', 'setting'])
+                ->when($search !== '', function ($q) use ($search) {
+                    $driver = $q->getModel()->getConnection()->getDriverName();
+                    $op = $driver === 'pgsql' ? 'ilike' : 'like';
+                    $needle = '%'.mb_strtolower($search).'%';
 
-        $users->getCollection()->transform(function (User $user) {
-            $user->setAttribute('avatar_thumb_url', $user->avatarUrl('thumb'));
-            // `setting` is eager-loaded above — reach through it directly so
-            // each row doesn't hit firstOrCreate (N+1 across a 15-row page).
-            $resolved = $user->setting
-                ? array_merge(UserSetting::$defaults, $user->setting->settings ?? [])
-                : UserSetting::$defaults;
-            $user->setAttribute('storage_quota_bytes', $resolved['storage_quota_bytes'] ?? null);
+                    $q->where(function ($q) use ($op, $needle, $driver) {
+                        if ($driver === 'pgsql') {
+                            $q->where('email', $op, $needle)
+                                ->orWhere('first_name', $op, $needle)
+                                ->orWhere('last_name', $op, $needle);
+                        } else {
+                            $q->whereRaw('LOWER(email) LIKE ?', [$needle])
+                                ->orWhereRaw('LOWER(first_name) LIKE ?', [$needle])
+                                ->orWhereRaw('LOWER(last_name) LIKE ?', [$needle]);
+                        }
+                    });
+                })
+                ->orderBy($sort, $direction)
+                ->paginate(15)
+                ->withQueryString();
 
-            return $user;
+            $users->getCollection()->transform(function (User $user) {
+                $user->setAttribute('avatar_thumb_url', $user->avatarUrl('thumb'));
+                // `setting` is eager-loaded above — reach through it directly so
+                // each row doesn't hit firstOrCreate (N+1 across a 15-row page).
+                $resolved = $user->setting
+                    ? array_merge(UserSetting::$defaults, $user->setting->settings ?? [])
+                    : UserSetting::$defaults;
+                $user->setAttribute('storage_quota_bytes', $resolved['storage_quota_bytes'] ?? null);
+
+                return $user;
+            });
+
+            return [
+                'users' => $users->toArray(),
+                'allRoles' => Role::orderBy('name')->pluck('name')->all(),
+                'userStats' => [
+                    'total' => User::count(),
+                    'active' => Schema::hasColumn('users', 'banned_at')
+                        ? User::whereNull('banned_at')->count()
+                        : User::count(),
+                ],
+            ];
         });
 
         return Inertia::render('Admin/Users/Index', [
-            'users' => $users,
+            'users' => $payload['users'],
             'filters' => ['search' => $search, 'sort' => $sort, 'direction' => $direction],
-            'allRoles' => Role::orderBy('name')->pluck('name')->all(),
-            'userStats' => [
-                'total' => User::count(),
-                'active' => Schema::hasColumn('users', 'banned_at')
-                    ? User::whereNull('banned_at')->count()
-                    : User::count(),
-            ],
+            'allRoles' => $payload['allRoles'],
+            'userStats' => $payload['userStats'],
         ]);
     }
 
@@ -93,26 +116,56 @@ class UserController extends Controller
         }
 
         $data = $request->validate([
-            'role' => ['required', 'string', Rule::exists('roles', 'name')],
+            'role' => [
+                'required',
+                'string',
+                // Use a closure rule rather than `exists:` so validation resolves
+                // against the central `roles` table even in tenancy contexts.
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! is_string($value) || ! Role::query()->where('name', $value)->exists()) {
+                        $fail(__('validation.exists', ['attribute' => $attribute]));
+                    }
+                },
+            ],
         ]);
 
-        // Prevent demoting the last admin — the system must always have at
-        // least one Admin to avoid a lockout state.
-        if ($user->hasRole('Admin') && $data['role'] !== 'Admin') {
-            $remainingAdmins = User::role('Admin')->where('id', '!=', $user->id)->count();
-            if ($remainingAdmins === 0) {
-                return back()->with('error', 'Cannot demote the last admin.');
+        $before = $user->getRoleNames()->all();
+
+        // Transaction + row-level lock on Admin role pivots so two concurrent
+        // role changes can't both pass the last-admin guard and leave the
+        // system without an Admin.
+        $locked = DB::transaction(function () use ($user, $data) {
+            if ($user->hasRole('Admin') && $data['role'] !== 'Admin') {
+                $adminRoleId = Role::where('name', 'Admin')->value('id');
+                if ($adminRoleId !== null) {
+                    DB::table(config('permission.table_names.model_has_roles'))
+                        ->where('role_id', $adminRoleId)
+                        ->lockForUpdate()
+                        ->get();
+                }
+
+                $remainingAdmins = User::role('Admin')->where('id', '!=', $user->id)->count();
+                if ($remainingAdmins === 0) {
+                    return false;
+                }
             }
+
+            $user->syncRoles([$data['role']]);
+
+            return true;
+        });
+
+        if ($locked === false) {
+            return back()->with('error', 'Cannot demote the last admin.');
         }
 
-        $before = $user->getRoleNames()->all();
-        $user->syncRoles([$data['role']]);
+        User::bumpUsersListVersion();
 
         activity('user')
             ->performedOn($user)
-            ->withProperties(['before' => $before, 'after' => [$data['role']]])
+            ->withProperties(['before' => $before, 'after' => [$data['role']], 'target_user_id' => $user->id])
             ->event('role_changed')
-            ->log("Role changed to {$data['role']} for {$user->email}");
+            ->log('User role changed');
 
         return back()->with('success', __('flash.users.role_updated', ['role' => $data['role']]));
     }

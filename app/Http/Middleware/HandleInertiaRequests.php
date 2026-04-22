@@ -97,7 +97,10 @@ class HandleInertiaRequests extends Middleware
             // The navbar customer switcher needs the user's memberships, so
             // share a compact list. Capped at 50 — past that, admins should
             // use the full picker or the /admin/customers UI.
-            'customers' => fn () => $this->availableCustomers($request),
+            //
+            // Keyed under `available_customers` to avoid being shadowed by the
+            // `customers` paginator prop on /admin/customers and similar pages.
+            'available_customers' => fn () => $this->availableCustomers($request),
         ];
     }
 
@@ -153,6 +156,7 @@ class HandleInertiaRequests extends Middleware
                 'id' => $customer->id,
                 'slug' => $customer->slug,
                 'name' => $customer->name,
+                'files_feature_enabled' => (bool) $customer->files_feature_enabled,
             ])
             ->values()
             ->all();
