@@ -36,6 +36,7 @@ return [
         'updated' => 'Customer updated.',
         'deleted' => 'Customer ":name" deleted.',
         'member_added' => 'Added :email to :name.',
+        'already_member' => ':email is already a member of :name — edit their role from the members list instead.',
         'member_removed' => 'Removed :email from :name.',
     ],
 

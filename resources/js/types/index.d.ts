@@ -52,6 +52,7 @@ export interface Customer {
 }
 
 export interface PageProps extends InertiaPageProps {
+    request_id?: string;
     auth: {
         user?: User;
     };

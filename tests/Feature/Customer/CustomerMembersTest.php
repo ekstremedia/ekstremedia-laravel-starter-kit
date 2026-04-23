@@ -64,8 +64,10 @@ it('invites an existing user with a role', function () {
 
     expect($newUser->fresh()->belongsToCustomer($this->customer))->toBeTrue();
 
-    app(PermissionRegistrar::class)->setPermissionsTeamId($this->customer->id);
-    expect($newUser->fresh()->hasRole('Editor'))->toBeTrue();
+    // `rolesOn` saves/restores the PermissionRegistrar team id internally,
+    // so we don't leak the customer's team id into whichever test runs next
+    // (the singleton persists across cases in the same process).
+    expect(CustomerMembership::rolesOn($newUser->fresh(), $this->customer))->toContain('Editor');
 });
 
 it('requires a role when inviting', function () {
@@ -135,5 +137,10 @@ it('prevents removing the last customer-Admin', function () {
         ->assertRedirect()
         ->assertSessionHas('error');
 
+    // Both the membership pivot AND the Admin role assignment must survive —
+    // `CustomerMembership::detach` wipes roles, so if the controller ever
+    // skipped the early `return` but still called detach, the membership
+    // alone could look preserved while the role was silently stripped.
     expect($this->admin->fresh()->belongsToCustomer($this->customer))->toBeTrue();
+    expect(CustomerMembership::roleOn($this->admin->fresh(), $this->customer))->toBe('Admin');
 });

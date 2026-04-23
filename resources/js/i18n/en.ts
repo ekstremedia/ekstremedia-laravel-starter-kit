@@ -583,6 +583,8 @@ export default {
             customer_memberships: 'Customer memberships',
             manage_memberships: 'Add or remove',
             not_member: 'Not a member of any customer.',
+            remove_from_customer_aria: 'Remove from {customer}',
+            confirm_remove_from_customer_html: 'Remove <strong>{email}</strong> from <strong>{customer}</strong>?',
             roles_are_customer_scoped: 'Roles are now per-customer. Manage them from the user show page or the customer members panel.',
             role: 'Role',
             no_roles: 'No roles',

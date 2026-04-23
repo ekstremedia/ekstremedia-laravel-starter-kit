@@ -14,8 +14,7 @@ use App\Models\User;
 // `postJson` so both the success and reject paths get the right status.
 
 it('allows a SuperAdmin to authenticate the admin.health channel', function () {
-    $super = User::factory()->create();
-    $super->forceFill(['is_super_admin' => true])->save();
+    $super = User::factory()->superAdmin()->create();
 
     $this->actingAs($super)->postJson('/broadcasting/auth', [
         'socket_id' => '1234.5678',

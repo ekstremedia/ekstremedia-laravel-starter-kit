@@ -45,6 +45,25 @@ it('ignores a roles payload on platform user creation', function () {
     expect(User::where('email', 'new@example.test')->exists())->toBeTrue();
 });
 
+it('ignores a roles payload on platform user update', function () {
+    // `UpdateUserRequest` dropped its `roles` rule; verify the controller
+    // still accepts (and silently drops) the field so no one re-adds a
+    // stale validator and makes the PUT path diverge from the POST path.
+    $user = User::factory()->create();
+
+    $this->actingAs($this->admin)
+        ->put("/admin/users/{$user->id}", [
+            'first_name' => 'Updated',
+            'last_name' => 'Name',
+            'email' => $user->email,
+            'roles' => ['NonExistentRole'],
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect('/admin/users');
+
+    expect($user->fresh()->first_name)->toBe('Updated');
+});
+
 it('allows updating a user without changing password when blank', function () {
     $user = User::factory()->create(['password' => bcrypt('old-pass')]);
     $hashBefore = $user->password;

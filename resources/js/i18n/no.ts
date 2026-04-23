@@ -583,6 +583,8 @@ export default {
             customer_memberships: 'Kundemedlemskap',
             manage_memberships: 'Legg til eller fjern',
             not_member: 'Ikke medlem av noen kunde.',
+            remove_from_customer_aria: 'Fjern fra {customer}',
+            confirm_remove_from_customer_html: 'Fjerne <strong>{email}</strong> fra <strong>{customer}</strong>?',
             roles_are_customer_scoped: 'Roller er nå per kunde. Administrer dem fra brukervisningen eller kundens medlemspanel.',
             role: 'Rolle',
             no_roles: 'Ingen roller',

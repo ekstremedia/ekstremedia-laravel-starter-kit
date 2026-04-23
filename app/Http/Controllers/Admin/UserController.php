@@ -169,13 +169,23 @@ class UserController extends Controller
 
         $before = $user->isSuperAdmin() ? ['SuperAdmin'] : [];
 
-        // Transaction + row-level lock on the users table so two concurrent
-        // demotions can't both pass the last-super-admin guard. Force the
-        // central connection — this endpoint can be reached via an admin
-        // action inside a tenancy-initialized session.
+        // Transaction + row-level lock so two concurrent demotions can't
+        // both pass the last-super-admin guard. Force the central connection
+        // — this endpoint can be reached via an admin action inside a
+        // tenancy-initialized session. We also read the target user's
+        // `is_super_admin` through a locked SELECT inside the transaction
+        // so a concurrent flip between route-model binding and this block
+        // can't make us take the wrong branch.
         $central = (string) config('tenancy.database.central_connection');
         $locked = DB::connection($central)->transaction(function () use ($user, $data, $central) {
-            if ($user->isSuperAdmin() && $data['role'] !== 'SuperAdmin') {
+            $current = (bool) DB::connection($central)->table('users')
+                ->where('id', $user->id)
+                ->lockForUpdate()
+                ->value('is_super_admin');
+
+            if ($current && $data['role'] !== 'SuperAdmin') {
+                // Lock every SuperAdmin row so a concurrent request can't
+                // slip past the "last admin" count check.
                 DB::connection($central)->table('users')->where('is_super_admin', true)->lockForUpdate()->get();
 
                 $remaining = User::where('is_super_admin', true)
@@ -186,7 +196,7 @@ class UserController extends Controller
                 }
 
                 $user->forceFill(['is_super_admin' => false])->save();
-            } elseif (! $user->isSuperAdmin() && $data['role'] === 'SuperAdmin') {
+            } elseif (! $current && $data['role'] === 'SuperAdmin') {
                 $user->forceFill(['is_super_admin' => true])->save();
             }
 
@@ -269,8 +279,13 @@ class UserController extends Controller
 
     public function show(User $user): Response
     {
-        $user->load('media');
-        $user->load('customers');
+        // Eager-load `customers` with the ordering/columns we render so the
+        // closure below can reuse the already-loaded collection instead of
+        // firing a second SELECT.
+        $user->load([
+            'media',
+            'customers' => fn ($q) => $q->orderBy('name'),
+        ]);
 
         $recentActivity = Activity::query()
             ->where(function ($q) use ($user) {
@@ -339,7 +354,7 @@ class UserController extends Controller
                 'unread_notifications_count' => $user->unreadNotifications()->count(),
                 'customers' => (function () use ($user, $rolesByTeam): array {
                     /** @var array<int, Tenant> $list */
-                    $list = $user->customers()->orderBy('name')->get(['tenants.id', 'name', 'slug'])->all();
+                    $list = $user->customers->all();
 
                     return array_map(fn (Tenant $c) => [
                         'id' => $c->id,
@@ -626,8 +641,13 @@ class UserController extends Controller
 
     public function setCustomerRole(Request $request, User $user, Tenant $customer): RedirectResponse
     {
+        // Require at least one role — posting `roles: []` would otherwise
+        // leave the user as a member with zero roles (matching nothing in
+        // `can()` checks), which breaks the pivot+role atomicity that
+        // `CustomerMembership` explicitly promises. Removing membership is
+        // a separate flow (`detachCustomer`).
         $data = $request->validate([
-            'roles' => ['present', 'array'],
+            'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['string', Rule::in(CustomerMembership::assignableRoles())],
         ]);
 

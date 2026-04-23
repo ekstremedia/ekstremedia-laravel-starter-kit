@@ -38,4 +38,21 @@ class UserFactory extends Factory
             'email_verified_at' => null,
         ]);
     }
+
+    /**
+     * Promote the user to platform SuperAdmin. `is_super_admin` is guarded
+     * (mass-assignment unsafe — see User model), so we set it after the
+     * model has been persisted via `forceFill` to bypass the fillable
+     * filter.
+     */
+    public function superAdmin(): static
+    {
+        return $this->afterMaking(function (User $user): void {
+            $user->forceFill(['is_super_admin' => true]);
+        })->afterCreating(function (User $user): void {
+            if (! $user->is_super_admin) {
+                $user->forceFill(['is_super_admin' => true])->save();
+            }
+        });
+    }
 }

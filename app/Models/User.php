@@ -112,7 +112,10 @@ class User extends Authenticatable implements HasLocalePreference, HasMedia, Mus
      */
     public function isSuperAdmin(): bool
     {
-        return (bool) ($this->attributes['is_super_admin'] ?? false);
+        // Read through `getAttribute` so the boolean cast declared in
+        // casts() + any mutator layer applies consistently. Previously this
+        // poked `$this->attributes` directly and bypassed the cast pipeline.
+        return (bool) $this->getAttribute('is_super_admin');
     }
 
     public function isBanned(): bool

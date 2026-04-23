@@ -30,7 +30,15 @@ class CustomerMembersController extends Controller
     {
         $customer = $this->customer($request);
 
+        // Eager-load team-scoped roles with one JOIN instead of the N+1 storm
+        // of per-user `CustomerMembership::rolesOn` calls. The `->where` on
+        // `model_has_roles.team_id` scopes the pivot to this customer so we
+        // never accidentally pick up the same user's roles on another customer.
+        $teamKey = config('permission.column_names.team_foreign_key');
+        $mhrTable = config('permission.table_names.model_has_roles');
+
         $members = $customer->users()
+            ->with(['roles' => fn ($q) => $q->where("{$mhrTable}.{$teamKey}", $customer->id)])
             ->orderBy('users.email')
             ->get(['users.id', 'users.first_name', 'users.last_name', 'users.email'])
             ->map(fn (User $u) => [
@@ -39,7 +47,7 @@ class CustomerMembersController extends Controller
                 'last_name' => $u->last_name,
                 'full_name' => $u->fullName(),
                 'email' => $u->email,
-                'roles' => CustomerMembership::rolesOn($u, $customer),
+                'roles' => $u->roles->pluck('name')->all(),
             ])
             ->values();
 
@@ -73,6 +81,17 @@ class CustomerMembersController extends Controller
         ]);
 
         $user = User::query()->where('email', $data['email'])->firstOrFail();
+
+        // `CustomerMembership::attach()` calls `syncRoles()`, which overwrites
+        // the member's existing role set. Inviting someone who is already in
+        // the customer would silently downgrade their roles — reject that
+        // here and direct the admin to the per-row role editor instead.
+        if ($user->belongsToCustomer($customer)) {
+            return back()->with('error', __('flash.customers.already_member', [
+                'email' => $user->email,
+                'name' => $customer->name,
+            ]));
+        }
 
         CustomerMembership::attach($user, $customer, $data['roles']);
 

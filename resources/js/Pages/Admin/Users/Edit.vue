@@ -5,7 +5,6 @@ import { useI18n } from 'vue-i18n';
 import AdminLayout from '@/Layouts/CommandLayout.vue';
 import MultiSelect from 'primevue/multiselect';
 import Password from 'primevue/password';
-import ConfirmDialog from 'primevue/confirmdialog';
 import CommandDialog from '@/Components/Command/Dialog.vue';
 import Field from '@/Components/Command/Field.vue';
 import CmdButton from '@/Components/Command/Button.vue';
@@ -117,7 +116,6 @@ function confirmRemove() {
 <template>
     <div :style="{ padding: '24px 32px', maxWidth: '1100px', margin: '0 auto' }">
         <Head :title="`Edit ${user.email} · Admin`" />
-        <ConfirmDialog />
 
         <!-- Add customer dialog -->
         <CommandDialog
@@ -183,10 +181,13 @@ function confirmRemove() {
             :title="t('admin.users.remove_from_customer')"
             width="440px"
         >
-            <p :style="{ margin: '0 0 14px', fontSize: '13px', color: 'var(--fg-dim)', lineHeight: 1.5 }">
-                Remove <strong :style="{ color: 'var(--fg)' }">{{ user.email }}</strong>
-                from <strong :style="{ color: 'var(--fg)' }">{{ removingCustomer?.name }}</strong>?
-            </p>
+            <p
+                :style="{ margin: '0 0 14px', fontSize: '13px', color: 'var(--fg-dim)', lineHeight: 1.5 }"
+                v-html="t('admin.users.confirm_remove_from_customer_html', {
+                    email: user.email,
+                    customer: removingCustomer?.name ?? '',
+                })"
+            />
             <label :style="{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12.5px', color: 'var(--fg)', cursor: 'pointer' }">
                 <Toggle v-model="notifyOnRemove" />
                 <span>{{ t('admin.users.notify_user') }}</span>
@@ -349,6 +350,9 @@ function confirmRemove() {
                             >{{ t('admin.users.no_roles') }}</span>
                         </div>
                         <div :style="{ display: 'flex', gap: '4px', flexShrink: 0 }">
+                            <!-- Roles are assigned per-customer on the Show page's
+                                 customer-memberships MultiSelect. The Edit page
+                                 only adds/removes the membership itself. -->
                             <Link
                                 :href="`/admin/users/${user.id}`"
                                 :style="{ fontSize: '11px', color: 'var(--accent)', textDecoration: 'none', padding: '4px 8px' }"
@@ -356,7 +360,7 @@ function confirmRemove() {
                             <CmdButton
                                 variant="ghost"
                                 size="sm"
-                                :aria-label="`Remove ${customer.name}`"
+                                :aria-label="t('admin.users.remove_from_customer_aria', { customer: customer.name })"
                                 @click="openRemoveDialog(customer)"
                             >
                                 {{ t('common.remove') }}

@@ -25,7 +25,7 @@ useTweaks();
 const { t } = useI18n();
 const page = usePage<PageProps>();
 const user = computed(() => page.props.auth?.user);
-const requestId = computed(() => (page.props as unknown as { request_id?: string }).request_id ?? '');
+const requestId = computed(() => page.props.request_id ?? '');
 
 const titleKey = computed(() => {
     if (props.status === 403) return 'errors.403.title';
