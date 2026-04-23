@@ -55,7 +55,10 @@ describe('LanguageSwitcher', () => {
         const wrapper = mount(LanguageSwitcher);
         await wrapper.get('button').trigger('click');
 
-        const activeBtn = wrapper.findAll('button').find((b) => b.text().includes('English'));
-        expect(activeBtn?.html()).toContain('pi-check');
+        const buttons = wrapper.findAll('button');
+        const activeBtn = buttons.find((b) => b.text().includes('English'));
+        const inactiveBtn = buttons.find((b) => b.text().includes('Norsk'));
+        expect(activeBtn?.find('svg').exists()).toBe(true);
+        expect(inactiveBtn?.find('svg').exists()).toBe(false);
     });
 });
