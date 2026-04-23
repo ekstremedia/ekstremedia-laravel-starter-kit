@@ -24,7 +24,12 @@ it('rejects creating a user with an existing email', function () {
         ->assertSessionHasErrors('email');
 });
 
-it('rejects unknown roles when assigning', function () {
+it('ignores a roles payload on platform user creation', function () {
+    // Platform /admin/users doesn't set customer-scoped roles (those live
+    // per-customer on the user Show page), so an incoming `roles` field is
+    // silently dropped rather than validated. Verify the create succeeds and
+    // no validation error surfaces — catching the next time someone re-adds
+    // a stale validator.
     $this->actingAs($this->admin)
         ->post('/admin/users', [
             'first_name' => 'X',
@@ -34,7 +39,10 @@ it('rejects unknown roles when assigning', function () {
             'password_confirmation' => 'Password#1',
             'roles' => ['NonExistentRole'],
         ])
-        ->assertSessionHasErrors('roles.0');
+        ->assertSessionHasNoErrors()
+        ->assertRedirect('/admin/users');
+
+    expect(User::where('email', 'new@example.test')->exists())->toBeTrue();
 });
 
 it('allows updating a user without changing password when blank', function () {

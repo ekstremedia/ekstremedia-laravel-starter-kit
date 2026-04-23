@@ -62,7 +62,14 @@ class InitializeTenancyByPath
         // Scope every downstream role/permission check to this customer.
         // SuperAdmin assignments (team_id = null) still resolve globally via
         // User::isSuperAdmin(); everything else is per-customer from here on.
-        app(PermissionRegistrar::class)->setPermissionsTeamId($customer->id);
+        // PermissionRegistrar is a container singleton and survives across
+        // requests in long-lived workers (Octane, queues, same-process
+        // tests), so we capture the previous team id and restore it after
+        // the request runs — otherwise customer A's team context leaks into
+        // the next request on the same worker.
+        $registrar = app(PermissionRegistrar::class);
+        $previousTeamId = $registrar->getPermissionsTeamId();
+        $registrar->setPermissionsTeamId($customer->id);
 
         $route->forgetParameter('customer');
 
@@ -76,6 +83,10 @@ class InitializeTenancyByPath
             $user->settings()->merge(['last_customer_slug' => $customer->slug]);
         }
 
-        return $next($request);
+        try {
+            return $next($request);
+        } finally {
+            $registrar->setPermissionsTeamId($previousTeamId);
+        }
     }
 }

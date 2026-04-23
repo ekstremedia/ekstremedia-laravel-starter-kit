@@ -20,13 +20,14 @@ class UpdateUserRequest extends FormRequest
     {
         $userId = $this->route('user')?->id;
 
+        // No `roles` rule: roles are customer-scoped and managed per-customer
+        // from `/admin/users/{id}`. The controller ignores any roles payload
+        // here, so we don't pretend to validate it.
         return [
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($userId)],
             'password' => ['nullable', 'confirmed', Password::defaults()],
-            'roles' => ['array'],
-            'roles.*' => ['string', 'exists:roles,name'],
         ];
     }
 }

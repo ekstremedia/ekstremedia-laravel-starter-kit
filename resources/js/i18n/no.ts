@@ -589,6 +589,7 @@ export default {
             send_test: 'Send testvarsel',
             impersonate: 'Etterlign',
             confirm_delete: 'Slett {name} permanent?',
+            confirm_remove_member: 'Fjerne {email} fra denne kunden?',
             toast_deleted: 'Slettet {name}',
             toast_role_updated: 'Rolle oppdatert for {name}',
             toast_role_update_failed: 'Kunne ikke oppdatere rolle',

@@ -54,7 +54,20 @@ class CustomerMembersController extends Controller
         $customer = $this->customer($request);
 
         $data = $request->validate([
-            'email' => ['required', 'email', 'exists:users,email'],
+            // `exists:users,email` runs through the default DB connection,
+            // which is the *tenant* schema after InitializeTenancyByPath has
+            // booted tenancy. Users live on the central schema — resolve
+            // against it explicitly via a closure to avoid "relation users
+            // does not exist" when tenancy bootstrappers are on.
+            'email' => [
+                'required',
+                'email',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! User::query()->where('email', (string) $value)->exists()) {
+                        $fail(__('validation.exists', ['attribute' => $attribute]));
+                    }
+                },
+            ],
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['string', Rule::in(CustomerMembership::assignableRoles())],
         ]);

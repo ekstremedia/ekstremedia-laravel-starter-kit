@@ -17,13 +17,15 @@ class StoreUserRequest extends FormRequest
      */
     public function rules(): array
     {
+        // No `roles` rule: platform user creation doesn't set customer-scoped
+        // roles. Roles are assigned per-customer via `/admin/users/{id}` or
+        // the customer-Members page. Keeping a validator here would only
+        // invite callers to post a field the controller silently ignores.
         return [
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::defaults()],
-            'roles' => ['array'],
-            'roles.*' => ['string', 'exists:roles,name'],
         ];
     }
 }

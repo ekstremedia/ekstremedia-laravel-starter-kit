@@ -46,19 +46,24 @@ it('the same user can hold different roles on different customers', function () 
     expect($user->fresh()->hasRole('Admin'))->toBeFalse();
 });
 
-it('InitializeTenancyByPath sets the permission team id to the active customer', function () {
+it('InitializeTenancyByPath scopes the permission team id to the active customer during the request', function () {
     $customer = createCustomer();
     $user = User::factory()->create();
     grantRoleOnCustomer($user, 'User', $customer);
 
-    // Clear team context to prove the middleware is what sets it.
+    // Inertia's shared props resolve against the team id set by the
+    // middleware — `roles: ['User']` on the response proves the team
+    // context was active while rendering. After the request, the middleware
+    // restores the previous team id (null here) to prevent leakage into
+    // subsequent requests on the same worker.
     app(PermissionRegistrar::class)->setPermissionsTeamId(null);
 
     $this->actingAs($user)
         ->get(customerUrl($customer, '/dashboard'))
-        ->assertOk();
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('auth.user.roles', ['User']));
 
-    expect(app(PermissionRegistrar::class)->getPermissionsTeamId())->toBe($customer->id);
+    expect(app(PermissionRegistrar::class)->getPermissionsTeamId())->toBeNull();
 });
 
 it('lets SuperAdmin enter any customer regardless of membership', function () {

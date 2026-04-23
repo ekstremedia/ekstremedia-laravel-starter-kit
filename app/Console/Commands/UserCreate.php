@@ -32,15 +32,32 @@ class UserCreate extends Command
             return self::FAILURE;
         }
 
-        $customer = null;
+        // Validate role + customer coupling up-front so an invalid combination
+        // doesn't create a half-onboarded user before failing at attach time.
+        $role = (string) $this->option('role');
         $customerSlug = $this->option('customer');
-        if ($customerSlug !== null && $customerSlug !== '') {
+        $hasCustomer = $customerSlug !== null && $customerSlug !== '';
+
+        if ($hasCustomer && ! in_array($role, CustomerMembership::assignableRoles(), true)) {
+            $this->error("Role [{$role}] is not assignable. Pick one of: ".implode(', ', CustomerMembership::assignableRoles()).'.');
+
+            return self::FAILURE;
+        }
+
+        $customer = null;
+        if ($hasCustomer) {
             $customer = Tenant::query()->where('slug', $customerSlug)->first();
             if ($customer === null) {
                 $this->error("Customer with slug [{$customerSlug}] not found.");
 
                 return self::FAILURE;
             }
+        } elseif ($this->option('role') !== $this->getDefinition()->getOption('role')->getDefault()) {
+            // `--role` was set explicitly without `--customer` — surface this
+            // rather than silently drop the role on a customer-less account.
+            $this->error('--role requires --customer=<slug> (customer-scoped roles need a customer context).');
+
+            return self::FAILURE;
         }
 
         // `--password=` (empty) must be treated as "unset" too, or we'd hash
@@ -60,8 +77,8 @@ class UserCreate extends Command
         ])->save();
 
         if ($customer !== null) {
-            CustomerMembership::attach($user, $customer, (string) $this->option('role'));
-            $this->info("Created user {$user->id} <{$email}> as {$this->option('role')} on [{$customer->slug}].");
+            CustomerMembership::attach($user, $customer, $role);
+            $this->info("Created user {$user->id} <{$email}> as {$role} on [{$customer->slug}].");
         } else {
             $this->info("Created user {$user->id} <{$email}>.");
         }

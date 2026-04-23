@@ -88,7 +88,13 @@ class UserController extends Controller
                 $rolesTable = config('permission.table_names.roles');
                 $teamKey = config('permission.column_names.team_foreign_key');
 
-                $rows = DB::table($mhr)
+                // `model_has_roles` / `roles` live on the central schema.
+                // Stancl swaps the default connection to the tenant mid-
+                // request, so pin raw queries explicitly — a bare DB::table
+                // here would silently hit the tenant schema when reached
+                // from inside `/c/{customer}/...`.
+                $central = (string) config('tenancy.database.central_connection');
+                $rows = DB::connection($central)->table($mhr)
                     ->join($rolesTable, "{$rolesTable}.id", '=', "{$mhr}.role_id")
                     ->where("{$mhr}.model_type", User::class)
                     ->whereIn("{$mhr}.model_id", $pageUserIds)
@@ -164,10 +170,13 @@ class UserController extends Controller
         $before = $user->isSuperAdmin() ? ['SuperAdmin'] : [];
 
         // Transaction + row-level lock on the users table so two concurrent
-        // demotions can't both pass the last-super-admin guard.
-        $locked = DB::transaction(function () use ($user, $data) {
+        // demotions can't both pass the last-super-admin guard. Force the
+        // central connection — this endpoint can be reached via an admin
+        // action inside a tenancy-initialized session.
+        $central = (string) config('tenancy.database.central_connection');
+        $locked = DB::connection($central)->transaction(function () use ($user, $data, $central) {
             if ($user->isSuperAdmin() && $data['role'] !== 'SuperAdmin') {
-                DB::table('users')->where('is_super_admin', true)->lockForUpdate()->get();
+                DB::connection($central)->table('users')->where('is_super_admin', true)->lockForUpdate()->get();
 
                 $remaining = User::where('is_super_admin', true)
                     ->where('id', '!=', $user->id)
@@ -296,8 +305,10 @@ class UserController extends Controller
             // `team_id` lives on both tables (roles.team_id for shared/global
             // role rows, model_has_roles.team_id for per-assignment scope), so
             // every reference has to be fully qualified — otherwise Postgres
-            // raises "column reference team_id is ambiguous".
-            $rows = DB::table($mhr)
+            // raises "column reference team_id is ambiguous". Pin to central
+            // since these tables live in the landlord schema.
+            $central = (string) config('tenancy.database.central_connection');
+            $rows = DB::connection($central)->table($mhr)
                 ->join($rolesTable, "{$rolesTable}.id", '=', "{$mhr}.role_id")
                 ->where("{$mhr}.model_type", User::class)
                 ->where("{$mhr}.model_id", $user->id)
@@ -355,7 +366,8 @@ class UserController extends Controller
             $rolesTable = config('permission.table_names.roles');
             $teamKey = config('permission.column_names.team_foreign_key');
 
-            $rows = DB::table($mhr)
+            $central = (string) config('tenancy.database.central_connection');
+            $rows = DB::connection($central)->table($mhr)
                 ->join($rolesTable, "{$rolesTable}.id", '=', "{$mhr}.role_id")
                 ->where("{$mhr}.model_type", User::class)
                 ->where("{$mhr}.model_id", $user->id)

@@ -9,6 +9,9 @@
  */
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useConfirm } from 'primevue/useconfirm';
+import ConfirmDialog from 'primevue/confirmdialog';
 import CommandLayout from '@/Layouts/CommandLayout.vue';
 import Icon from '@/Components/Command/Icon.vue';
 import MultiSelect from 'primevue/multiselect';
@@ -34,6 +37,8 @@ interface Props {
 const props = defineProps<Props>();
 const { customerUrl } = useCustomer();
 const { push } = useCommandToasts();
+const { t } = useI18n();
+const confirmer = useConfirm();
 
 const inviteForm = useForm<{ email: string; roles: string[] }>({ email: '', roles: ['User'] });
 const pendingId = ref<number | null>(null);
@@ -72,20 +77,31 @@ function syncRoles(member: Member) {
 }
 
 function remove(member: Member) {
-    if (!window.confirm(`Remove ${member.email} from this customer?`)) return;
-    pendingId.value = member.id;
-    router.delete(customerUrl(`/members/${member.id}`), {
-        preserveScroll: true,
-        onFinish: () => {
-            pendingId.value = null;
+    confirmer.require({
+        group: 'command',
+        header: t('common.delete'),
+        message: t('admin.users.confirm_remove_member', { email: member.email }),
+        icon: 'pi pi-exclamation-triangle',
+        acceptClass: 'p-button-danger',
+        acceptLabel: t('common.remove'),
+        rejectLabel: t('common.cancel'),
+        accept: () => {
+            pendingId.value = member.id;
+            router.delete(customerUrl(`/members/${member.id}`), {
+                preserveScroll: true,
+                onFinish: () => {
+                    pendingId.value = null;
+                },
+            });
         },
     });
 }
 </script>
 
 <template>
-    <Head title="Members" />
     <div class="page">
+        <Head title="Members" />
+        <ConfirmDialog />
         <header class="page__head">
             <div>
                 <h1>Members</h1>

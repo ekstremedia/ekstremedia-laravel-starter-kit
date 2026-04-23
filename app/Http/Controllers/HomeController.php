@@ -67,7 +67,8 @@ class HomeController extends Controller
         $rolesTable = config('permission.table_names.roles');
         $teamKey = config('permission.column_names.team_foreign_key');
 
-        $rows = DB::table($mhr)
+        $central = (string) config('tenancy.database.central_connection');
+        $rows = DB::connection($central)->table($mhr)
             ->join($rolesTable, "{$rolesTable}.id", '=', "{$mhr}.role_id")
             ->where("{$mhr}.model_type", User::class)
             ->where("{$mhr}.model_id", $user->getKey())

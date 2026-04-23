@@ -6,6 +6,7 @@ namespace App\Support;
 
 use App\Models\Tenant;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
@@ -46,9 +47,14 @@ class CustomerMembership
      */
     public static function attach(User $user, Tenant $customer, string|array $roles): void
     {
-        $user->customers()->syncWithoutDetaching([$customer->id]);
-
-        static::syncRoles($user, $customer, (array) $roles);
+        // Run both touches in a single transaction on the central connection.
+        // The class docblock promises membership pivot + role assignments
+        // "move together"; without the transaction a failure after the pivot
+        // insert leaves the user a member with no role (or vice versa).
+        DB::connection(static::centralConnection())->transaction(function () use ($user, $customer, $roles): void {
+            $user->customers()->syncWithoutDetaching([$customer->id]);
+            static::syncRoles($user, $customer, (array) $roles);
+        });
     }
 
     /**
@@ -58,19 +64,24 @@ class CustomerMembership
      */
     public static function detach(User $user, Tenant $customer): void
     {
-        $registrar = app(PermissionRegistrar::class);
-        $previous = $registrar->getPermissionsTeamId();
+        // Same atomicity concern as `attach()` — run the role removals and
+        // the pivot detach in one transaction so a crash mid-way can't leave
+        // the user with roles on a customer they're no longer a member of.
+        DB::connection(static::centralConnection())->transaction(function () use ($user, $customer): void {
+            $registrar = app(PermissionRegistrar::class);
+            $previous = $registrar->getPermissionsTeamId();
 
-        try {
-            $registrar->setPermissionsTeamId($customer->id);
-            foreach ($user->roles()->pluck('name') as $roleName) {
-                $user->removeRole((string) $roleName);
+            try {
+                $registrar->setPermissionsTeamId($customer->id);
+                foreach ($user->roles()->pluck('name') as $roleName) {
+                    $user->removeRole((string) $roleName);
+                }
+            } finally {
+                $registrar->setPermissionsTeamId($previous);
             }
-        } finally {
-            $registrar->setPermissionsTeamId($previous);
-        }
 
-        $user->customers()->detach($customer->id);
+            $user->customers()->detach($customer->id);
+        });
     }
 
     /**
@@ -120,5 +131,10 @@ class CustomerMembership
     public static function roleOn(User $user, Tenant $customer): ?string
     {
         return static::rolesOn($user, $customer)[0] ?? null;
+    }
+
+    protected static function centralConnection(): string
+    {
+        return (string) config('tenancy.database.central_connection');
     }
 }
