@@ -54,7 +54,6 @@ it('allows updating a user without changing password when blank', function () {
             'first_name' => 'Same',
             'last_name' => 'Same',
             'email' => $user->email,
-            'roles' => ['User'],
         ])
         ->assertRedirect('/admin/users');
 
@@ -69,7 +68,6 @@ it('allows the same email when editing the same user', function () {
             'first_name' => 'Updated',
             'last_name' => 'Name',
             'email' => 'stays@example.test',
-            'roles' => ['User'],
         ])
         ->assertRedirect('/admin/users');
 });

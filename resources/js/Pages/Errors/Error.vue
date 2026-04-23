@@ -5,7 +5,7 @@
  * centered code + message + CTAs. Registered via Inertia exception
  * renderer in bootstrap/app.php.
  */
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useTweaks } from '@/composables/useTweaks';
@@ -58,7 +58,12 @@ const body = computed(() => (showRawMessage.value && props.message) ? props.mess
 function goBack() {
     if (typeof window !== 'undefined' && window.history.length > 1) {
         window.history.back();
+        return;
     }
+    // Direct landings (opened in a new tab, deep link) have an empty history
+    // stack — point "go back" at a sensible destination so it's never a dead
+    // click. Authenticated users land on /home; guests land on /.
+    router.visit(user.value ? '/home' : '/');
 }
 </script>
 

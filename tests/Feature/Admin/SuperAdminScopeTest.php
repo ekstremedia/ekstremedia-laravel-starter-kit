@@ -8,6 +8,14 @@ use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(fn () => $this->seed(RoleAndPermissionSeeder::class));
 
+// PermissionRegistrar is a container singleton; RefreshDatabase doesn't touch
+// it, so whichever team id the previous test left behind leaks into the next.
+// Zero it out before every case so any scoping assertion proves the SUT set
+// the team id — not carry-over from earlier.
+afterEach(function (): void {
+    app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+});
+
 it('reads SuperAdmin purely from the is_super_admin column', function () {
     $user = User::factory()->create();
     expect($user->isSuperAdmin())->toBeFalse();

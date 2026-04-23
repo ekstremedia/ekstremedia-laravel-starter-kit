@@ -143,7 +143,7 @@ function chipStyle(active: boolean) {
                         gap: '5px',
                     }"
                 >
-                    <span :style="{ fontSize: '12px', lineHeight: 1 }">{{ loc.flag }}</span>
+                    <span aria-hidden="true" :style="{ fontSize: '12px', lineHeight: 1 }">{{ loc.flag }}</span>
                     <span>{{ loc.name }}</span>
                 </button>
             </div>

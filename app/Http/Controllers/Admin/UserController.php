@@ -545,10 +545,22 @@ class UserController extends Controller
 
     public function attachCustomer(Request $request, User $user): RedirectResponse
     {
+        // `exists:tenants,id` would resolve through the default DB connection,
+        // which swaps to the tenant mid-request. Tenant lives on the central
+        // schema — use a closure against the Eloquent model so the check
+        // honours `Tenant::$connection` regardless of ambient tenancy state.
         $data = $request->validate([
             'customer_ids' => ['required', 'array', 'min:1'],
             'customer_ids.*' => [
-                Rule::exists('tenants', 'id')->where(fn ($query) => $query->where('status', 'active')),
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $exists = Tenant::query()
+                        ->where('id', $value)
+                        ->where('status', 'active')
+                        ->exists();
+                    if (! $exists) {
+                        $fail(__('validation.exists', ['attribute' => $attribute]));
+                    }
+                },
             ],
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['string', Rule::in(CustomerMembership::assignableRoles())],
@@ -607,7 +619,7 @@ class UserController extends Controller
         ]);
 
         if (! $user->belongsToCustomer($customer)) {
-            return back()->with('error', "{$user->email} is not a member of {$customer->name}.");
+            return back()->with('error', __('flash.customers.not_member', ['email' => $user->email, 'name' => $customer->name]));
         }
 
         $roles = array_values(array_unique($data['roles']));
@@ -637,7 +649,7 @@ class UserController extends Controller
         $customerName = $customer->name;
 
         if (! $user->belongsToCustomer($customer)) {
-            return back()->with('error', "{$user->email} is not a member of {$customerName}.");
+            return back()->with('error', __('flash.customers.not_member', ['email' => $user->email, 'name' => $customerName]));
         }
 
         CustomerMembership::detach($user, $customer);

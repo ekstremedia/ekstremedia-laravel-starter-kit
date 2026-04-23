@@ -113,6 +113,11 @@ class UserExport extends Command
             ->leftJoin('tenants', 'tenants.id', '=', "{$mhr}.{$teamKey}")
             ->where("{$mhr}.model_type", User::class)
             ->where("{$mhr}.model_id", $user->id)
+            // Defence against a future assignment that lands with a null
+            // `team_id` — we'd otherwise group it under `customer_id: 0`
+            // (the int-cast of null) and the PHPDoc `customer_id:int`
+            // would lie to callers.
+            ->whereNotNull("{$mhr}.{$teamKey}")
             ->get([
                 "{$mhr}.{$teamKey} as customer_id",
                 'tenants.slug as customer_slug',

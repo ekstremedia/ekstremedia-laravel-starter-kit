@@ -8,11 +8,12 @@
  * EnsureCustomerAdmin middleware.
  */
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useConfirm } from 'primevue/useconfirm';
 import ConfirmDialog from 'primevue/confirmdialog';
 import CommandLayout from '@/Layouts/CommandLayout.vue';
+import CmdButton from '@/Components/Command/Button.vue';
 import Icon from '@/Components/Command/Icon.vue';
 import MultiSelect from 'primevue/multiselect';
 import { useCustomer } from '@/composables/useCustomer';
@@ -44,8 +45,20 @@ const inviteForm = useForm<{ email: string; roles: string[] }>({ email: '', role
 const pendingId = ref<number | null>(null);
 
 // Local per-row editable copy so opening the dropdown doesn't race the PATCH.
-const editableRoles = ref<Record<number, string[]>>(
-    Object.fromEntries(props.members.map((m) => [m.id, [...m.roles]])),
+// Kept in sync with `props.members` via a watcher so Inertia partial reloads
+// (fresh member added by another admin, a sync from another window) don't
+// leave the MultiSelect showing stale roles and tripping the unchanged-check.
+const editableRoles = ref<Record<number, string[]>>({});
+watch(
+    () => props.members,
+    (members) => {
+        const next: Record<number, string[]> = {};
+        for (const m of members) {
+            next[m.id] = [...m.roles];
+        }
+        editableRoles.value = next;
+    },
+    { immediate: true, deep: true },
 );
 
 const roleOptions = computed(() => props.assignable_roles);
@@ -100,34 +113,46 @@ function remove(member: Member) {
 
 <template>
     <div class="page">
-        <Head title="Members" />
-        <ConfirmDialog />
+        <Head :title="t('customer.members.title')" />
+        <ConfirmDialog group="command" />
         <header class="page__head">
             <div>
-                <h1>Members</h1>
-                <p class="muted">People who can access this customer.</p>
+                <h1>{{ t('customer.members.title') }}</h1>
+                <p class="muted">{{ t('customer.members.subtitle') }}</p>
             </div>
         </header>
 
         <section class="invite">
             <form @submit.prevent="invite" class="invite__form">
                 <label class="field">
-                    <span>Email</span>
-                    <input v-model="inviteForm.email" type="email" required autocomplete="off" placeholder="person@example.com" />
+                    <span>{{ t('customer.members.email') }}</span>
+                    <input
+                        v-model="inviteForm.email"
+                        type="email"
+                        required
+                        autocomplete="off"
+                        :placeholder="t('customer.members.email_placeholder')"
+                    />
                 </label>
                 <label class="field">
-                    <span>Roles</span>
+                    <span>{{ t('customer.members.roles') }}</span>
                     <MultiSelect
                         v-model="inviteForm.roles"
                         :options="roleOptions"
                         display="chip"
-                        placeholder="Select roles"
+                        :placeholder="t('customer.members.select_roles')"
                     />
                 </label>
-                <button type="submit" :disabled="inviteForm.processing || inviteForm.roles.length === 0">
-                    <Icon name="plus" />
-                    Add member
-                </button>
+                <CmdButton
+                    type="submit"
+                    variant="primary"
+                    size="md"
+                    :loading="inviteForm.processing"
+                    :disabled="inviteForm.roles.length === 0"
+                >
+                    <template #icon><Icon name="plus" :size="12" /></template>
+                    {{ t('customer.members.add') }}
+                </CmdButton>
             </form>
             <p v-if="inviteForm.errors.email" class="error">{{ inviteForm.errors.email }}</p>
             <p v-else-if="inviteForm.errors.roles" class="error">{{ inviteForm.errors.roles }}</p>
@@ -135,9 +160,9 @@ function remove(member: Member) {
 
         <section class="table">
             <div class="table__row table__row--head">
-                <span>Name</span>
-                <span>Email</span>
-                <span>Role</span>
+                <span>{{ t('customer.members.header_name') }}</span>
+                <span>{{ t('customer.members.header_email') }}</span>
+                <span>{{ t('customer.members.header_roles') }}</span>
                 <span></span>
             </div>
             <div v-for="m in props.members" :key="m.id" class="table__row" :class="{ 'table__row--busy': pendingId === m.id }">
@@ -154,12 +179,18 @@ function remove(member: Member) {
                     />
                 </span>
                 <span class="table__actions">
-                    <button type="button" class="danger" @click="remove(m)" :disabled="pendingId === m.id">
-                        <Icon name="trash" />
-                    </button>
+                    <CmdButton
+                        variant="ghost"
+                        size="sm"
+                        :disabled="pendingId === m.id"
+                        :aria-label="t('customer.members.remove_aria')"
+                        @click="remove(m)"
+                    >
+                        <template #icon><Icon name="trash" :size="12" /></template>
+                    </CmdButton>
                 </span>
             </div>
-            <div v-if="props.members.length === 0" class="empty">No members yet.</div>
+            <div v-if="props.members.length === 0" class="empty">{{ t('customer.members.empty') }}</div>
         </section>
     </div>
 </template>

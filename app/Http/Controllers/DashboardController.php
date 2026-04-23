@@ -23,12 +23,18 @@ class DashboardController extends Controller
 
         $filesStats = null;
         if ($customer?->files_feature_enabled) {
+            // `file_items` carries `tenant_id`. Without that filter a user
+            // who owns files in two customers would see their *combined*
+            // count on each customer's dashboard — surfacing bytes that
+            // belong to another tenant in this customer's UI.
             $filesStats = [
                 'count' => FileItem::query()
+                    ->where('tenant_id', $customer->getKey())
                     ->where('user_id', $user->getKey())
                     ->where('type', 'file')
                     ->count(),
                 'bytes' => (int) FileItem::query()
+                    ->where('tenant_id', $customer->getKey())
                     ->where('user_id', $user->getKey())
                     ->where('type', 'file')
                     ->sum('size'),

@@ -349,6 +349,28 @@ export default {
         accent_select: 'Select {name} accent',
         show_kbd_hints: 'Rail keyboard hints',
     },
+    roles: {
+        super_admin: 'Super admin',
+        admin: 'Admin',
+        editor: 'Editor',
+        user: 'User',
+    },
+    customer: {
+        members: {
+            title: 'Members',
+            subtitle: 'People who can access this customer.',
+            email: 'Email',
+            email_placeholder: 'person@example.com',
+            roles: 'Roles',
+            select_roles: 'Select roles',
+            add: 'Add member',
+            header_name: 'Name',
+            header_email: 'Email',
+            header_roles: 'Roles',
+            empty: 'No members yet.',
+            remove_aria: 'Remove member',
+        },
+    },
     notifications: {
         title: 'Notifications',
         mark_all_read: 'Mark all read',

@@ -61,6 +61,8 @@ describe('LanguageSwitcher', () => {
         // icon's presentational wrapper changes.
         const activeBtn = wrapper.findAll('button').find((b) => b.text().includes('English'));
         const inactiveBtn = wrapper.findAll('button').find((b) => b.text().includes('Norsk'));
+        expect(activeBtn).toBeDefined();
+        expect(inactiveBtn).toBeDefined();
         expect(activeBtn?.find('svg').exists()).toBe(true);
         expect(activeBtn?.html()).toContain('M3 8l3 3 7-7');
         expect(inactiveBtn?.find('svg').exists()).toBe(false);

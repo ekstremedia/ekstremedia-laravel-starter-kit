@@ -89,7 +89,7 @@ class CustomerMembersController extends Controller
         ]);
 
         if (! $user->belongsToCustomer($customer)) {
-            return back()->with('error', "{$user->email} is not a member of {$customer->name}.");
+            return back()->with('error', __('flash.customers.not_member', ['email' => $user->email, 'name' => $customer->name]));
         }
 
         $newRoles = array_values(array_unique($data['roles']));
@@ -115,7 +115,7 @@ class CustomerMembersController extends Controller
         $customer = $this->customer($request);
 
         if (! $user->belongsToCustomer($customer)) {
-            return back()->with('error', "{$user->email} is not a member of {$customer->name}.");
+            return back()->with('error', __('flash.customers.not_member', ['email' => $user->email, 'name' => $customer->name]));
         }
 
         if (in_array('Admin', CustomerMembership::rolesOn($user, $customer), true)
@@ -135,10 +135,16 @@ class CustomerMembersController extends Controller
      */
     private function otherAdmins(Tenant $customer, User $excluding): int
     {
+        // Collapse what used to be "pull every member, call rolesOn() per
+        // user" (one N+1 query storm per membership action) into a single
+        // JOIN that counts Admin role rows on this customer's team scope.
+        $teamKey = config('permission.column_names.team_foreign_key');
+
         return $customer->users()
             ->where('users.id', '!=', $excluding->id)
-            ->get()
-            ->filter(fn (User $m) => in_array('Admin', CustomerMembership::rolesOn($m, $customer), true))
+            ->whereHas('roles', fn ($q) => $q
+                ->where('name', 'Admin')
+                ->where(config('permission.table_names.model_has_roles').'.'.$teamKey, $customer->id))
             ->count();
     }
 

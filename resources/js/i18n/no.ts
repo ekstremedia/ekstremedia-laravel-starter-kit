@@ -349,6 +349,28 @@ export default {
         accent_select: 'Velg {name}-aksent',
         show_kbd_hints: 'Hurtigtaster i rail',
     },
+    roles: {
+        super_admin: 'Superadmin',
+        admin: 'Admin',
+        editor: 'Redaktør',
+        user: 'Bruker',
+    },
+    customer: {
+        members: {
+            title: 'Medlemmer',
+            subtitle: 'Brukere med tilgang til denne kunden.',
+            email: 'E-post',
+            email_placeholder: 'person@eksempel.no',
+            roles: 'Roller',
+            select_roles: 'Velg roller',
+            add: 'Legg til medlem',
+            header_name: 'Navn',
+            header_email: 'E-post',
+            header_roles: 'Roller',
+            empty: 'Ingen medlemmer ennå.',
+            remove_aria: 'Fjern medlem',
+        },
+    },
     notifications: {
         title: 'Varsler',
         mark_all_read: 'Merk alle som lest',

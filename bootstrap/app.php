@@ -80,7 +80,7 @@ return Application::configure(basePath: dirname(__DIR__))
             if ($status === 419) {
                 return back()->with('flash', [
                     'level' => 'warning',
-                    'message' => 'The page expired, please try again.',
+                    'message' => __('flash.session.expired'),
                 ]);
             }
 

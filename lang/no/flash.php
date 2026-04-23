@@ -16,6 +16,10 @@ return [
         'saved' => 'Innstillinger lagret.',
     ],
 
+    'session' => [
+        'expired' => 'Siden har utløpt, prøv igjen.',
+    ],
+
     'avatar' => [
         'updated' => 'Profilbildet er oppdatert.',
         'removed' => 'Profilbildet er fjernet.',
@@ -81,5 +85,6 @@ return [
         'customers_attached' => 'La til :email i :names.',
         'customer_detached' => 'Fjernet :email fra :name.',
         'customer_role_updated' => 'Satte :email som :role på :name.',
+        'not_member' => ':email er ikke medlem av :name.',
     ],
 ];
