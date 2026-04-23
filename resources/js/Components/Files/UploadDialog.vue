@@ -212,12 +212,14 @@ async function startUpload() {
                             }
                         },
                         onSuccess: () => {
+                            if (settled) return;
                             uploadFile.status = 'complete';
                             uploadFile.progress = 100;
                             emit('file-uploaded', uploadFile.name);
                             settle();
                         },
                         onError: (errors) => {
+                            if (settled) return;
                             const fallback = t('upload.failed');
                             const errorMsg = Object.values(errors).flat().join(', ') || fallback;
                             uploadFile.status = 'error';
@@ -226,6 +228,11 @@ async function startUpload() {
                             settle();
                         },
                         onCancel: () => {
+                            // Inertia fires onCancel on the previous visit's follow-up
+                            // GET when the loop starts the next upload — the POST
+                            // itself already succeeded, so ignore the cancel once
+                            // we've settled.
+                            if (settled) return;
                             const msg = t('upload.cancelled');
                             uploadFile.status = 'error';
                             uploadFile.error = msg;
