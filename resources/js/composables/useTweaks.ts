@@ -46,7 +46,6 @@ function readStored(): TweaksState {
 }
 
 const state = ref<TweaksState>(readStored());
-let initialized = false;
 
 function apply(s: TweaksState) {
     if (typeof document === 'undefined') return;
@@ -87,20 +86,25 @@ function persist(s: TweaksState) {
     }
 }
 
-export function useTweaks() {
-    if (!initialized) {
-        initialized = true;
-        apply(state.value);
-        watch(
-            state,
-            (s) => {
-                apply(s);
-                persist(s);
-            },
-            { deep: true },
-        );
-    }
+// Eagerly apply the stored theme + register the persistence watcher at module
+// load time. We used to gate this on a `let initialized = false` flag flipped
+// by the first `useTweaks()` call, but under Vite HMR the module re-evaluates
+// and creates a new `state` ref — a component that was mounted before the
+// reload kept mutating the old ref while the new module's watch was never
+// registered (nothing calls `useTweaks()` during HMR until a component
+// re-renders). Running the watch binding at module scope means every module
+// evaluation — initial load and every HMR — gets a matched state/watch pair.
+apply(state.value);
+watch(
+    state,
+    (s) => {
+        apply(s);
+        persist(s);
+    },
+    { deep: true },
+);
 
+export function useTweaks() {
     function setTheme(theme: CommandTheme) { state.value = { ...state.value, theme }; }
     function setAccent(accent: CommandAccent) { state.value = { ...state.value, accent }; }
     function setDensity(density: CommandDensity) { state.value = { ...state.value, density }; }
