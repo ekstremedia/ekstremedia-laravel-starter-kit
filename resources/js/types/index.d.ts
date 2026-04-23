@@ -15,6 +15,7 @@ export interface User {
     avatar_thumb_url?: string | null;
     roles?: string[];
     permissions?: string[];
+    is_super_admin?: boolean;
     unread_notifications_count?: number;
     unread_messages_count?: number;
     is_impersonating?: boolean;

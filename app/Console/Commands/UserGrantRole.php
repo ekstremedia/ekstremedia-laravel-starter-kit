@@ -3,14 +3,21 @@
 namespace App\Console\Commands;
 
 use App\Models\Role;
+use App\Models\Tenant;
 use App\Models\User;
+use App\Support\CustomerMembership;
 use Illuminate\Console\Command;
+use Spatie\Permission\PermissionRegistrar;
 
 class UserGrantRole extends Command
 {
-    protected $signature = 'user:grant-role {email} {role} {--revoke : Revoke the role instead of granting it}';
+    protected $signature = 'user:grant-role
+        {email}
+        {role : Customer-scoped role (Admin/Editor/User) or the literal SuperAdmin}
+        {--customer= : Customer slug for customer-scoped roles (required unless role=SuperAdmin)}
+        {--revoke : Revoke the role instead of granting it}';
 
-    protected $description = 'Grant (or revoke) a role on a user.';
+    protected $description = 'Grant (or revoke) a customer-scoped role, or toggle the SuperAdmin flag.';
 
     public function handle(): int
     {
@@ -22,22 +29,48 @@ class UserGrantRole extends Command
         }
 
         $role = (string) $this->argument('role');
+        $revoke = (bool) $this->option('revoke');
 
-        // Spatie throws RoleDoesNotExist from assignRole / removeRole and the
-        // stack trace is ugly in a CLI. Check up front so we match the
-        // "no user with that email" ergonomics above.
+        if ($role === 'SuperAdmin') {
+            $user->forceFill(['is_super_admin' => ! $revoke])->save();
+            $this->info(($revoke ? 'Demoted' : 'Promoted')." {$user->email} (SuperAdmin).");
+
+            return self::SUCCESS;
+        }
+
+        $customerSlug = $this->option('customer');
+        if ($customerSlug === null || $customerSlug === '') {
+            $this->error('Customer-scoped roles require --customer=<slug>. Pass role=SuperAdmin for the platform flag.');
+
+            return self::FAILURE;
+        }
+
+        $customer = Tenant::query()->where('slug', $customerSlug)->first();
+        if (! $customer) {
+            $this->error("No customer with slug [{$customerSlug}].");
+
+            return self::FAILURE;
+        }
+
         if (! Role::where('name', $role)->where('guard_name', 'web')->exists()) {
             $this->error("No role named {$role}.");
 
             return self::FAILURE;
         }
 
-        if ($this->option('revoke')) {
-            $user->removeRole($role);
-            $this->info("Revoked {$role} from {$user->email}.");
+        if ($revoke) {
+            $registrar = app(PermissionRegistrar::class);
+            $previous = $registrar->getPermissionsTeamId();
+            try {
+                $registrar->setPermissionsTeamId($customer->id);
+                $user->removeRole($role);
+            } finally {
+                $registrar->setPermissionsTeamId($previous);
+            }
+            $this->info("Revoked {$role} from {$user->email} on [{$customer->slug}].");
         } else {
-            $user->assignRole($role);
-            $this->info("Granted {$role} to {$user->email}.");
+            CustomerMembership::attach($user, $customer, $role);
+            $this->info("Granted {$role} to {$user->email} on [{$customer->slug}].");
         }
 
         return self::SUCCESS;

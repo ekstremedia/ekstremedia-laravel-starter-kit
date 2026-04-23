@@ -80,5 +80,6 @@ return [
         'customer_attached' => 'La til :email i :name.',
         'customers_attached' => 'La til :email i :names.',
         'customer_detached' => 'Fjernet :email fra :name.',
+        'customer_role_updated' => 'Satte :email som :role på :name.',
     ],
 ];

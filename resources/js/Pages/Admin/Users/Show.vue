@@ -8,6 +8,7 @@ import CmdButton from '@/Components/Command/Button.vue';
 import Field from '@/Components/Command/Field.vue';
 import Icon from '@/Components/Command/Icon.vue';
 import Dot from '@/Components/Command/Dot.vue';
+import MultiSelect from 'primevue/multiselect';
 import { formatDateTime } from '@/composables/useDateTime';
 import ConfirmDialog from 'primevue/confirmdialog';
 import { useConfirm } from 'primevue/useconfirm';
@@ -15,24 +16,47 @@ import { useConfirm } from 'primevue/useconfirm';
 defineOptions({ layout: AdminLayout });
 
 interface ActivityItem { id: number; log_name: string | null; description: string; event: string | null; created_at: string }
-interface CustomerItem { id: number; name: string; slug: string }
+interface CustomerMembership { id: number; name: string; slug: string; roles: string[] }
 interface Props {
     user: {
         id: number; first_name: string; last_name: string; full_name: string; email: string;
         email_verified_at: string | null; banned_at: string | null; banned_reason: string | null;
         last_login_at: string | null; created_at: string; two_factor_enabled: boolean;
-        roles: string[]; avatar_url: string | null; avatar_thumb_url: string | null;
+        is_super_admin: boolean; avatar_url: string | null; avatar_thumb_url: string | null;
         unread_notifications_count: number;
-        customers: CustomerItem[];
+        customers: CustomerMembership[];
     };
+    assignable_roles: string[];
     activity: ActivityItem[];
-    tenancy_enabled: boolean;
 }
 const props = defineProps<Props>();
 const { t } = useI18n();
 
-const isAdmin = props.user.roles.includes('Admin');
+const isAdmin = props.user.is_super_admin;
 const confirm = useConfirm();
+const roleUpdating = ref<number | null>(null);
+
+// Local editable copy of each customer's roles — separate from the server
+// prop so opening the dropdown doesn't flicker while the PATCH is in flight.
+const editableRoles = ref<Record<number, string[]>>(
+    Object.fromEntries(props.user.customers.map((c) => [c.id, [...c.roles]])),
+);
+
+function syncCustomerRoles(customer: CustomerMembership) {
+    const roles = editableRoles.value[customer.id] ?? [];
+    const unchanged = roles.length === customer.roles.length
+        && roles.every((r) => customer.roles.includes(r));
+    if (unchanged) return;
+    roleUpdating.value = customer.id;
+    router.patch(
+        `/admin/users/${props.user.id}/customers/${customer.id}/role`,
+        { roles },
+        {
+            preserveScroll: true,
+            onFinish: () => { roleUpdating.value = null; },
+        },
+    );
+}
 
 const banDialog = ref(false);
 const notifyDialog = ref(false);
@@ -231,7 +255,7 @@ function chipStyle(tone: Tone) {
                         {{ user.email }}
                     </p>
                     <div :style="{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '5px', marginTop: '12px' }">
-                        <span v-for="r in user.roles" :key="r" :style="chipStyle(tones.accent)">{{ r }}</span>
+                        <span v-if="user.is_super_admin" :style="chipStyle(tones.danger)">SuperAdmin</span>
                         <span v-if="user.email_verified_at" :style="chipStyle(tones.success)">verified</span>
                         <span v-else :style="chipStyle(tones.warning)">unverified</span>
                         <span v-if="user.two_factor_enabled" :style="chipStyle(tones.success)">2FA on</span>
@@ -368,25 +392,50 @@ function chipStyle(tone: Tone) {
                 </dl>
             </section>
 
-            <!-- Customer memberships -->
+            <!-- Customer memberships with per-customer role -->
             <section
-                v-if="tenancy_enabled"
                 class="cmd-card"
                 :style="{ padding: '16px', gridColumn: 'span 3' }"
             >
-                <h2 :style="{ margin: '0 0 10px', fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">
-                    {{ t('admin.users.customer_memberships') }}
-                </h2>
-                <div v-if="user.customers.length" :style="{ display: 'flex', flexWrap: 'wrap', gap: '6px' }">
+                <div :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }">
+                    <h2 :style="{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">
+                        {{ t('admin.users.customer_memberships') }} ({{ user.customers.length }})
+                    </h2>
                     <Link
-                        v-for="c in user.customers"
-                        :key="c.id"
-                        :href="`/admin/customers/${c.id}/edit`"
-                        :style="{ textDecoration: 'none', ...chipStyle(tones.accent) }"
+                        :href="`/admin/users/${user.id}/edit`"
+                        :style="{ fontSize: '12px', color: 'var(--accent)', textDecoration: 'none' }"
                     >
-                        <Icon name="customer" :size="11" />
-                        {{ c.name }}
+                        {{ t('admin.users.manage_memberships') }} →
                     </Link>
+                </div>
+                <div
+                    v-if="user.customers.length"
+                    :style="{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(260px, 320px)', rowGap: '1px', background: 'var(--border)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'visible' }"
+                >
+                    <template v-for="c in user.customers" :key="c.id">
+                        <div :style="{ background: 'var(--bg)', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '10px' }">
+                            <Icon name="customer" :size="12" />
+                            <div :style="{ display: 'flex', flexDirection: 'column', minWidth: 0 }">
+                                <Link
+                                    :href="`/admin/customers/${c.id}/edit`"
+                                    :style="{ fontSize: '13px', fontWeight: 500, color: 'var(--fg)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }"
+                                >{{ c.name }}</Link>
+                                <span class="cmd-mono" :style="{ fontSize: '11px', color: 'var(--fg-mute)' }">/c/{{ c.slug }}</span>
+                            </div>
+                        </div>
+                        <div :style="{ background: 'var(--bg)', padding: '8px 12px', display: 'flex', alignItems: 'center' }">
+                            <MultiSelect
+                                v-model="editableRoles[c.id]"
+                                :options="assignable_roles"
+                                :disabled="roleUpdating === c.id"
+                                display="chip"
+                                :placeholder="t('admin.users.select_roles', 'Velg roller')"
+                                class="w-full"
+                                :style="{ width: '100%' }"
+                                @hide="syncCustomerRoles(c)"
+                            />
+                        </div>
+                    </template>
                 </div>
                 <p
                     v-else

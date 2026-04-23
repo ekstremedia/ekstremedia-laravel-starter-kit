@@ -20,7 +20,7 @@ class EnforceAppSettings
         }
 
         $user = $request->user();
-        $isAdmin = $user?->hasRole('Admin') ?? false;
+        $isAdmin = $user?->isSuperAdmin() ?? false;
 
         // Site down — admins and the health endpoint always pass
         if (! $settings->site_up && ! $isAdmin && ! $this->isSystemRoute($request)) {

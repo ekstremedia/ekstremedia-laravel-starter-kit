@@ -80,5 +80,6 @@ return [
         'customer_attached' => 'Added :email to :name.',
         'customers_attached' => 'Added :email to :names.',
         'customer_detached' => 'Removed :email from :name.',
+        'customer_role_updated' => 'Set :email as :role on :name.',
     ],
 ];

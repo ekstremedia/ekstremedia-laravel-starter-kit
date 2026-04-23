@@ -45,11 +45,24 @@ class AppServiceProvider extends ServiceProvider
         RedirectIfAuthenticated::redirectUsing(fn () => route('app.landing'));
 
         Gate::define('viewPulse', function ($user = null) {
-            return $user !== null && $user->hasRole('Admin');
+            return $user !== null && $user->isSuperAdmin();
         });
 
         Gate::define('viewLogViewer', function ($user = null) {
-            return $user !== null && $user->hasRole('Admin');
+            return $user !== null && $user->isSuperAdmin();
+        });
+
+        // SuperAdmin bypass: `Gate::before` runs before every ability check
+        // (Spatie permission gates included), so a SuperAdmin clears customer-
+        // scoped `can('upload files')` / `can('manage customer users')` checks
+        // even when they enter a customer they hold no membership role on.
+        // Returning `null` falls through to normal resolution for everyone else.
+        Gate::before(function ($user, $ability) {
+            if ($user !== null && $user->isSuperAdmin()) {
+                return true;
+            }
+
+            return null;
         });
 
         // Laravel's default /up route dispatches DiagnosingHealth before it

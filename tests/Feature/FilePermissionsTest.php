@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\AppSetting;
 use App\Models\FileItem;
+use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RoleAndPermissionSeeder;
 use Illuminate\Http\UploadedFile;
@@ -11,18 +12,22 @@ use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
- * Users in this project get file permissions via their "User" role. Revoking
- * role-granted permissions directly on a user is a no-op — we strip the role
- * and (optionally) grant back a curated subset, then forget the registrar's
+ * Users in this project get file permissions via their customer-scoped
+ * `User` role. Revoking role-granted permissions directly on a user is a
+ * no-op — we strip the role within the customer's team context and
+ * (optionally) grant back a curated subset, then forget the registrar's
  * permission cache so the next HTTP request sees the new state.
  */
-function grantOnly(User $user, array $keep): void
+function grantOnly(User $user, Tenant $customer, array $keep): void
 {
+    $registrar = app(PermissionRegistrar::class);
+    $registrar->setPermissionsTeamId($customer->id);
+
     $user->syncRoles([]);
     foreach ($keep as $perm) {
         $user->givePermissionTo($perm);
     }
-    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    $registrar->forgetCachedPermissions();
 }
 
 beforeEach(function () {
@@ -34,7 +39,6 @@ beforeEach(function () {
     $this->customer->update(['files_feature_enabled' => true]);
 
     $this->user = User::factory()->create();
-    $this->user->assignRole('User');
     joinCustomer($this->user, $this->customer);
     $this->user->settings()->merge([
         'files_enabled' => true,
@@ -45,6 +49,7 @@ beforeEach(function () {
 });
 
 it('seeded User role has all file permissions', function () {
+    app(PermissionRegistrar::class)->setPermissionsTeamId($this->customer->id);
     expect($this->user->can('upload files'))->toBeTrue();
     expect($this->user->can('create folders'))->toBeTrue();
     expect($this->user->can('rename files'))->toBeTrue();
@@ -53,7 +58,7 @@ it('seeded User role has all file permissions', function () {
 });
 
 it('rejects upload when user lacks the upload permission', function () {
-    grantOnly($this->user, ['create folders', 'rename files', 'delete files', 'share files']);
+    grantOnly($this->user, $this->customer, ['create folders', 'rename files', 'delete files', 'share files']);
 
     $this->actingAs($this->user)
         ->post($this->filesUrl, ['files' => [UploadedFile::fake()->create('a.txt', 10)]])
@@ -61,7 +66,7 @@ it('rejects upload when user lacks the upload permission', function () {
 });
 
 it('rejects folder create when user lacks the create-folders permission', function () {
-    grantOnly($this->user, ['upload files', 'rename files', 'delete files', 'share files']);
+    grantOnly($this->user, $this->customer, ['upload files', 'rename files', 'delete files', 'share files']);
 
     $this->actingAs($this->user)
         ->post(customerUrl($this->customer, '/files/folder'), ['name' => 'dir'])
@@ -73,7 +78,7 @@ it('rejects rename when user lacks the rename-files permission', function () {
         'user_id' => $this->user->id,
         'tenant_id' => $this->customer->id,
     ]);
-    grantOnly($this->user, ['upload files', 'create folders', 'delete files', 'share files']);
+    grantOnly($this->user, $this->customer, ['upload files', 'create folders', 'delete files', 'share files']);
 
     $this->actingAs($this->user)
         ->patch(customerUrl($this->customer, "/files/{$file->id}"), ['name' => 'new'])
@@ -85,7 +90,7 @@ it('rejects delete when user lacks the delete-files permission', function () {
         'user_id' => $this->user->id,
         'tenant_id' => $this->customer->id,
     ]);
-    grantOnly($this->user, ['upload files', 'create folders', 'rename files', 'share files']);
+    grantOnly($this->user, $this->customer, ['upload files', 'create folders', 'rename files', 'share files']);
 
     $this->actingAs($this->user)
         ->delete(customerUrl($this->customer, "/files/{$file->id}"))
@@ -97,7 +102,7 @@ it('rejects share when user lacks the share-files permission', function () {
         'user_id' => $this->user->id,
         'tenant_id' => $this->customer->id,
     ]);
-    grantOnly($this->user, ['upload files', 'create folders', 'rename files', 'delete files']);
+    grantOnly($this->user, $this->customer, ['upload files', 'create folders', 'rename files', 'delete files']);
 
     $this->actingAs($this->user)
         ->postJson(customerUrl($this->customer, "/files/{$file->id}/shares"), ['expires_in_hours' => 1])
@@ -110,7 +115,7 @@ it('rejects trash force-delete when user lacks the delete-files permission', fun
         'tenant_id' => $this->customer->id,
     ]);
     $file->delete();
-    grantOnly($this->user, ['upload files', 'create folders', 'rename files', 'share files']);
+    grantOnly($this->user, $this->customer, ['upload files', 'create folders', 'rename files', 'share files']);
 
     $this->actingAs($this->user)
         ->delete(customerUrl($this->customer, "/files/trash/{$file->id}"))

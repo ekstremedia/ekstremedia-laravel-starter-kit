@@ -7,10 +7,9 @@ beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
 
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
 
     $this->target = User::factory()->create();
-    $this->target->assignRole('User');
 });
 
 it('allows an admin to impersonate a non-admin', function () {
@@ -24,7 +23,7 @@ it('allows an admin to impersonate a non-admin', function () {
 
 it('forbids impersonating another admin', function () {
     $otherAdmin = User::factory()->create();
-    $otherAdmin->assignRole('Admin');
+    $otherAdmin->forceFill(['is_super_admin' => true])->save();
 
     $this->actingAs($this->admin)
         ->post("/admin/users/{$otherAdmin->id}/impersonate")
@@ -33,7 +32,6 @@ it('forbids impersonating another admin', function () {
 
 it('forbids non-admins from impersonating', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
 
     $this->actingAs($user)
         ->post("/admin/users/{$this->target->id}/impersonate")

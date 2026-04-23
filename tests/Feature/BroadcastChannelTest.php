@@ -33,7 +33,7 @@ function resolveChannel(string $name, $user)
 
 it('authorizes admins on the admin.health channel', function () {
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $channels = require base_path('routes/channels.php');
 
@@ -52,7 +52,6 @@ it('authorizes admins on the admin.health channel', function () {
 
 it('denies non-admins on the admin.health channel', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
 
     $broadcaster = app('Illuminate\Contracts\Broadcasting\Broadcaster');
     $reflection = new ReflectionClass($broadcaster);

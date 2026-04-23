@@ -3,6 +3,7 @@
 use App\Models\User;
 use App\Notifications\CustomerMemberAddedNotification;
 use App\Notifications\CustomerMemberRemovedNotification;
+use App\Support\CustomerMembership;
 use Database\Seeders\RoleAndPermissionSeeder;
 use Illuminate\Support\Facades\Notification;
 
@@ -13,7 +14,7 @@ beforeEach(function () {
 
 it('shows customers on user show page when tenancy enabled', function () {
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $user = User::factory()->create();
     $customer = createCustomer();
@@ -23,7 +24,6 @@ it('shows customers on user show page when tenancy enabled', function () {
         ->get("/admin/users/{$user->id}")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->where('tenancy_enabled', true)
             ->has('user.customers', 1)
             ->where('user.customers.0.slug', $customer->slug)
         );
@@ -31,7 +31,7 @@ it('shows customers on user show page when tenancy enabled', function () {
 
 it('shows customers and all_customers on user edit page', function () {
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $user = User::factory()->create();
     $customer = createCustomer();
@@ -41,7 +41,6 @@ it('shows customers and all_customers on user edit page', function () {
         ->get("/admin/users/{$user->id}/edit")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->where('tenancy_enabled', true)
             ->has('user.customers', 1)
             ->has('all_customers', 1)
         );
@@ -49,7 +48,7 @@ it('shows customers and all_customers on user edit page', function () {
 
 it('allows admin to attach a customer to a user', function () {
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $user = User::factory()->create();
     $customer = createCustomer();
@@ -57,6 +56,7 @@ it('allows admin to attach a customer to a user', function () {
     $this->actingAs($admin)
         ->post("/admin/users/{$user->id}/customers", [
             'customer_ids' => [$customer->id],
+            'roles' => ['User'],
             'notify' => false,
         ])
         ->assertRedirect();
@@ -66,7 +66,7 @@ it('allows admin to attach a customer to a user', function () {
 
 it('allows admin to detach a customer from a user', function () {
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $user = User::factory()->create();
     $customer = createCustomer();
@@ -85,7 +85,7 @@ it('dispatches notification when notify is true on attach', function () {
     Notification::fake();
 
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $user = User::factory()->create();
     $customer = createCustomer();
@@ -93,6 +93,7 @@ it('dispatches notification when notify is true on attach', function () {
     $this->actingAs($admin)
         ->post("/admin/users/{$user->id}/customers", [
             'customer_ids' => [$customer->id],
+            'roles' => ['User'],
             'notify' => true,
         ])
         ->assertRedirect();
@@ -104,7 +105,7 @@ it('does not dispatch notification when notify is false', function () {
     Notification::fake();
 
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $user = User::factory()->create();
     $customer = createCustomer();
@@ -112,6 +113,7 @@ it('does not dispatch notification when notify is false', function () {
     $this->actingAs($admin)
         ->post("/admin/users/{$user->id}/customers", [
             'customer_ids' => [$customer->id],
+            'roles' => ['User'],
             'notify' => false,
         ])
         ->assertRedirect();
@@ -123,7 +125,7 @@ it('dispatches removal notification when notify is true on detach', function () 
     Notification::fake();
 
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $user = User::factory()->create();
     $customer = createCustomer();
@@ -138,9 +140,60 @@ it('dispatches removal notification when notify is true on detach', function () 
     Notification::assertSentTo($user, CustomerMemberRemovedNotification::class);
 });
 
+it('lets super admin set a users role on a specific customer', function () {
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_super_admin' => true])->save();
+
+    $user = User::factory()->create();
+    $customer = createCustomer();
+    grantRoleOnCustomer($user, 'User', $customer);
+
+    $this->actingAs($admin)
+        ->patch("/admin/users/{$user->id}/customers/{$customer->id}/role", ['roles' => ['Admin']])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect(CustomerMembership::roleOn($user->fresh(), $customer))->toBe('Admin');
+});
+
+it('rejects setting a customer role for a user not in the customer', function () {
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_super_admin' => true])->save();
+
+    $user = User::factory()->create();
+    $customer = createCustomer();
+
+    $this->actingAs($admin)
+        ->patch("/admin/users/{$user->id}/customers/{$customer->id}/role", ['roles' => ['Admin']])
+        ->assertRedirect();
+
+    expect(CustomerMembership::roleOn($user->fresh(), $customer))->toBeNull();
+});
+
+it('shows per-customer roles in the user show payload', function () {
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_super_admin' => true])->save();
+
+    $user = User::factory()->create();
+    $a = createCustomer('a-co', 'A Co');
+    $b = createCustomer('b-co', 'B Co');
+    grantRoleOnCustomer($user, 'Admin', $a);
+    grantRoleOnCustomer($user, 'User', $b);
+
+    $this->actingAs($admin)
+        ->get("/admin/users/{$user->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('user.customers', 2)
+            ->where('user.customers', fn ($customers) => collect($customers)
+                ->contains(fn ($c) => $c['slug'] === 'a-co' && $c['roles'] === ['Admin'])
+                && collect($customers)->contains(fn ($c) => $c['slug'] === 'b-co' && $c['roles'] === ['User'])
+            )
+        );
+});
+
 it('rejects non-admin from attaching customers', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
 
     $target = User::factory()->create();
     $customer = createCustomer();
@@ -148,6 +201,7 @@ it('rejects non-admin from attaching customers', function () {
     $this->actingAs($user)
         ->post("/admin/users/{$target->id}/customers", [
             'customer_ids' => [$customer->id],
+            'roles' => ['User'],
             'notify' => false,
         ])
         ->assertForbidden();

@@ -10,6 +10,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Spatie\Permission\Exceptions\RoleDoesNotExist;
+use Spatie\Permission\PermissionRegistrar;
 
 class UserSeeder extends Seeder
 {
@@ -19,7 +20,10 @@ class UserSeeder extends Seeder
             ->where('slug', config('tenancy.default_customer_slug', 'default'))
             ->first();
 
-        // Admin (from .env)
+        // SuperAdmin (from .env) — platform super-user. The `is_super_admin`
+        // boolean on the user row is the single source of truth; it grants
+        // access to /admin/*, lets them enter any customer, and bypasses
+        // customer-scoped role checks.
         $admin = User::firstOrCreate(
             ['email' => env('STARTER_ADMIN_EMAIL', 'admin@example.test')],
             [
@@ -27,10 +31,16 @@ class UserSeeder extends Seeder
                 'last_name' => env('STARTER_ADMIN_LAST_NAME', 'User'),
                 'password' => Hash::make(env('STARTER_ADMIN_PASSWORD', 'password')),
                 'email_verified_at' => now(),
+                'is_super_admin' => true,
             ],
         );
-        $this->safeAssignRole($admin, 'Admin');
+        if (! $admin->is_super_admin) {
+            $admin->forceFill(['is_super_admin' => true])->save();
+        }
         $this->attachToCustomer($admin, $defaultCustomer);
+        // Also give them a customer-scoped Admin role on the default customer
+        // so they have a full member role when they enter it.
+        $this->assignCustomerRole($admin, 'Admin', $defaultCustomer);
 
         if (! env('SEED_DEMO_USERS', false)) {
             return;
@@ -52,8 +62,8 @@ class UserSeeder extends Seeder
                 'email_verified_at' => null,
             ],
         );
-        $this->safeAssignRole($unverified, 'User');
         $this->attachToCustomer($unverified, $defaultCustomer);
+        $this->assignCustomerRole($unverified, 'User', $defaultCustomer);
     }
 
     private function seedRole(Generator $faker, string $role, int $count, string $password, ?Tenant $customer): void
@@ -77,17 +87,8 @@ class UserSeeder extends Seeder
                 'password' => $password,
                 'email_verified_at' => now(),
             ]);
-            $this->safeAssignRole($user, $role);
             $this->attachToCustomer($user, $customer);
-        }
-    }
-
-    private function safeAssignRole(User $user, string $role): void
-    {
-        try {
-            $user->assignRole($role);
-        } catch (RoleDoesNotExist) {
-            $this->command->warn("Role '{$role}' not found; skipping assignment for {$user->email}. Run RoleAndPermissionSeeder first.");
+            $this->assignCustomerRole($user, $role, $customer);
         }
     }
 
@@ -98,5 +99,27 @@ class UserSeeder extends Seeder
         }
 
         $user->customers()->syncWithoutDetaching([$customer->id]);
+    }
+
+    /**
+     * Assigns a customer-scoped role with team_id = customer.id so the
+     * assignment only applies while that customer is the active team context.
+     */
+    private function assignCustomerRole(User $user, string $role, ?Tenant $customer): void
+    {
+        if ($customer === null) {
+            return;
+        }
+
+        try {
+            app(PermissionRegistrar::class)->setPermissionsTeamId($customer->id);
+            if (! $user->hasRole($role)) {
+                $user->assignRole($role);
+            }
+        } catch (RoleDoesNotExist) {
+            $this->command->warn("Role '{$role}' not found; skipping customer assignment for {$user->email}. Run RoleAndPermissionSeeder first.");
+        } finally {
+            app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+        }
     }
 }

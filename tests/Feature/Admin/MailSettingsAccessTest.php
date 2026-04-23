@@ -9,7 +9,7 @@ beforeEach(function () {
 
 it('renders the mail settings page for admins', function () {
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $this->actingAs($admin)
         ->get('/admin/mail')
@@ -25,7 +25,7 @@ it('renders the mail settings page for admins', function () {
 
 it('exposes has_password=true after saving a password', function () {
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $this->actingAs($admin)->patch('/admin/mail', [
         'mailer' => 'smtp',
@@ -49,7 +49,7 @@ it('exposes has_password=true after saving a password', function () {
 
 it('rejects invalid mail settings payloads', function () {
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $this->actingAs($admin)
         ->patch('/admin/mail', [

@@ -24,14 +24,13 @@ it('redirects guests from admin routes to login', function (string $method, stri
 
 it('forbids non-admins from admin routes', function (string $method, string $uri) {
     $user = User::factory()->create();
-    $user->assignRole('User');
 
     $this->actingAs($user)->call($method, $uri)->assertForbidden();
 })->with($adminRoutes);
 
 it('allows admins to access admin routes', function (string $method, string $uri) {
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $this->actingAs($admin)->call($method, $uri)->assertOk();
 })->with($adminRoutes);

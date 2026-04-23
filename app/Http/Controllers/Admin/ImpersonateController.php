@@ -4,12 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use Illuminate\Http\RedirectResponse;
+use Inertia\Inertia;
 use Lab404\Impersonate\Services\ImpersonateManager;
+use Symfony\Component\HttpFoundation\Response;
 
 class ImpersonateController extends Controller
 {
-    public function take(User $user, ImpersonateManager $manager): RedirectResponse
+    public function take(User $user, ImpersonateManager $manager): Response
     {
         $me = auth()->user();
 
@@ -20,34 +21,26 @@ class ImpersonateController extends Controller
         // Impersonation activity is intentionally NOT logged to activity_log;
         // the banner at the top of every page already signals the session is
         // impersonated, and the noise drowned out useful admin signal.
-        // Re-enable by uncommenting if you need an audit trail.
-        // activity('impersonation')
-        //     ->causedBy($me)
-        //     ->performedOn($user)
-        //     ->event('started')
-        //     ->log("{$me->email} impersonated {$user->email}");
 
         $manager->take($me, $user);
 
-        return redirect()->route('app.landing');
+        // The session identity changes mid-request. A plain Laravel redirect
+        // would be followed by Inertia's XHR as a GET to /app — but the SPA
+        // shell is still rendering on /admin/users/{id}/impersonate (a
+        // super.admin-guarded URL), so it 403s before the new page swaps in.
+        // `Inertia::location` forces a hard reload so the browser reconnects
+        // with the new session at the target URL.
+        return Inertia::location(route('app.landing'));
     }
 
-    public function leave(ImpersonateManager $manager): RedirectResponse
+    public function leave(ImpersonateManager $manager): Response
     {
         if ($manager->isImpersonating()) {
-            $impersonator = User::find($manager->getImpersonatorId());
-            $me = auth()->user();
-
-            // See take() — impersonation activity is intentionally not logged.
-            // activity('impersonation')
-            //     ->causedBy($impersonator)
-            //     ->performedOn($me)
-            //     ->event('stopped')
-            //     ->log("{$impersonator?->email} stopped impersonating {$me->email}");
-
             $manager->leave();
         }
 
-        return redirect()->route('admin.users.index');
+        // Same reasoning as `take`: force a full reload so the Inertia shell
+        // re-hydrates against the restored (super admin) session.
+        return Inertia::location(route('admin.users.index'));
     }
 }

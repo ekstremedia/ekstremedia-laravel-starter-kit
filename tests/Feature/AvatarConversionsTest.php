@@ -14,7 +14,6 @@ beforeEach(function () {
 
 it('generates the thumb conversion synchronously on upload', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
     joinCustomer($user, $this->customer);
 
     $this->actingAs($user)
@@ -31,7 +30,6 @@ it('generates the thumb conversion synchronously on upload', function () {
 
 it('updates the avatar on re-upload', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
     joinCustomer($user, $this->customer);
 
     $this->actingAs($user)
@@ -52,7 +50,6 @@ it('updates the avatar on re-upload', function () {
 
 it('enforces the upload size ceiling', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
     joinCustomer($user, $this->customer);
 
     $this->actingAs($user)

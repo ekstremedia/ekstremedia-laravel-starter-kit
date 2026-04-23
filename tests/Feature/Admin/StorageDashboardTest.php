@@ -9,12 +9,11 @@ beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
 
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
 });
 
 it('guards the dashboard behind the Admin role', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
 
     $this->actingAs($user)
         ->get('/admin/storage')

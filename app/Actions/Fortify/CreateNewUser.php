@@ -6,6 +6,7 @@ use App\Models\AppSetting;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\WelcomeNotification;
+use App\Support\CustomerMembership;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -40,47 +41,51 @@ class CreateNewUser implements CreatesNewUsers
 
         $settings = AppSetting::current();
 
-        try {
-            $user->assignRole($settings->default_role ?? 'User');
-        } catch (RoleDoesNotExist) {
-            // Configured default role isn't seeded; the account is created without a role.
-        }
-
         if ($settings->send_welcome_notification) {
             $user->notify(new WelcomeNotification);
         }
 
-        $this->attachToDefaultCustomer($user);
+        $this->attachToDefaultCustomer($user, $settings->default_role ?? 'User');
 
         return $user;
     }
 
     /**
-     * When multi-tenancy is enabled, new sign-ups auto-join the default customer
-     * configured in `tenancy.default_customer_slug` (env: `TENANCY_DEFAULT_CUSTOMER`).
-     * In single-tenant mode this is a no-op. When the configured slug exists but
-     * the row hasn't been seeded we log a warning — the user will hit 403 on
-     * every tenant route until an admin attaches them, which is worth surfacing.
+     * New sign-ups auto-join the default customer configured in
+     * `tenancy.default_customer_slug` (env: `TENANCY_DEFAULT_CUSTOMER`) with the
+     * platform-configured default role. Roles are always customer-scoped, so we
+     * go through `CustomerMembership` to keep the pivot + role assignment in
+     * sync. When the configured slug doesn't resolve we log a warning — the
+     * user would land on the picker with nowhere to go until an admin attaches
+     * them, which is worth surfacing.
      */
-    private function attachToDefaultCustomer(User $user): void
+    private function attachToDefaultCustomer(User $user, string $defaultRole): void
     {
-        if (! config('tenancy.enabled')) {
-            return;
-        }
-
         $slug = config('tenancy.default_customer_slug', 'default');
 
         $customer = Tenant::query()->where('slug', $slug)->first();
 
-        if ($customer !== null) {
-            $user->customers()->syncWithoutDetaching([$customer->id]);
+        if ($customer === null) {
+            Log::warning('Default customer not found for new user; skipping auto-join.', [
+                'slug' => $slug,
+                'user_id' => $user->id,
+            ]);
 
             return;
         }
 
-        Log::warning('Default customer not found for new user; skipping auto-join.', [
-            'slug' => $slug,
-            'user_id' => $user->id,
-        ]);
+        // Fall back to 'User' if the configured default role isn't one we
+        // recognise as assignable — mirroring the previous swallowed
+        // RoleDoesNotExist behaviour so a bad app-setting value can't block
+        // registration.
+        $role = in_array($defaultRole, CustomerMembership::assignableRoles(), true)
+            ? $defaultRole
+            : 'User';
+
+        try {
+            CustomerMembership::attach($user, $customer, [$role]);
+        } catch (RoleDoesNotExist) {
+            $user->customers()->syncWithoutDetaching([$customer->id]);
+        }
     }
 }

@@ -43,8 +43,13 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'request_id' => (string) $request->attributes->get('request_id', ''),
+            // `user` resolves lazily so `getRoleNames()` / `getAllPermissions()`
+            // see the team id set by `InitializeTenancyByPath` — Inertia's
+            // `share()` runs *before* the rest of the middleware stack, so
+            // eagerly reading roles here would yield the pre-tenancy (empty)
+            // set on customer-scoped routes.
             'auth' => [
-                'user' => $request->user() ? [
+                'user' => fn () => $request->user() ? [
                     'id' => $request->user()->id,
                     'first_name' => $request->user()->first_name,
                     'last_name' => $request->user()->last_name,
@@ -57,6 +62,7 @@ class HandleInertiaRequests extends Middleware
                     'avatar_thumb_url' => $request->user()->avatarUrl('thumb'),
                     'roles' => $request->user()->getRoleNames()->toArray(),
                     'permissions' => $request->user()->getAllPermissions()->pluck('name')->toArray(),
+                    'is_super_admin' => $request->user()->isSuperAdmin(),
                     'unread_notifications_count' => $request->user()->unreadNotifications()->count(),
                     'unread_messages_count' => config('chat.enabled')
                         ? $request->user()->unreadMessagesCount()
@@ -145,7 +151,7 @@ class HandleInertiaRequests extends Middleware
             return [];
         }
 
-        $query = $user->hasRole('Admin')
+        $query = $user->isSuperAdmin()
             ? Tenant::query()->where('status', 'active')
             : $user->customers()->where('status', 'active');
 

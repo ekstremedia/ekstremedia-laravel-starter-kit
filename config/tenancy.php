@@ -12,21 +12,15 @@ use Stancl\Tenancy\TenantDatabaseManagers\SQLiteDatabaseManager;
 
 return [
     /**
-     * Master switch.
+     * Multi-tenancy is always on. The app is customer-scoped end-to-end:
+     * routes live under `/c/{customer}/...`, `/app` is the post-login picker,
+     * and `CustomerSeeder` provisions a `default` workspace on `migrate --seed`.
+     * At least one customer must exist for users to reach anything beyond `/app`.
      *
-     * When `false` (default) the app behaves like a plain single-tenant Laravel
-     * SPA: routes live at `/dashboard`, `/profile`, etc., no `/c/{customer}`
-     * prefix, no landlord UI, no default-customer seeding, and new
-     * registrations are not attached to any customer. The `tenants` and
-     * `tenant_user` tables still exist in the central DB but stay empty.
-     *
-     * Flip to `true` (set `TENANCY_ENABLED=true` in `.env` and clear config) to
-     * activate multi-tenancy: routes move under `/c/{customer}/...`, `/app`
-     * becomes the post-login picker, `/admin/customers` exposes the landlord
-     * UI, and `CustomerSeeder` provisions a `default` workspace on `migrate
-     * --seed`.
+     * Kept as a config key (rather than removed) so legacy callers that read
+     * it still resolve cleanly.
      */
-    'enabled' => env('TENANCY_ENABLED', false),
+    'enabled' => true,
 
     'tenant_model' => Tenant::class,
 

@@ -18,7 +18,6 @@ beforeEach(function () {
     $this->customer->update(['files_feature_enabled' => true]);
 
     $this->user = User::factory()->create();
-    $this->user->assignRole('User');
     joinCustomer($this->user, $this->customer);
     $this->user->settings()->merge([
         'files_enabled' => true,

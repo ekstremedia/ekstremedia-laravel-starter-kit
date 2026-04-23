@@ -21,7 +21,7 @@ useTweaks();
 const { t } = useI18n();
 const page = usePage<PageProps>();
 const user = computed(() => page.props.auth?.user);
-const isAdmin = computed(() => user.value?.roles?.includes('Admin') ?? false);
+const isAdmin = computed(() => user.value?.is_super_admin === true);
 const registrationOpen = computed(() => page.props.app_settings?.registration_open !== false);
 const appName = import.meta.env.VITE_APP_NAME || t('app.name');
 

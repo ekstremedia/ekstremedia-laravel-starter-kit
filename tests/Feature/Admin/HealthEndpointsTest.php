@@ -8,7 +8,7 @@ beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
 
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
 });
 
 it('exposes queue-last as JSON with current cache state', function () {
@@ -31,7 +31,6 @@ it('returns null last when no ping has been recorded', function () {
 
 it('forbids non-admins from health endpoints', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
 
     $this->actingAs($user)->post('/admin/health/queue')->assertForbidden();
     $this->actingAs($user)->post('/admin/health/broadcast')->assertForbidden();

@@ -7,7 +7,7 @@ beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
 
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
 });
 
 it('renders the overview dashboard with live metrics', function () {
@@ -54,7 +54,6 @@ it('returns one point per day in the 30-day trend series', function () {
 
 it('forbids non-admins from the overview and metrics endpoints', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
 
     $this->actingAs($user)->get('/admin')->assertForbidden();
     $this->actingAs($user)->get('/admin/overview/metrics')->assertForbidden();

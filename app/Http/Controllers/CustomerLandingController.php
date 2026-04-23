@@ -15,24 +15,19 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
  * Post-login landing (`/app`). Central redirects from Fortify, LoginResponse,
  * RedirectIfAuthenticated, impersonation, and DevLogin all point here:
  *
- *   - tenancy disabled → redirect to `/dashboard` (plain single-tenant app)
- *   - tenancy enabled, user has 1 customer  → /c/{slug}/dashboard
- *   - tenancy enabled, user has many         → render the picker
+ *   - user has 1 customer  → /c/{slug}/dashboard
+ *   - user has many        → render the picker
  */
 class CustomerLandingController extends Controller
 {
     public function __invoke(Request $request): RedirectResponse|Response
     {
-        if (! config('tenancy.enabled')) {
-            return redirect('/dashboard');
-        }
-
         // `/app` is behind `['auth','verified']`, so `user()` is guaranteed non-null.
         $user = $request->user();
 
-        // Admins can enter any active customer; regular users only their memberships.
+        // SuperAdmins can enter any active customer; regular users only their memberships.
         /** @var Collection<int, Tenant> $customers */
-        $customers = $user->hasRole('Admin')
+        $customers = $user->isSuperAdmin()
             ? Tenant::query()->where('status', 'active')->orderBy('name')->get()
             : $user->customers()->where('status', 'active')->orderBy('name')->get();
 

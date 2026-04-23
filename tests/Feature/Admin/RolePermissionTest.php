@@ -9,18 +9,18 @@ beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
 
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
 });
 
 it('creates a role with permissions', function () {
     $this->actingAs($this->admin)->post('/admin/roles', [
         'name' => 'Moderator',
-        'permissions' => ['manage users', 'view dashboard'],
+        'permissions' => ['manage customer users', 'view dashboard'],
     ])->assertRedirect('/admin/roles');
 
     $role = Role::findByName('Moderator');
     expect($role->permissions->pluck('name')->all())
-        ->toEqualCanonicalizing(['manage users', 'view dashboard']);
+        ->toEqualCanonicalizing(['manage customer users', 'view dashboard']);
 });
 
 it('updates role permissions', function () {

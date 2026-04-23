@@ -3,8 +3,10 @@
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\MjmlCompiler;
+use App\Support\CustomerMembership;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Spatie\Permission\PermissionRegistrar;
 use Stancl\Tenancy\Events\TenantCreated;
 use Stancl\Tenancy\Events\TenantDeleted;
 use Tests\TestCase;
@@ -56,12 +58,20 @@ function createCustomer(string $slug = 'acme', ?string $name = null): Tenant
 }
 
 /**
- * Attach the user to a customer (creating one on the fly when not supplied).
+ * Attach the user to a customer (creating one on the fly when not supplied)
+ * and grant them a customer-scoped role. Defaults to `User` so most tests get
+ * the standard file permissions; pass `null` to skip role assignment when a
+ * bare membership is what the test needs.
  */
-function joinCustomer(User $user, ?Tenant $customer = null): Tenant
+function joinCustomer(User $user, ?Tenant $customer = null, ?string $role = 'User'): Tenant
 {
     $customer ??= Tenant::query()->where('slug', 'acme')->first() ?? createCustomer();
-    $user->customers()->syncWithoutDetaching([$customer->id]);
+
+    if ($role === null) {
+        $user->customers()->syncWithoutDetaching([$customer->id]);
+    } else {
+        grantRoleOnCustomer($user, $role, $customer);
+    }
 
     return $customer;
 }
@@ -75,4 +85,27 @@ function customerUrl(Tenant $customer, string $path = ''): string
     $path = $path === '' ? '' : '/'.ltrim($path, '/');
 
     return "/c/{$customer->slug}{$path}";
+}
+
+/**
+ * Assign a customer-scoped role to a user on a specific customer. Joins the
+ * customer first so the membership + role rows stay in sync. Resets the
+ * PermissionRegistrar team id back to null so subsequent unscoped checks
+ * (e.g. SuperAdmin) aren't accidentally constrained.
+ */
+function grantRoleOnCustomer(User $user, string $role, Tenant $customer): void
+{
+    CustomerMembership::attach($user, $customer, $role);
+    app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+}
+
+/**
+ * Promote a user to platform SuperAdmin by setting the boolean column on the
+ * users table. Independent of any customer context; see `User::isSuperAdmin()`.
+ */
+function makeSuperAdmin(User $user): User
+{
+    $user->forceFill(['is_super_admin' => true])->save();
+
+    return $user->refresh();
 }

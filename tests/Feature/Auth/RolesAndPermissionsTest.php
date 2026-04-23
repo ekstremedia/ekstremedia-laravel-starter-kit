@@ -4,26 +4,27 @@ use App\Models\User;
 use Database\Seeders\RoleAndPermissionSeeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
 });
 
-it('creates the admin role', function () {
+it('creates the customer-scoped Admin role template', function () {
     expect(Role::where('name', 'Admin')->exists())->toBeTrue();
 });
 
-it('creates the user role', function () {
+it('creates the User role template', function () {
     expect(Role::where('name', 'User')->exists())->toBeTrue();
 });
 
-it('creates expected permissions', function () {
+it('creates expected customer-scoped permissions', function () {
     $expected = [
         'view dashboard',
-        'manage users',
-        'manage roles',
-        'manage settings',
+        'manage customer users',
+        'manage customer settings',
         'manage profile',
+        'upload files',
     ];
 
     foreach ($expected as $permission) {
@@ -31,17 +32,26 @@ it('creates expected permissions', function () {
     }
 });
 
-it('assigns all permissions to admin role', function () {
+it('gives the customer-scoped Admin role every customer permission', function () {
     $adminRole = Role::findByName('Admin');
-    $allPermissions = Permission::all();
+    $allCustomerPermissions = Permission::all();
 
-    expect($adminRole->permissions->count())->toBe($allPermissions->count());
+    expect($adminRole->permissions->count())->toBe($allCustomerPermissions->count());
 });
 
-it('can assign admin role to a user', function () {
-    $user = User::factory()->create();
-    $user->assignRole('Admin');
+it('promotes a user to platform SuperAdmin via the is_super_admin column', function () {
+    $user = makeSuperAdmin(User::factory()->create());
 
+    expect($user->isSuperAdmin())->toBeTrue();
+});
+
+it('assigns the Admin role on a specific customer', function () {
+    $customer = createCustomer();
+    $user = User::factory()->create();
+
+    grantRoleOnCustomer($user, 'Admin', $customer);
+
+    app(PermissionRegistrar::class)->setPermissionsTeamId($customer->id);
     expect($user->hasRole('Admin'))->toBeTrue();
-    expect($user->can('manage users'))->toBeTrue();
+    expect($user->can('manage customer users'))->toBeTrue();
 });

@@ -14,15 +14,13 @@ import Icon from '@/Components/Command/Icon.vue';
 
 defineOptions({ layout: AdminLayout });
 
-interface CustomerItem { id: number; name: string; slug: string }
+interface CustomerItem { id: number; name: string; slug: string; roles?: string[] }
 interface Props {
     user: {
         id: number; first_name: string; last_name: string; email: string;
-        roles: string[];
         customers: CustomerItem[];
     };
-    roles: { id: number; name: string }[];
-    tenancy_enabled: boolean;
+    assignable_roles: string[];
     all_customers: CustomerItem[];
 }
 const props = defineProps<Props>();
@@ -34,15 +32,34 @@ const form = useForm({
     email: props.user.email,
     password: '',
     password_confirmation: '',
-    roles: [...props.user.roles],
 });
 
 function submit() {
     form.put(`/admin/users/${props.user.id}`);
 }
 
+function roleToneColor(r: string): string {
+    if (r === 'SuperAdmin') return '#ef4444';
+    if (r === 'Admin') return '#8b5cf6';
+    if (r === 'Editor') return 'var(--warning)';
+    return 'var(--accent)';
+}
+function roleToneBg(r: string): string {
+    if (r === 'SuperAdmin') return 'rgba(239,68,68,0.12)';
+    if (r === 'Admin') return 'rgba(139,92,246,0.12)';
+    if (r === 'Editor') return 'rgba(251,191,36,0.12)';
+    return 'var(--accent-soft)';
+}
+function roleToneBorder(r: string): string {
+    if (r === 'SuperAdmin') return 'rgba(239,68,68,0.33)';
+    if (r === 'Admin') return 'rgba(139,92,246,0.33)';
+    if (r === 'Editor') return 'rgba(251,191,36,0.33)';
+    return 'var(--accent-border)';
+}
+
 const addCustomerDialog = ref(false);
 const selectedCustomerIds = ref<number[]>([]);
+const selectedRoles = ref<string[]>(['User']);
 const notifyOnAdd = ref(true);
 const notifyOnRemove = ref(true);
 const removeDialog = ref(false);
@@ -57,15 +74,17 @@ const availableCustomers = () => {
 
 function openAddDialog() {
     selectedCustomerIds.value = [];
+    selectedRoles.value = ['User'];
     notifyOnAdd.value = true;
     addCustomerDialog.value = true;
 }
 
 function confirmAdd() {
-    if (!selectedCustomerIds.value.length) return;
+    if (!selectedCustomerIds.value.length || !selectedRoles.value.length) return;
     addingCustomer.value = true;
     router.post(`/admin/users/${props.user.id}/customers`, {
         customer_ids: selectedCustomerIds.value,
+        roles: selectedRoles.value,
         notify: notifyOnAdd.value,
     }, {
         preserveScroll: true,
@@ -121,6 +140,19 @@ function confirmRemove() {
                         :filter="true"
                         :filterPlaceholder="t('common.search')"
                         display="chip"
+                        class="w-full"
+                    />
+                </div>
+                <div>
+                    <label
+                        class="cmd-mono cmd-uc"
+                        :style="{ display: 'block', fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '6px', letterSpacing: '0.06em', fontWeight: 500 }"
+                    >{{ t('admin.users.roles') }}</label>
+                    <MultiSelect
+                        v-model="selectedRoles"
+                        :options="assignable_roles"
+                        display="chip"
+                        :placeholder="t('admin.users.select_roles')"
                         class="w-full"
                     />
                 </div>
@@ -187,7 +219,7 @@ function confirmRemove() {
         <div
             :style="{
                 display: 'grid',
-                gridTemplateColumns: tenancy_enabled ? 'minmax(0, 1fr) minmax(0, 1fr)' : 'minmax(0, 720px)',
+                gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
                 gap: '20px',
             }"
         >
@@ -231,20 +263,9 @@ function confirmRemove() {
                         <Password v-model="form.password_confirmation" toggleMask :feedback="false" class="w-full" inputClass="w-full" />
                     </div>
                 </div>
-                <div>
-                    <label
-                        class="cmd-mono cmd-uc"
-                        :style="{ display: 'block', fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '6px', letterSpacing: '0.06em', fontWeight: 500 }"
-                    >{{ t('admin.users.roles') }}</label>
-                    <MultiSelect
-                        v-model="form.roles"
-                        :options="roles"
-                        optionLabel="name"
-                        optionValue="name"
-                        :placeholder="t('admin.users.select_roles')"
-                        class="w-full"
-                    />
-                </div>
+                <p :style="{ fontSize: '11.5px', color: 'var(--fg-mute)', margin: 0, lineHeight: 1.45 }">
+                    {{ t('admin.users.roles_are_customer_scoped') }}
+                </p>
                 <div :style="{ display: 'flex', gap: '8px', marginTop: '4px' }">
                     <CmdButton type="submit" variant="primary" size="md" :loading="form.processing">
                         <template #icon>
@@ -261,7 +282,6 @@ function confirmRemove() {
             </form>
 
             <section
-                v-if="tenancy_enabled"
                 class="cmd-card"
                 :style="{ padding: '20px' }"
             >
@@ -290,11 +310,12 @@ function confirmRemove() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
+                            gap: '12px',
                             padding: '10px 0',
                             borderTop: i === 0 ? 'none' : '1px solid var(--border)',
                         }"
                     >
-                        <div>
+                        <div :style="{ minWidth: 0 }">
                             <Link
                                 :href="`/admin/customers/${customer.id}/edit`"
                                 :style="{ fontSize: '13px', fontWeight: 500, color: 'var(--fg)', textDecoration: 'none' }"
@@ -304,15 +325,43 @@ function confirmRemove() {
                             <p class="cmd-mono" :style="{ margin: '2px 0 0', fontSize: '11px', color: 'var(--fg-mute)' }">
                                 /c/{{ customer.slug }}
                             </p>
+                            <div
+                                v-if="customer.roles && customer.roles.length"
+                                :style="{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }"
+                            >
+                                <span
+                                    v-for="r in customer.roles"
+                                    :key="r"
+                                    class="cmd-mono"
+                                    :style="{
+                                        fontSize: '10px',
+                                        padding: '1px 6px',
+                                        borderRadius: '3px',
+                                        color: roleToneColor(r),
+                                        background: roleToneBg(r),
+                                        border: `1px solid ${roleToneBorder(r)}`,
+                                    }"
+                                >{{ r }}</span>
+                            </div>
+                            <span
+                                v-else
+                                :style="{ fontSize: '11px', color: 'var(--fg-mute)', fontStyle: 'italic', marginTop: '6px', display: 'inline-block' }"
+                            >{{ t('admin.users.no_roles') }}</span>
                         </div>
-                        <CmdButton
-                            variant="ghost"
-                            size="sm"
-                            :aria-label="`Remove ${customer.name}`"
-                            @click="openRemoveDialog(customer)"
-                        >
-                            {{ t('common.remove') }}
-                        </CmdButton>
+                        <div :style="{ display: 'flex', gap: '4px', flexShrink: 0 }">
+                            <Link
+                                :href="`/admin/users/${user.id}`"
+                                :style="{ fontSize: '11px', color: 'var(--accent)', textDecoration: 'none', padding: '4px 8px' }"
+                            >{{ t('admin.users.edit_roles') }}</Link>
+                            <CmdButton
+                                variant="ghost"
+                                size="sm"
+                                :aria-label="`Remove ${customer.name}`"
+                                @click="openRemoveDialog(customer)"
+                            >
+                                {{ t('common.remove') }}
+                            </CmdButton>
+                        </div>
                     </li>
                 </ul>
                 <p

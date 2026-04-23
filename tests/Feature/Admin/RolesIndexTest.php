@@ -8,11 +8,12 @@ beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
 
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
 });
 
 it('renders roles index with permission and user counts', function () {
-    User::factory()->count(3)->create()->each(fn ($u) => $u->assignRole('User'));
+    $customer = createCustomer();
+    User::factory()->count(3)->create()->each(fn ($u) => grantRoleOnCustomer($u, 'User', $customer));
 
     $this->actingAs($this->admin)
         ->get('/admin/roles')

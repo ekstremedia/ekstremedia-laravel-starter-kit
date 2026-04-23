@@ -34,11 +34,11 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $banned_at
  * @property Carbon|null $last_login_at
  */
-#[Fillable(['first_name', 'last_name', 'email', 'password'])]
+#[Fillable(['first_name', 'last_name', 'email', 'password', 'is_super_admin'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements HasLocalePreference, HasMedia, MustVerifyEmail
 {
-    public const ROLE_ADMIN = 'Admin';
+    public const ROLE_SUPER_ADMIN = 'SuperAdmin';
 
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasRoles, Impersonate, InteractsWithMedia, LogsActivity, Notifiable, Searchable, TwoFactorAuthenticatable;
@@ -89,12 +89,25 @@ class User extends Authenticatable implements HasLocalePreference, HasMedia, Mus
 
     public function canImpersonate(): bool
     {
-        return $this->hasRole(self::ROLE_ADMIN);
+        return $this->isSuperAdmin();
     }
 
     public function canBeImpersonated(): bool
     {
-        return ! $this->hasRole(self::ROLE_ADMIN);
+        return ! $this->isSuperAdmin();
+    }
+
+    /**
+     * Platform super-user flag. Stored as a plain column on users rather than
+     * a Spatie role: Spatie's team schema forces `model_has_roles.team_id` to
+     * be non-null, so "global, not attached to any customer" isn't
+     * representable there. Keeping it as a boolean also makes the distinction
+     * crystal-clear — SuperAdmin is a platform property of the account, not a
+     * per-customer assignment.
+     */
+    public function isSuperAdmin(): bool
+    {
+        return (bool) ($this->attributes['is_super_admin'] ?? false);
     }
 
     public function isBanned(): bool
@@ -323,6 +336,7 @@ class User extends Authenticatable implements HasLocalePreference, HasMedia, Mus
             'last_login_at' => 'datetime',
             'password' => 'hashed',
             'storage_used_bytes' => 'integer',
+            'is_super_admin' => 'boolean',
         ];
     }
 }

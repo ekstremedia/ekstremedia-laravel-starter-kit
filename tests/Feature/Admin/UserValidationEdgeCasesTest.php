@@ -7,7 +7,7 @@ beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
 
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
 });
 
 it('rejects creating a user with an existing email', function () {
@@ -39,7 +39,6 @@ it('rejects unknown roles when assigning', function () {
 
 it('allows updating a user without changing password when blank', function () {
     $user = User::factory()->create(['password' => bcrypt('old-pass')]);
-    $user->assignRole('User');
     $hashBefore = $user->password;
 
     $this->actingAs($this->admin)
@@ -56,7 +55,6 @@ it('allows updating a user without changing password when blank', function () {
 
 it('allows the same email when editing the same user', function () {
     $user = User::factory()->create(['email' => 'stays@example.test']);
-    $user->assignRole('User');
 
     $this->actingAs($this->admin)
         ->put("/admin/users/{$user->id}", [
@@ -70,7 +68,6 @@ it('allows the same email when editing the same user', function () {
 
 it('forbids non-admins from creating users', function () {
     $user = User::factory()->create();
-    $user->assignRole('Editor');
 
     $this->actingAs($user)
         ->post('/admin/users', [

@@ -23,7 +23,6 @@ it('redirects unverified users to verification notice', function () {
 
 it('renders the dashboard for verified users', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
     joinCustomer($user, $this->customer);
 
     $this->actingAs($user)

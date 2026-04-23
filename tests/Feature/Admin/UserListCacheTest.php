@@ -9,7 +9,7 @@ beforeEach(function () {
     Cache::flush();
 
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
 });
 
 it('caches the admin users index payload under a versioned key', function () {
@@ -42,15 +42,14 @@ it('invalidates the cache when a user is deleted', function () {
     expect(User::usersListVersion())->toBeGreaterThan($before);
 });
 
-it('invalidates the cache when a role is changed via setRole', function () {
+it('invalidates the cache when SuperAdmin is toggled via setRole', function () {
     $target = User::factory()->create();
-    $target->assignRole('User');
 
     $this->actingAs($this->admin)->get('/admin/users')->assertOk();
     $before = User::usersListVersion();
 
     $this->actingAs($this->admin)
-        ->patch("/admin/users/{$target->id}/role", ['role' => 'Editor'])
+        ->patch("/admin/users/{$target->id}/role", ['role' => 'SuperAdmin'])
         ->assertRedirect();
 
     expect(User::usersListVersion())->toBeGreaterThan($before);

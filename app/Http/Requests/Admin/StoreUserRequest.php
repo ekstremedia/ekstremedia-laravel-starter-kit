@@ -9,7 +9,7 @@ class StoreUserRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user() !== null && $this->user()->hasRole('Admin');
+        return $this->user() !== null && $this->user()->isSuperAdmin();
     }
 
     /**

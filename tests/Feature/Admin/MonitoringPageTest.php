@@ -9,7 +9,7 @@ beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
 
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
 });
 
 it('renders the monitoring page with the activity tab by default', function () {
@@ -101,7 +101,6 @@ it('rejects invalid filter payloads', function () {
 
 it('forbids non-admins from the monitoring page', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
 
     $this->actingAs($user)->get('/admin/monitoring')->assertForbidden();
 });

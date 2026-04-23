@@ -7,22 +7,21 @@ beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
 
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
 });
 
-it('creates a user with roles', function () {
+it('creates a user (platform-level; no customer role assigned here)', function () {
     $this->actingAs($this->admin)->post('/admin/users', [
         'first_name' => 'Jane',
         'last_name' => 'Doe',
         'email' => 'jane@example.test',
         'password' => 'Password#1',
         'password_confirmation' => 'Password#1',
-        'roles' => ['Editor'],
     ])->assertRedirect('/admin/users');
 
     $user = User::where('email', 'jane@example.test')->first();
     expect($user)->not->toBeNull()
-        ->and($user->hasRole('Editor'))->toBeTrue();
+        ->and($user->isSuperAdmin())->toBeFalse();
 });
 
 it('validates new user input', function () {
@@ -31,21 +30,17 @@ it('validates new user input', function () {
         ->assertSessionHasErrors(['first_name', 'last_name', 'email', 'password']);
 });
 
-it('updates a user and syncs roles', function () {
+it('updates a user profile fields', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
 
     $this->actingAs($this->admin)->put("/admin/users/{$user->id}", [
         'first_name' => 'Updated',
         'last_name' => 'Name',
         'email' => $user->email,
-        'roles' => ['Editor'],
     ])->assertRedirect('/admin/users');
 
     $user->refresh();
-    expect($user->first_name)->toBe('Updated')
-        ->and($user->hasRole('Editor'))->toBeTrue()
-        ->and($user->hasRole('User'))->toBeFalse();
+    expect($user->first_name)->toBe('Updated');
 });
 
 it('deletes a user', function () {

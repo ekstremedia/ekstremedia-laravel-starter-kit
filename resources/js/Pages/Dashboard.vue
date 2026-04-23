@@ -38,7 +38,7 @@ const { t } = useI18n();
 const page = usePage<PageProps>();
 const user = computed(() => page.props.auth.user!);
 const customer = computed(() => page.props.customer);
-const isAdmin = computed(() => (user.value.roles ?? []).includes('Admin'));
+const isAdmin = computed(() => user.value?.is_super_admin === true);
 const { customerUrl } = useCustomer();
 
 const headerMeta = computed(() => {

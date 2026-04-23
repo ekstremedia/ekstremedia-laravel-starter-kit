@@ -11,7 +11,6 @@ beforeEach(function () {
 
     $this->customer = createCustomer();
     $this->user = User::factory()->create();
-    $this->user->assignRole('User');
     joinCustomer($this->user, $this->customer);
 
     $this->avatarUrl = customerUrl($this->customer, '/profile/avatar');

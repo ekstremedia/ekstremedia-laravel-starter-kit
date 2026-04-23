@@ -2,7 +2,9 @@
 
 use App\Http\Middleware\EnforceAppSettings;
 use App\Http\Middleware\EnsureChatEnabled;
+use App\Http\Middleware\EnsureCustomerAdmin;
 use App\Http\Middleware\EnsureStorageAvailable;
+use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureUserIsNotBanned;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\InitializeTenancyByPath;
@@ -16,11 +18,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Sentry\Laravel\Integration;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -29,19 +31,10 @@ return Application::configure(basePath: dirname(__DIR__))
         channels: __DIR__.'/../routes/channels.php',
         health: '/up',
         then: function (): void {
-            // Same routes file, two shapes. See `config/tenancy.php` and
-            // `routes/customer.php` for the contract.
-            $customerRoutes = __DIR__.'/../routes/customer.php';
-
-            if (config('tenancy.enabled')) {
-                Route::prefix('c/{customer}')
-                    ->middleware(['web', 'auth', 'verified', InitializeTenancyByPath::class])
-                    ->name('customer.')
-                    ->group($customerRoutes);
-            } else {
-                Route::middleware(['web', 'auth', 'verified'])
-                    ->group($customerRoutes);
-            }
+            Route::prefix('c/{customer}')
+                ->middleware(['web', 'auth', 'verified', InitializeTenancyByPath::class])
+                ->name('customer.')
+                ->group(__DIR__.'/../routes/customer.php');
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -65,6 +58,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => RoleOrPermissionMiddleware::class,
             'chat.enabled' => EnsureChatEnabled::class,
             'storage.available' => EnsureStorageAvailable::class,
+            'customer.admin' => EnsureCustomerAdmin::class,
+            'super.admin' => EnsureSuperAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -74,7 +69,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // error codes outside local/testing (so stack traces still surface
         // during development). 419 falls back to the standard "page expired"
         // redirect so form resubmits keep their old behavior.
-        $exceptions->respond(function (Response $response, \Throwable $exception, Request $request) {
+        $exceptions->respond(function (Response $response, Throwable $exception, Request $request) {
             if ($request->expectsJson()) {
                 return $response;
             }

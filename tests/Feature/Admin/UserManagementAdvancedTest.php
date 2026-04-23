@@ -14,11 +14,10 @@ beforeEach(function () {
     $this->customer = createCustomer();
 
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
     joinCustomer($this->admin, $this->customer);
 
     $this->target = User::factory()->create(['email_verified_at' => now()]);
-    $this->target->assignRole('User');
     joinCustomer($this->target, $this->customer);
 });
 
@@ -34,7 +33,6 @@ it('shows the user dashboard', function () {
 
 it('marks an unverified user as verified', function () {
     $user = User::factory()->unverified()->create();
-    $user->assignRole('User');
 
     $this->actingAs($this->admin)
         ->post("/admin/users/{$user->id}/verify")
@@ -67,7 +65,7 @@ it('bans a user with a reason and notifies them', function () {
 
 it('forbids banning an admin', function () {
     $other = User::factory()->create();
-    $other->assignRole('Admin');
+    $other->forceFill(['is_super_admin' => true])->save();
 
     $this->actingAs($this->admin)
         ->post("/admin/users/{$other->id}/ban")
@@ -106,7 +104,6 @@ it('logs out a banned user on the next request', function () {
 
 it('resends the verification email', function () {
     $user = User::factory()->unverified()->create();
-    $user->assignRole('User');
     Notification::fake();
 
     $this->actingAs($this->admin)

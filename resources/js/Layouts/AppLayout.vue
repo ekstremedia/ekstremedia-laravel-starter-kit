@@ -17,7 +17,7 @@ import type { PageProps } from '@/types';
 const { t } = useI18n();
 const page = usePage<PageProps>();
 const user = computed(() => page.props.auth?.user);
-const isAdmin = computed(() => user.value?.roles?.includes('Admin') ?? false);
+const isAdmin = computed(() => user.value?.is_super_admin === true);
 const appName = import.meta.env.VITE_APP_NAME || t('app.name');
 const { customer, tenancyEnabled, customerUrl } = useCustomer();
 const dashboardUrl = computed(() => customerUrl('/dashboard'));

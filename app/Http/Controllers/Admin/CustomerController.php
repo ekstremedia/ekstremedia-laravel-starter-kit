@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\CustomerMembership;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -147,18 +148,20 @@ class CustomerController extends Controller
     {
         $data = $request->validate([
             'email' => ['required', 'email', 'exists:users,email'],
+            'roles' => ['required', 'array', 'min:1'],
+            'roles.*' => ['string', Rule::in(CustomerMembership::assignableRoles())],
         ]);
 
         $user = User::query()->where('email', $data['email'])->firstOrFail();
 
-        $customer->users()->syncWithoutDetaching([$user->id]);
+        CustomerMembership::attach($user, $customer, $data['roles']);
 
         return back()->with('success', __('flash.customers.member_added', ['email' => $user->email, 'name' => $customer->name]));
     }
 
     public function detachMember(Tenant $customer, User $user): RedirectResponse
     {
-        $customer->users()->detach($user->id);
+        CustomerMembership::detach($user, $customer);
 
         return back()->with('success', __('flash.customers.member_removed', ['email' => $user->email, 'name' => $customer->name]));
     }

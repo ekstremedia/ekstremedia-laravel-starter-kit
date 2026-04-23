@@ -13,7 +13,6 @@ beforeEach(function () {
     $this->customer->update(['files_feature_enabled' => true]);
 
     $this->user = User::factory()->create();
-    $this->user->assignRole('User');
     joinCustomer($this->user, $this->customer);
     $this->user->settings()->merge(['files_enabled' => true]);
 });
@@ -36,7 +35,7 @@ it('returns OK when all three flags are on', function () {
 
 it('admin can toggle the feature flag from /admin/settings', function () {
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $current = AppSetting::current();
 

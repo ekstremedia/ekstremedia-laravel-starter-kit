@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\AvatarController;
+use App\Http\Controllers\CustomerMembersController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FileItemController;
 use App\Http\Controllers\FileShareController;
@@ -79,3 +80,13 @@ Route::post('/files/{file}/shares/signed', [FileShareController::class, 'quickSi
     ->whereNumber('file')
     ->name('files.shares.signed');
 Route::delete('/files/shares/{share}', [FileShareController::class, 'destroy'])->name('files.shares.destroy');
+
+// Customer-Admin — manage the members of the active customer. `role:Admin`
+// resolves against the team id set by InitializeTenancyByPath, so it means
+// "Admin on THIS customer" (not platform admin).
+Route::middleware('customer.admin')->prefix('members')->name('members.')->group(function () {
+    Route::get('/', [CustomerMembersController::class, 'index'])->name('index');
+    Route::post('/', [CustomerMembersController::class, 'store'])->name('store');
+    Route::patch('/{user}/role', [CustomerMembersController::class, 'setRole'])->name('setRole');
+    Route::delete('/{user}', [CustomerMembersController::class, 'destroy'])->name('destroy');
+});

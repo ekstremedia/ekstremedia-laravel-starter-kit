@@ -8,7 +8,7 @@ beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
 
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
 
     // Spatie's BackupDestination writes into the real configured disk; swap it
     // for an in-memory fake so we can drop a placeholder zip and drive the UI
@@ -153,7 +153,6 @@ it('forbids non-admins from download and restore endpoints', function () {
     $path = seedBackup('starter/real.zip');
 
     $user = User::factory()->create();
-    $user->assignRole('User');
 
     $this->actingAs($user)
         ->get('/admin/backups/download?disk=local&path='.rawurlencode($path))

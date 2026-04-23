@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Spatie\Activitylog\Models\Activity;
 
 /**
@@ -78,8 +79,11 @@ class UserExport extends Command
                 'email_verified_at' => $user->email_verified_at?->toIso8601String(),
                 'last_login_at' => $user->last_login_at?->toIso8601String(),
             ],
-            'roles' => $user->roles()->pluck('name'),
-            'permissions' => $user->getAllPermissions()->pluck('name'),
+            'is_super_admin' => $user->isSuperAdmin(),
+            // Console has no team context, so a naive `roles()->pluck('name')`
+            // would come back empty. Build the full per-customer map directly
+            // from `model_has_roles` so the GDPR export is accurate.
+            'customer_roles' => $this->customerRoles($user),
             'settings' => $user->settings()->resolved(),
             'activity_as_causer' => Activity::query()
                 ->where('causer_type', User::class)
@@ -88,5 +92,38 @@ class UserExport extends Command
                 ->toArray(),
             'notifications' => $user->notifications()->get(['id', 'type', 'data', 'read_at', 'created_at'])->toArray(),
         ];
+    }
+
+    /**
+     * @return array<int, array{customer_id:int, customer_slug:string|null, roles:array<int,string>}>
+     */
+    private function customerRoles(User $user): array
+    {
+        $mhr = config('permission.table_names.model_has_roles');
+        $rolesTable = config('permission.table_names.roles');
+        $teamKey = config('permission.column_names.team_foreign_key');
+
+        $rows = DB::table($mhr)
+            ->join($rolesTable, "{$rolesTable}.id", '=', "{$mhr}.role_id")
+            ->leftJoin('tenants', 'tenants.id', '=', "{$mhr}.{$teamKey}")
+            ->where("{$mhr}.model_type", User::class)
+            ->where("{$mhr}.model_id", $user->id)
+            ->get([
+                "{$mhr}.{$teamKey} as customer_id",
+                'tenants.slug as customer_slug',
+                "{$rolesTable}.name as role",
+            ]);
+
+        $grouped = [];
+        foreach ($rows as $row) {
+            $grouped[$row->customer_id] ??= [
+                'customer_id' => (int) $row->customer_id,
+                'customer_slug' => $row->customer_slug,
+                'roles' => [],
+            ];
+            $grouped[$row->customer_id]['roles'][] = $row->role;
+        }
+
+        return array_values($grouped);
     }
 }
