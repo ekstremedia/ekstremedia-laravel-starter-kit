@@ -8,16 +8,25 @@
     "mcp": true,
     "nightwatch_mcp": false,
     "packages": [
-        "spatie/laravel-permission"
+        "spatie/laravel-permission",
+        "spatie/laravel-activitylog",
+        "spatie/laravel-medialibrary",
+        "spatie/laravel-backup"
     ],
     "sail": false,
     "skills": [
         "fortify-development",
         "laravel-best-practices",
+        "configuring-horizon",
+        "pulse-development",
+        "scout-development",
+        "socialite-development",
         "pest-testing",
         "inertia-vue-development",
         "echo-development",
         "tailwindcss-development",
+        "laravel-backup",
+        "medialibrary-development",
         "laravel-permission-development"
     ]
 }
