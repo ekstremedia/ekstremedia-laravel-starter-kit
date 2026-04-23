@@ -150,8 +150,17 @@ class CustomerMembersController extends Controller
 
     private function customer(Request $request): Tenant
     {
-        /** @var Tenant $customer */
         $customer = $request->attributes->get('customer');
+
+        // InitializeTenancyByPath always populates this attribute before the
+        // route dispatches. If we land here with it missing, the routing is
+        // misconfigured (someone mounted the controller outside the
+        // `/c/{customer}` group) — bail loudly so the fault is visible.
+        if (! $customer instanceof Tenant) {
+            throw new \LogicException(
+                'CustomerMembersController requires the customer request attribute set by InitializeTenancyByPath.',
+            );
+        }
 
         // Defensive: the team id should already be set by InitializeTenancyByPath,
         // but re-asserting keeps this controller safe if it's ever called from

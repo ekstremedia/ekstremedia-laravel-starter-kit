@@ -360,7 +360,7 @@ export default {
             title: 'Medlemmer',
             subtitle: 'Brukere med tilgang til denne kunden.',
             email: 'E-post',
-            email_placeholder: 'person@eksempel.no',
+            email_placeholder: "person{'@'}eksempel.no",
             roles: 'Roller',
             select_roles: 'Velg roller',
             add: 'Legg til medlem',

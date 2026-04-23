@@ -168,7 +168,7 @@ function confirmRemove() {
                 <CmdButton
                     variant="primary"
                     size="sm"
-                    :disabled="!selectedCustomerIds.length"
+                    :disabled="!selectedCustomerIds.length || !selectedRoles.length"
                     :loading="addingCustomer"
                     @click="confirmAdd"
                 >

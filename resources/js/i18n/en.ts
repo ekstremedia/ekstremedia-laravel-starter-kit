@@ -360,7 +360,7 @@ export default {
             title: 'Members',
             subtitle: 'People who can access this customer.',
             email: 'Email',
-            email_placeholder: 'person@example.com',
+            email_placeholder: "person{'@'}example.com",
             roles: 'Roles',
             select_roles: 'Select roles',
             add: 'Add member',

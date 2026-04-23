@@ -34,7 +34,12 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $banned_at
  * @property Carbon|null $last_login_at
  */
-#[Fillable(['first_name', 'last_name', 'email', 'password', 'is_super_admin'])]
+// `is_super_admin` is intentionally *not* fillable — it must only be set via
+// explicit `forceFill(['is_super_admin' => ...])` or the dedicated setRole
+// flow in UserController. Allowing mass-assignment here would let a crafted
+// payload on `/admin/users` or `/register` elevate the account without
+// going through the SuperAdmin-gated code path.
+#[Fillable(['first_name', 'last_name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements HasLocalePreference, HasMedia, MustVerifyEmail
 {

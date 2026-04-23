@@ -31,9 +31,11 @@ class UserSeeder extends Seeder
                 'last_name' => env('STARTER_ADMIN_LAST_NAME', 'User'),
                 'password' => Hash::make(env('STARTER_ADMIN_PASSWORD', 'password')),
                 'email_verified_at' => now(),
-                'is_super_admin' => true,
             ],
         );
+        // `is_super_admin` is deliberately unfillable (see User model) so a
+        // crafted `/admin/users` payload can't elevate an account via mass
+        // assignment — set it explicitly via forceFill here.
         if (! $admin->is_super_admin) {
             $admin->forceFill(['is_super_admin' => true])->save();
         }

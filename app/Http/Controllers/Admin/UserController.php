@@ -519,6 +519,11 @@ class UserController extends Controller
 
         $passwordChanged = ! empty($data['password']);
 
+        // Capture the "before" snapshot for audit-log diffing so the activity
+        // entry records which fields actually changed (pure profile edits
+        // used to be silently unlogged while only password changes surfaced).
+        $before = $user->only(['first_name', 'last_name', 'email']);
+
         $user->fill([
             'first_name' => $data['first_name'],
             'last_name' => $data['last_name'],
@@ -531,11 +536,19 @@ class UserController extends Controller
 
         $user->save();
 
-        // Roles are customer-scoped; managed from `/c/{customer}/members`.
-        if ($passwordChanged) {
+        $after = $user->only(['first_name', 'last_name', 'email']);
+        $changedFields = array_keys(array_udiff_assoc($after, $before, fn ($a, $b) => $a === $b ? 0 : 1));
+
+        // Log every admin update, not just password changes. Roles are
+        // customer-scoped and managed from `/c/{customer}/members` so they
+        // don't appear here.
+        if ($passwordChanged || $changedFields !== []) {
             activity('user')
                 ->performedOn($user)
-                ->withProperties(['password_changed' => true])
+                ->withProperties([
+                    'password_changed' => $passwordChanged,
+                    'changed_fields' => $changedFields,
+                ])
                 ->event('admin_updated')
                 ->log("Admin updated user {$user->email}");
         }
@@ -674,16 +687,17 @@ class UserController extends Controller
         }
 
         $email = $user->email;
-        // Snapshot the user's memberships at delete-time. Plain `getRoleNames`
-        // would read the (typically null) team context and come back empty;
-        // the customer-slug list is what's actually auditable.
+        // Snapshot the audit facts BEFORE delete(): after the row is gone,
+        // `isSuperAdmin()` reads a stripped attribute set (always false) and
+        // the customers() relation resolves against a detached model.
+        $wasSuperAdmin = $user->isSuperAdmin();
         $memberships = $user->customers()->pluck('slug')->all();
         $user->delete();
 
         activity('user')
             ->withProperties([
                 'email' => $email,
-                'was_super_admin' => $user->isSuperAdmin(),
+                'was_super_admin' => $wasSuperAdmin,
                 'memberships' => $memberships,
             ])
             ->event('deleted')

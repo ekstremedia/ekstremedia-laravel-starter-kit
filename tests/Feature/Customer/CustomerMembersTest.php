@@ -92,11 +92,14 @@ it('changes a member role on the customer', function () {
 });
 
 it('prevents demoting the last customer-Admin', function () {
-    // $this->admin is the only Admin on this customer. Trying to demote fails.
+    // $this->admin is the only Admin on this customer. The controller redirects
+    // back with a flashed error rather than mutating the role.
     $this->actingAs($this->admin)
         ->patch(customerUrl($this->customer, "/members/{$this->admin->id}/role"), [
             'roles' => ['Editor'],
-        ]);
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('error');
 
     expect(CustomerMembership::roleOn($this->admin->fresh(), $this->customer))->toBe('Admin');
 });
@@ -128,7 +131,9 @@ it('removes a member', function () {
 
 it('prevents removing the last customer-Admin', function () {
     $this->actingAs($this->admin)
-        ->delete(customerUrl($this->customer, "/members/{$this->admin->id}"));
+        ->delete(customerUrl($this->customer, "/members/{$this->admin->id}"))
+        ->assertRedirect()
+        ->assertSessionHas('error');
 
     expect($this->admin->fresh()->belongsToCustomer($this->customer))->toBeTrue();
 });

@@ -476,6 +476,7 @@ const gridCols = '32px 32px 2fr 2.2fr 1fr 1.2fr 1fr 120px';
                     <span
                         v-for="c in u.customer_roles"
                         :key="c.id"
+                        tabindex="0"
                         class="cmd-mono"
                         :style="{
                             position: 'relative',
@@ -486,9 +487,12 @@ const gridCols = '32px 32px 2fr 2.2fr 1fr 1.2fr 1fr 120px';
                             color: 'var(--fg-dim)',
                             border: '1px solid var(--border)',
                             cursor: 'default',
+                            outline: 'none',
                         }"
                         @mouseenter="hoverCustomerKey = `${u.id}-${c.id}`"
                         @mouseleave="hoverCustomerKey = null"
+                        @focus="hoverCustomerKey = `${u.id}-${c.id}`"
+                        @blur="hoverCustomerKey = null"
                     >
                         {{ c.name }}
                         <!-- Hover tooltip: per-customer roles for this user. -->
