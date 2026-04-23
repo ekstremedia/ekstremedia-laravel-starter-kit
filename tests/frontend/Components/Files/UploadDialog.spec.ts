@@ -56,9 +56,12 @@ describe('UploadDialog', () => {
             attachTo: document.body,
         });
 
-        // The close button is the only button inside the dialog header (SVG icon, no text).
-        const header = document.querySelector('.border-b');
-        const closeBtn = header?.querySelector<HTMLButtonElement>('button');
+        // UploadDialog now renders via CommandDialog, whose header close button
+        // carries the `cmd-dialog-close` class. Clicking it fires CommandDialog's
+        // `update:visible=false`, which UploadDialog translates into
+        // `update:open=false`.
+        const closeBtn = document.querySelector<HTMLButtonElement>('.cmd-dialog-close');
+        expect(closeBtn).not.toBeNull();
         closeBtn?.click();
         await wrapper.vm.$nextTick();
 

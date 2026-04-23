@@ -11,7 +11,7 @@ vi.mock('@inertiajs/vue3', async () => {
     };
 });
 
-import CustomerSwitcher from '@/Components/CustomerSwitcher.vue';
+import CustomerSwitcher from '@/Components/Command/CustomerSwitcher.vue';
 
 function setPage(
     customers: Array<{ id: number; slug: string; name: string }>,
