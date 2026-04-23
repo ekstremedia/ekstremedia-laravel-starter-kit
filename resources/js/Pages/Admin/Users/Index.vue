@@ -10,6 +10,7 @@ import { useCommandToasts } from '@/composables/useCommandToasts';
 
 defineOptions({ layout: CommandLayout });
 
+interface CustomerRoleCell { id: number; name: string; slug: string; roles: string[] }
 interface UserRow {
     id: number;
     first_name: string;
@@ -18,7 +19,8 @@ interface UserRow {
     created_at: string;
     last_login_at?: string | null;
     avatar_thumb_url: string | null;
-    roles: { id: number; name: string }[];
+    is_super_admin?: boolean;
+    customer_roles: CustomerRoleCell[];
     storage_used_bytes: number;
     storage_quota_bytes: number | null;
     banned_at?: string | null;
@@ -51,9 +53,7 @@ function sortBy(key: 'first_name' | 'email' | 'storage_used_bytes') {
 }
 const selected = ref<Set<number>>(new Set());
 const hoverId = ref<number | null>(null);
-const editingId = ref<number | null>(null);
-const editValue = ref<string>('');
-const selectRef = ref<HTMLSelectElement | null>(null);
+const hoverCustomerKey = ref<string | null>(null);
 // Data is always pre-rendered by Inertia (and the controller caches the
 // payload), so no client-side loading state is needed — the skeleton shimmer
 // was purely cosmetic and added a 700ms stutter on every reload.
@@ -72,23 +72,22 @@ function avatarColor(u: UserRow): string {
     return AVATAR_PALETTE[u.id % AVATAR_PALETTE.length];
 }
 
-function primaryRole(u: UserRow): string {
-    return u.roles?.[0]?.name ?? 'User';
-}
-
 function roleToneColor(r: string): string {
+    if (r === 'SuperAdmin') return '#ef4444';
     if (r === 'Admin') return '#8b5cf6';
     if (r === 'Editor') return 'var(--warning)';
     return 'var(--accent)';
 }
 
 function roleToneBg(r: string): string {
+    if (r === 'SuperAdmin') return 'rgba(239,68,68,0.12)';
     if (r === 'Admin') return 'rgba(139,92,246,0.12)';
     if (r === 'Editor') return 'rgba(251,191,36,0.12)';
     return 'var(--accent-soft)';
 }
 
 function roleToneBorder(r: string): string {
+    if (r === 'SuperAdmin') return 'rgba(239,68,68,0.33)';
     if (r === 'Admin') return 'rgba(139,92,246,0.33)';
     if (r === 'Editor') return 'rgba(251,191,36,0.33)';
     return 'var(--accent-border)';
@@ -159,31 +158,6 @@ function toggleAll() {
     } else {
         selected.value = new Set(rows.value.map((u) => u.id));
     }
-}
-
-function startEdit(u: UserRow) {
-    editingId.value = u.id;
-    editValue.value = primaryRole(u);
-    nextTick(() => selectRef.value?.focus());
-}
-
-function commitEdit(u: UserRow) {
-    if (editingId.value !== u.id) return;
-    const role = editValue.value;
-    const previous = primaryRole(u);
-    editingId.value = null;
-    if (role === previous) return;
-    router.patch(
-        `/admin/users/${u.id}/role`,
-        { role },
-        {
-            preserveState: true,
-            preserveScroll: true,
-            only: ['users', 'flash'],
-            onSuccess: () => push(t('admin.users.toast_role_updated', { name: `${u.first_name} ${u.last_name}` }), 'success'),
-            onError: () => push(t('admin.users.toast_role_update_failed'), 'danger'),
-        },
-    );
 }
 
 function deleteOne(u: UserRow) {
@@ -403,7 +377,7 @@ const gridCols = '32px 32px 2fr 2.2fr 1fr 1.2fr 1fr 120px';
                     :style="{ color: 'var(--accent)', transform: sortDir === 'asc' ? 'rotate(180deg)' : 'rotate(0deg)' }"
                 />
             </div>
-            <div>Rolle</div>
+            <div>{{ t('admin.users.companies_col', 'Selskaper') }}</div>
             <div
                 role="button"
                 tabindex="0"
@@ -485,42 +459,93 @@ const gridCols = '32px 32px 2fr 2.2fr 1fr 1.2fr 1fr 120px';
                     class="cmd-mono"
                     :style="{ color: 'var(--fg-dim)', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }"
                 >{{ u.email }}</span>
-                <div>
-                    <select
-                        v-if="editingId === u.id"
-                        ref="selectRef"
-                        v-model="editValue"
-                        @blur="commitEdit(u)"
-                        @change="commitEdit(u)"
-                        @keydown.enter.prevent="commitEdit(u)"
-                        @keydown.escape="editingId = null"
+                <div :style="{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }">
+                    <span
+                        v-if="u.is_super_admin"
                         class="cmd-mono"
                         :style="{
-                            background: 'var(--panel2)',
-                            color: 'var(--fg)',
-                            border: '1px solid var(--accent)',
+                            fontSize: '9.5px',
                             padding: '2px 6px',
                             borderRadius: '3px',
-                            fontSize: '11px',
-                            outline: 'none',
+                            color: roleToneColor('SuperAdmin'),
+                            background: roleToneBg('SuperAdmin'),
+                            border: `1px solid ${roleToneBorder('SuperAdmin')}`,
+                            letterSpacing: '0.02em',
                         }"
-                    >
-                        <option v-for="r in (allRoles ?? [])" :key="r" :value="r">{{ r }}</option>
-                    </select>
+                    >SUPER</span>
                     <span
-                        v-else
+                        v-for="c in u.customer_roles"
+                        :key="c.id"
+                        tabindex="0"
                         class="cmd-mono"
-                        @click="startEdit(u)"
                         :style="{
+                            position: 'relative',
                             fontSize: '10.5px',
-                            cursor: 'pointer',
                             padding: '2px 7px',
                             borderRadius: '3px',
-                            color: roleToneColor(primaryRole(u)),
-                            background: roleToneBg(primaryRole(u)),
-                            border: `1px solid ${roleToneBorder(primaryRole(u))}`,
+                            background: 'var(--panel2)',
+                            color: 'var(--fg-dim)',
+                            border: '1px solid var(--border)',
+                            cursor: 'default',
+                            outline: 'none',
                         }"
-                    >{{ primaryRole(u) }}</span>
+                        @mouseenter="hoverCustomerKey = `${u.id}-${c.id}`"
+                        @mouseleave="hoverCustomerKey = null"
+                        @focus="hoverCustomerKey = `${u.id}-${c.id}`"
+                        @blur="hoverCustomerKey = null"
+                    >
+                        {{ c.name }}
+                        <!-- Hover tooltip: per-customer roles for this user. -->
+                        <span
+                            v-if="hoverCustomerKey === `${u.id}-${c.id}`"
+                            role="tooltip"
+                            :style="{
+                                position: 'absolute',
+                                bottom: 'calc(100% + 6px)',
+                                left: '0',
+                                zIndex: 50,
+                                background: 'var(--panel2)',
+                                border: '1px solid var(--border)',
+                                boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+                                borderRadius: '6px',
+                                padding: '8px 10px',
+                                minWidth: '180px',
+                                fontSize: '11px',
+                                color: 'var(--fg)',
+                                whiteSpace: 'normal',
+                                textAlign: 'left',
+                                fontFamily: 'var(--font-sans, inherit)',
+                            }"
+                        >
+                            <div
+                                class="cmd-mono cmd-uc"
+                                :style="{ fontSize: '9.5px', color: 'var(--fg-mute)', letterSpacing: '0.06em', marginBottom: '4px' }"
+                            >{{ c.name }} · /c/{{ c.slug }}</div>
+                            <div v-if="c.roles.length" :style="{ display: 'flex', flexWrap: 'wrap', gap: '4px' }">
+                                <span
+                                    v-for="r in c.roles"
+                                    :key="r"
+                                    class="cmd-mono"
+                                    :style="{
+                                        fontSize: '10px',
+                                        padding: '1px 6px',
+                                        borderRadius: '3px',
+                                        color: roleToneColor(r),
+                                        background: roleToneBg(r),
+                                        border: `1px solid ${roleToneBorder(r)}`,
+                                    }"
+                                >{{ r }}</span>
+                            </div>
+                            <span
+                                v-else
+                                :style="{ fontStyle: 'italic', color: 'var(--fg-mute)' }"
+                            >{{ t('admin.users.no_roles_on_customer', 'Ingen rolle') }}</span>
+                        </span>
+                    </span>
+                    <span
+                        v-if="!u.is_super_admin && u.customer_roles.length === 0"
+                        :style="{ fontSize: '11px', color: 'var(--fg-mute)', fontStyle: 'italic' }"
+                    >—</span>
                 </div>
                 <div :style="{ display: 'flex', alignItems: 'center', gap: '8px' }">
                     <div

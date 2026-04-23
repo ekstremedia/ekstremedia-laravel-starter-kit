@@ -8,7 +8,7 @@ beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
 
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
 });
 
 it('renders the backups index for admins', function () {
@@ -33,7 +33,6 @@ it('queues a backup:run when the admin triggers a backup', function () {
 
 it('forbids non-admins from backup management', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
 
     $this->actingAs($user)->get('/admin/backups')->assertForbidden();
     $this->actingAs($user)->post('/admin/backups/run')->assertForbidden();

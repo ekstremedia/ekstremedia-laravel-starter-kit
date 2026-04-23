@@ -39,7 +39,7 @@ docker compose exec app php artisan test --compact
 - Every visible string must use `t('key')` from vue-i18n (see Localization section)
 - Vue components must have a single root element (Inertia requirement)
 - PrimeVue label props use dynamic binding: `:label="t('...')"` not `label="..."`
-- Dark palette: use `dark:bg-dark-900`, `dark:border-dark-700` etc. (custom blues in `app.css @theme`)
+- **Use Command primitives + tokens, NOT raw Tailwind color utilities.** All UI chrome (buttons, inputs, dialogs, cards, dropdowns) must use the Command design system — see the "Command design system" section below. Do not write `bg-white`, `dark:bg-dark-*`, `bg-indigo-*`, `text-indigo-*`, `border-gray-*` for UI surfaces; they bypass the tokens and break theme / accent switching
 - Check sibling files for conventions before creating new components
 
 ### Testing
@@ -155,17 +155,79 @@ Features with three gates (global + tenant + per-user) follow the pattern used b
 
 Backend controllers abort 404 (global/tenant off) or 403 (user off). Frontend nav links check all three via shared Inertia props (`app_settings.*`, `customer.*`, `user_settings.*`) so a user never sees a link that 404s.
 
-## UI Theme
+## Command design system
 
-Dark-first (`dark_mode` defaults `true`). Custom blue palette `--color-dark-950` through `--color-dark-300` in `app.css @theme`. PrimeVue Aura preset with dark mode overrides for DataTable, Tabs, Dialog / ConfirmDialog.
+The app's UI is built on the **Command** design system — a token-driven set of Vue primitives at `resources/js/Components/Command/` styled via CSS variables in `resources/css/tokens.css`. All new UI should compose these primitives; reach for Tailwind only for layout (grid, flex, spacing) and for legacy PrimeVue escape hatches listed below.
 
-Flash → PrimeVue toast via `useFlashToast.ts`. Backend: `->with('success', '...')`.
+### Tokens
 
-### Dialogs
+Themes, accents, and densities are switched by setting `data-theme`, `data-accent`, `data-density` on `<html>`. This is done by `useTweaks()` (see `resources/js/composables/useTweaks.ts`) and persisted to localStorage. The pre-hydration script in `resources/views/app.blade.php` applies the saved tokens before Vue hydrates so there's no theme flash.
 
-- **Never use `window.confirm()` or `window.prompt()` for user-facing decisions** — use `<ConfirmDialog>` + `useConfirm()` from PrimeVue for yes/no, and `<Dialog>` (PrimeVue) for custom forms. The app's dark palette overrides live in `app.css`; any new `.p-dialog` picks them up automatically.
-- **Group your ConfirmDialogs** so they don't cross-fire. A page with multiple confirms should name a group (e.g. `group="files"`) and pass it to every `confirm.require(...)` call.
-- **When overriding `.p-dialog` backgrounds**, set `overflow: hidden` on the root so child sections (header/footer) don't paint past the rounded corners, and restore explicit padding on `.p-dialog-header`, `.p-dialog-content`, `.p-dialog-footer` — overriding their `background-color` collapses PrimeVue's default padding.
+- Themes: `dark` (default) · `hc` (high-contrast) · `light`
+- Accents: `cobalt` (default) · `emerald` · `amber` · `violet`
+- Densities: `compact` · `comfortable` (default) · `relaxed`
+
+Key tokens (always use `var(...)`, never hardcoded colors):
+- Surface: `--bg`, `--bg2`, `--panel`, `--panel2`, `--border`
+- Text: `--fg`, `--fg-dim`, `--fg-mute`
+- Accent: `--accent`, `--accent-soft`, `--accent-border`
+- Semantic: `--success`, `--warning`, `--danger`
+- Layout: `--pad-page`, `--pad-row`, `--radius-card`, `--radius-control`, `--radius-chip`
+- Typography: `--font-ui`, `--font-mono`
+
+Utility classes: `.cmd-shell` (root page), `.cmd-card` (panel with border + radius), `.cmd-mono` (JetBrains Mono + tabular numbers), `.cmd-uc` (uppercase + letter-spacing), `.cmd-skeleton` (shimmer loader).
+
+### Primitives (all in `resources/js/Components/Command/`)
+
+| Component | Purpose |
+|---|---|
+| `Dialog.vue` | Modal dialog with backdrop, Esc, focus trap, header/body/footer slots. **Use for every dialog.** |
+| `Button.vue` | Variants `primary` / `ghost` / `danger`, sizes `sm` / `md`, `loading`, `full-width`, leading `#icon` slot |
+| `Field.vue` | Labeled text input. `type`, `error`, `autofocus`, `numeric` modifiers |
+| `Select.vue` | Labeled native `<select>` wrapper |
+| `Toggle.vue` | 32×18 pill switch for booleans |
+| `Icon.vue` | 16×16 inline SVG set, 1.5 stroke, currentColor |
+| `PublicTopbar.vue` | Unauthenticated top bar (marketing/error pages) |
+| `Rail.vue`, `Topbar.vue`, `CommandLayout.vue` | Authenticated app shell — don't reimplement, use `defineOptions({ layout: CommandLayout })` |
+| `CommandPalette.vue` | ⌘K navigation palette |
+| `DataTable.vue` | Sortable/searchable admin tables |
+| `Dot.vue`, `Counter.vue`, `Kbd.vue`, `Skeleton.vue`, `ToastStack.vue` | Supporting pieces |
+
+### Building a new dialog
+
+```vue
+<script setup lang="ts">
+import CommandDialog from '@/Components/Command/Dialog.vue';
+import Field from '@/Components/Command/Field.vue';
+import Button from '@/Components/Command/Button.vue';
+import { ref } from 'vue';
+const open = ref(false);
+const name = ref('');
+</script>
+<template>
+  <CommandDialog v-model:visible="open" title="Rename folder" width="380px">
+    <Field v-model="name" label="Name" autofocus />
+    <template #footer>
+      <Button variant="ghost" size="sm" @click="open = false">Cancel</Button>
+      <Button variant="primary" size="sm">Save</Button>
+    </template>
+  </CommandDialog>
+</template>
+```
+
+Use `data-autofocus` on any element inside the dialog to override the default autofocus target.
+
+### Theme / PrimeVue escape hatches
+
+PrimeVue is still loaded for a handful of components that have no Command equivalent: `DataTable`, `MultiSelect`, `ConfirmDialog`, `Password` (toggle-mask input). Dark-mode overrides for these live in `app.css` and are kept in sync via the `.dark` class toggled by `useTweaks()`.
+
+- **Never use `window.confirm()` or `window.prompt()`** — use `<ConfirmDialog>` + `useConfirm()` for yes/no.
+- **Group your ConfirmDialogs** so they don't cross-fire: a page with multiple confirms should name a group (`group="files"`) and pass it to every `confirm.require(...)` call.
+- **For any custom dialog, use `CommandDialog`** — NOT PrimeVue `Dialog`. PrimeVue Dialog's palette drifts from the Command tokens and requires brittle `:pt` overrides.
+
+### Flash & toasts
+
+Flash → PrimeVue toast via `useFlashToast.ts`. Backend: `->with('success', '...')`. For in-page toasts inside Command flows, prefer `useCommandToasts()` (top-right, token-styled).
 
 ## Settings System
 

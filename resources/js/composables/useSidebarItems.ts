@@ -16,7 +16,8 @@ export function useSidebarItems() {
     const page = usePage<PageProps>();
 
     const user = computed(() => page.props.auth?.user);
-    const isAdmin = computed(() => (user.value?.roles ?? []).includes('Admin'));
+    const isSuperAdmin = computed(() => user.value?.is_super_admin === true);
+    const isCustomerAdmin = computed(() => (user.value?.roles ?? []).includes('Admin'));
     const tenancyEnabled = computed(() => page.props.tenancy?.enabled ?? false);
     const chatEnabled = computed(() => page.props.chat?.enabled ?? false);
     const globalFilesEnabled = computed(() => page.props.app_settings?.files_feature_enabled ?? false);
@@ -44,7 +45,16 @@ export function useSidebarItems() {
             { id: 'chat', href: '/chat', label: t('rail.chat'), icon: 'mail', match: (p) => p.startsWith('/chat'), hideWhen: () => !chatEnabled.value },
         ];
 
-        if (isAdmin.value) {
+        // Customer-admin: only meaningful inside a customer context. Shows the
+        // Members link for the active customer.
+        if (isCustomerAdmin.value && customerSlug.value) {
+            entries.push(
+                { separator: true, key: 'c1' },
+                { id: 'members', href: `/c/${customerSlug.value}/members`, label: t('rail.members'), icon: 'users', match: (p) => p.startsWith(`/c/${customerSlug.value}/members`) },
+            );
+        }
+
+        if (isSuperAdmin.value) {
             entries.push(
                 { separator: true, key: 's1' },
                 { id: 'dashboard', href: '/admin', label: t('rail.admin_overview'), icon: 'home', kb: 'D', match: (p) => p === '/admin' },

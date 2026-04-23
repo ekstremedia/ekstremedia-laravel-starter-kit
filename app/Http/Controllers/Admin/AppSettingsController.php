@@ -4,11 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
+use App\Support\CustomerMembership;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
-use Spatie\Permission\Models\Role;
 
 class AppSettingsController extends Controller
 {
@@ -21,7 +22,10 @@ class AppSettingsController extends Controller
                 'maintenance_message', 'announcement_banner', 'announcement_severity',
                 'files_feature_enabled', 'max_share_days',
             ]),
-            'roles' => Role::orderBy('name')->pluck('name'),
+            // Only customer-scoped roles are valid as a Fortify default — the
+            // registration flow hands the new user off to `CustomerMembership`,
+            // which would reject SuperAdmin (a platform flag, not a role).
+            'roles' => CustomerMembership::assignableRoles(),
         ]);
     }
 
@@ -32,7 +36,7 @@ class AppSettingsController extends Controller
             'registration_open' => ['required', 'boolean'],
             'login_enabled' => ['required', 'boolean'],
             'require_email_verification' => ['required', 'boolean'],
-            'default_role' => ['required', 'string', 'exists:roles,name'],
+            'default_role' => ['required', 'string', Rule::in(CustomerMembership::assignableRoles())],
             'require_2fa_for_admins' => ['required', 'boolean'],
             'send_welcome_notification' => ['required', 'boolean'],
             'maintenance_message' => ['nullable', 'string', 'max:500'],

@@ -7,7 +7,7 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
 });
 
 Broadcast::channel('admin.health', function ($user) {
-    return $user !== null && $user->hasRole('Admin');
+    return $user !== null && $user->isSuperAdmin();
 });
 
 Broadcast::channel('chat.conversation.{conversationId}', function ($user, $conversationId) {

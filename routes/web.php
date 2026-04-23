@@ -71,16 +71,12 @@ Route::middleware('auth')->group(function () {
     // take precedence when a customer is active.
     Route::middleware('verified')->group(function () {
         Route::get('/profile', fn () => Inertia::render('Profile'))->name('profile.central');
-        // Avatar endpoints are also registered centrally when tenancy is on —
-        // otherwise admins visiting the central /profile page (no active
-        // customer) hit a 404 on upload, because the customer.php copy only
-        // exists under /c/{customer}/… in that mode. In single-tenant mode
-        // routes/customer.php already registers these at root, so we don't
-        // duplicate.
-        if (config('tenancy.enabled')) {
-            Route::post('/profile/avatar', [AvatarController::class, 'store'])->name('profile.avatar.central.store');
-            Route::delete('/profile/avatar', [AvatarController::class, 'destroy'])->name('profile.avatar.central.destroy');
-        }
+        // Avatar endpoints are also registered centrally — admins visiting
+        // /profile without an active customer (e.g. from the picker page or
+        // the admin panel) would otherwise hit a 404 on upload, since the
+        // customer.php copy only exists under /c/{customer}/...
+        Route::post('/profile/avatar', [AvatarController::class, 'store'])->name('profile.avatar.central.store');
+        Route::delete('/profile/avatar', [AvatarController::class, 'destroy'])->name('profile.avatar.central.destroy');
         Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.central.index');
         Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.central.read');
         Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.central.readAll');
@@ -121,7 +117,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 // Admin routes (system super-user — spans all tenants)
-Route::middleware(['auth', 'verified', 'role:Admin'])
+Route::middleware(['auth', 'verified', 'super.admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
@@ -175,17 +171,14 @@ Route::middleware(['auth', 'verified', 'role:Admin'])
         Route::get('backups/download', [BackupController::class, 'download'])->name('backups.download');
         Route::post('backups/prepare-restore', [BackupController::class, 'prepareRestore'])->name('backups.prepareRestore');
 
-        // Landlord — customer management. Only registered when multi-tenancy is
-        // active so single-tenant installs don't expose a CRUD for a concept
-        // that doesn't apply.
-        if (config('tenancy.enabled')) {
-            Route::resource('customers', CustomerController::class)->except(['show']);
-            Route::post('customers/{customer}/members', [CustomerController::class, 'attachMember'])->name('customers.members.attach');
-            Route::delete('customers/{customer}/members/{user}', [CustomerController::class, 'detachMember'])->name('customers.members.detach');
+        // Landlord — customer management.
+        Route::resource('customers', CustomerController::class)->except(['show']);
+        Route::post('customers/{customer}/members', [CustomerController::class, 'attachMember'])->name('customers.members.attach');
+        Route::delete('customers/{customer}/members/{user}', [CustomerController::class, 'detachMember'])->name('customers.members.detach');
 
-            Route::post('users/{user}/customers', [UserController::class, 'attachCustomer'])->name('users.customers.attach');
-            Route::delete('users/{user}/customers/{customer}', [UserController::class, 'detachCustomer'])->name('users.customers.detach');
-        }
+        Route::post('users/{user}/customers', [UserController::class, 'attachCustomer'])->name('users.customers.attach');
+        Route::patch('users/{user}/customers/{customer}/role', [UserController::class, 'setCustomerRole'])->name('users.customers.setRole');
+        Route::delete('users/{user}/customers/{customer}', [UserController::class, 'detachCustomer'])->name('users.customers.detach');
 
         Route::post('users/{user}/impersonate', [ImpersonateController::class, 'take'])->name('users.impersonate');
     });

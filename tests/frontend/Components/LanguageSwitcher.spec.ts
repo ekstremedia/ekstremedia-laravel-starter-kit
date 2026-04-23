@@ -55,7 +55,16 @@ describe('LanguageSwitcher', () => {
         const wrapper = mount(LanguageSwitcher);
         await wrapper.get('button').trigger('click');
 
+        // The active row is the only one that renders the <Icon name="check"> — a
+        // small SVG with this distinctive path. We assert on the path d-value
+        // rather than a class name so the test doesn't break the next time the
+        // icon's presentational wrapper changes.
         const activeBtn = wrapper.findAll('button').find((b) => b.text().includes('English'));
-        expect(activeBtn?.html()).toContain('pi-check');
+        const inactiveBtn = wrapper.findAll('button').find((b) => b.text().includes('Norsk'));
+        expect(activeBtn).toBeDefined();
+        expect(inactiveBtn).toBeDefined();
+        expect(activeBtn?.find('svg').exists()).toBe(true);
+        expect(activeBtn?.html()).toContain('M3 8l3 3 7-7');
+        expect(inactiveBtn?.find('svg').exists()).toBe(false);
     });
 });

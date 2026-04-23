@@ -20,7 +20,6 @@ it('redirects unverified users to the verification notice', function () {
 
 it('renders the Home Inertia page with userDetail and activity', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
 
     $this->actingAs($user)
         ->get('/home')
@@ -34,7 +33,8 @@ it('renders the Home Inertia page with userDetail and activity', function () {
                 ->where('last_name', $user->last_name)
                 ->has('email_verified_at')
                 ->where('two_factor_enabled', false)
-                ->has('roles')
+                ->has('customer_roles')
+                ->where('is_super_admin', false)
                 ->has('created_at')
             )
             ->has('activity')

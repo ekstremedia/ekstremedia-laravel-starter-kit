@@ -85,11 +85,11 @@ describe('useSidebarItems', () => {
         expect(files?.href).toBe('/c/acme/files');
     });
 
-    it('includes admin group only for Admin role', () => {
+    it('includes the platform admin group only for SuperAdmin users', () => {
         const noAdmin = renderWithProps({
-            auth: { user: { roles: [] } },
+            auth: { user: { roles: [], is_super_admin: false } },
             chat: { enabled: false },
-            tenancy: { enabled: false },
+            tenancy: { enabled: true },
             app_settings: { files_feature_enabled: false },
             customer: null,
             available_customers: [],
@@ -97,7 +97,7 @@ describe('useSidebarItems', () => {
         expect(noAdmin.vm.visible.filter(isSidebarItem).map((e) => e.id)).not.toContain('users');
 
         const admin = renderWithProps({
-            auth: { user: { roles: ['Admin'] } },
+            auth: { user: { roles: [], is_super_admin: true } },
             chat: { enabled: false },
             tenancy: { enabled: true },
             app_settings: { files_feature_enabled: false },
@@ -110,17 +110,18 @@ describe('useSidebarItems', () => {
         expect(adminIds).toContain('settings');
     });
 
-    it('hides customers entry when tenancy disabled', () => {
+    it('shows a customer Members link for a customer-Admin when inside a customer', () => {
         const w = renderWithProps({
-            auth: { user: { roles: ['Admin'] } },
+            auth: { user: { roles: ['Admin'], is_super_admin: false } },
             chat: { enabled: false },
-            tenancy: { enabled: false },
+            tenancy: { enabled: true },
             app_settings: { files_feature_enabled: false },
-            customer: null,
-            available_customers: [],
+            customer: { id: 1, slug: 'acme', name: 'Acme' },
+            available_customers: [{ id: 1, slug: 'acme', name: 'Acme' }],
         });
         const ids = w.vm.visible.filter(isSidebarItem).map((e) => e.id);
-        expect(ids).not.toContain('customers');
-        expect(ids).toContain('users');
+        expect(ids).toContain('members');
+        // Customer-Admin without the SuperAdmin flag doesn't see the platform group.
+        expect(ids).not.toContain('users');
     });
 });

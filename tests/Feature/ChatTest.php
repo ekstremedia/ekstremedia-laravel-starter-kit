@@ -20,15 +20,12 @@ beforeEach(function () {
     $this->customer = createCustomer();
 
     $this->alice = User::factory()->create(['first_name' => 'Alice', 'last_name' => 'Smith']);
-    $this->alice->assignRole('User');
     joinCustomer($this->alice, $this->customer);
 
     $this->bob = User::factory()->create(['first_name' => 'Bob', 'last_name' => 'Jones']);
-    $this->bob->assignRole('User');
     joinCustomer($this->bob, $this->customer);
 
     $this->charlie = User::factory()->create(['first_name' => 'Charlie', 'last_name' => 'Brown']);
-    $this->charlie->assignRole('User');
     joinCustomer($this->charlie, $this->customer);
 });
 

@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Activitylog\Models\Activity;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -39,17 +40,55 @@ class AppServiceProvider extends ServiceProvider
         // never takes the site down in the field.
         Model::preventLazyLoading(! $this->app->isProduction());
 
+        // Stamp the active customer on every activity_log row. Without this,
+        // customer-scoped dashboards that filter activity by "members of
+        // this customer" would leak rows from other customers the same
+        // users belong to (a user who's Admin on A and User on B would see
+        // B's actions on A's dashboard). Null tenant_id is preserved for
+        // genuine central-only events (password reset, profile edit from
+        // the picker page, etc.).
+        //
+        // Escape hatch: callers that fire a deliberately platform-level
+        // event while tenancy happens to be initialized can opt out with
+        // `activity()->withProperties(['central' => true])->log(...)` — we
+        // skip the stamp and leave `tenant_id` null so the row remains in
+        // "all central activity" (tenant_id IS NULL) queries.
+        Activity::creating(function (Activity $activity): void {
+            // `properties` is a Collection cast by Spatie Activitylog (can be
+            // null when no properties were set).
+            if ((bool) ($activity->properties?->get('central', false) ?? false)) {
+                return;
+            }
+
+            if ($activity->tenant_id === null && tenancy()->initialized) {
+                $activity->tenant_id = tenancy()->tenant?->getKey();
+            }
+        });
+
         // Authenticated users visiting guest-only pages (/login, /register, ...)
         // land on the tenant landing page, which dispatches them into their
         // workspace (or renders the picker for admins / multi-tenant users).
         RedirectIfAuthenticated::redirectUsing(fn () => route('app.landing'));
 
         Gate::define('viewPulse', function ($user = null) {
-            return $user !== null && $user->hasRole('Admin');
+            return $user !== null && $user->isSuperAdmin();
         });
 
         Gate::define('viewLogViewer', function ($user = null) {
-            return $user !== null && $user->hasRole('Admin');
+            return $user !== null && $user->isSuperAdmin();
+        });
+
+        // SuperAdmin bypass: `Gate::before` runs before every ability check
+        // (Spatie permission gates included), so a SuperAdmin clears customer-
+        // scoped `can('upload files')` / `can('manage customer users')` checks
+        // even when they enter a customer they hold no membership role on.
+        // Returning `null` falls through to normal resolution for everyone else.
+        Gate::before(function ($user, $ability) {
+            if ($user !== null && $user->isSuperAdmin()) {
+                return true;
+            }
+
+            return null;
         });
 
         // Laravel's default /up route dispatches DiagnosingHealth before it

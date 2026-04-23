@@ -14,7 +14,7 @@ beforeEach(function () {
 
 it('shows templates on the mail settings page', function () {
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $this->actingAs($admin)
         ->get('/admin/mail')
@@ -27,7 +27,7 @@ it('shows templates on the mail settings page', function () {
 
 it('allows admin to update a template', function () {
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $template = EmailTemplate::forSlug('welcome', 'en');
 
@@ -50,7 +50,7 @@ it('allows admin to update a template', function () {
 
 it('returns preview HTML for a template', function () {
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $template = EmailTemplate::forSlug('welcome', 'en');
 
@@ -64,7 +64,7 @@ it('sends a test email for a template', function () {
     Mail::fake();
 
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $template = EmailTemplate::forSlug('admin-test', 'en');
     $email = fake()->safeEmail();
@@ -81,7 +81,6 @@ it('sends a test email for a template', function () {
 
 it('rejects non-admin from updating templates', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
 
     $template = EmailTemplate::forSlug('welcome', 'en');
 
@@ -95,7 +94,7 @@ it('rejects non-admin from updating templates', function () {
 
 it('validates required fields on template update', function () {
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
 
     $template = EmailTemplate::forSlug('welcome', 'en');
 

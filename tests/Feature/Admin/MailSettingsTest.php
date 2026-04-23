@@ -10,7 +10,7 @@ beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
 
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
 });
 
 it('saves mail settings', function () {

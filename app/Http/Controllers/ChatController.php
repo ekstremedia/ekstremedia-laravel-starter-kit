@@ -213,7 +213,7 @@ class ChatController extends Controller
             ->notBanned()
             ->whereIn('id', $participantIds);
 
-        if (config('tenancy.enabled') && ! $user->hasRole('Admin')) {
+        if (! $user->isSuperAdmin()) {
             $customerIds = $user->customers()->pluck('tenants.id');
             $allowedQuery->whereHas('customers', function ($q) use ($customerIds) {
                 $q->whereIn('tenants.id', $customerIds);
@@ -463,7 +463,7 @@ class ChatController extends Controller
 
         // When tenancy is enabled and user is not admin, limit to users
         // who share at least one customer (company) with the searcher.
-        if (config('tenancy.enabled') && ! $user->hasRole('Admin')) {
+        if (! $user->isSuperAdmin()) {
             $customerIds = $user->customers()->pluck('tenants.id');
             $usersQuery->whereHas('customers', function ($q) use ($customerIds) {
                 $q->whereIn('tenants.id', $customerIds);

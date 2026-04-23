@@ -15,7 +15,6 @@ it('dispatches the preview job after uploading a PDF', function () {
 
     $this->seed(RoleAndPermissionSeeder::class);
     $user = User::factory()->create();
-    $user->assignRole('User');
     $customer = createCustomer();
     AppSetting::current()->update(['files_feature_enabled' => true]);
     $customer->update(['files_feature_enabled' => true]);
@@ -36,7 +35,6 @@ it('skips the preview job for plain images', function () {
 
     $this->seed(RoleAndPermissionSeeder::class);
     $user = User::factory()->create();
-    $user->assignRole('User');
     $customer = createCustomer();
     AppSetting::current()->update(['files_feature_enabled' => true]);
     $customer->update(['files_feature_enabled' => true]);

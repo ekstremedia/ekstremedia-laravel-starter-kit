@@ -10,7 +10,7 @@ beforeEach(function () {
     $this->customer = createCustomer();
 
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
     joinCustomer($this->admin, $this->customer);
 });
 
@@ -53,7 +53,6 @@ it('shows maintenance page to non-admins when site is down', function () {
     AppSetting::current()->update(['site_up' => false]);
 
     $user = User::factory()->create();
-    $user->assignRole('User');
     joinCustomer($user, $this->customer);
 
     $this->actingAs($user)

@@ -115,15 +115,18 @@ return [
     'events_enabled' => false,
 
     /*
-     * Teams Feature — left off on purpose.
-     * Roles (`Admin`, `Editor`, `User`) remain global: `Admin` is the system super-user
-     * across every tenant, and `Editor` / `User` are just generic application roles.
-     * Membership in a tenant is tracked by the `tenant_user` pivot, not by scoped roles.
-     * If you later need per-tenant roles (Owner / Manager / ...), flip this to `true`
-     * and add a migration that sets `team_id` on existing role assignments.
+     * Teams Feature — enabled.
+     *
+     * `SuperAdmin` (global, team_id=null) is the system super-user across every
+     * customer. `Admin`/`Editor`/`User` are customer-scoped: the same user can be
+     * Admin on customer A and plain User on customer B.
+     *
+     * Team id = the active customer (Tenant) id. It is set by
+     * `InitializeTenancyByPath` after `tenancy()->initialize()` so every
+     * `hasRole`/`can` check in the request auto-scopes to the active customer.
      */
 
-    'teams' => false,
+    'teams' => true,
 
     /*
      * The class to use to resolve the permissions team id

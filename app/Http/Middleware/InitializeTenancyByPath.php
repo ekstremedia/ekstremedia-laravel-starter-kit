@@ -8,16 +8,18 @@ use App\Models\Tenant;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * Resolves the {customer} route parameter (a slug) into a Tenant (our Customer),
- * verifies the authenticated user belongs to it, and boots tenancy (PG
- * search_path → tenant<id>).
+ * verifies the authenticated user belongs to it, boots tenancy (PG
+ * search_path → tenant<id>), and sets the Spatie permission team id to the
+ * customer so every downstream `hasRole`/`can` call auto-scopes.
  *
- * Admins bypass the membership check — they can enter any customer.
+ * SuperAdmins bypass the membership check — they can enter any customer.
  *
  * Class name mentions "Tenancy" because stancl/tenancy is the underlying
  * mechanism; at the app layer we surface everything as "customer".
@@ -51,11 +53,23 @@ class InitializeTenancyByPath
 
         $user = Auth::user();
 
-        if (! $user || (! $user->hasRole('Admin') && ! $user->belongsToCustomer($customer))) {
+        if (! $user || (! $user->isSuperAdmin() && ! $user->belongsToCustomer($customer))) {
             throw new AccessDeniedHttpException("You are not a member of [{$slug}].");
         }
 
         tenancy()->initialize($customer);
+
+        // Scope every downstream role/permission check to this customer.
+        // SuperAdmin assignments (team_id = null) still resolve globally via
+        // User::isSuperAdmin(); everything else is per-customer from here on.
+        // PermissionRegistrar is a container singleton and survives across
+        // requests in long-lived workers (Octane, queues, same-process
+        // tests), so we capture the previous team id and restore it after
+        // the request runs — otherwise customer A's team context leaks into
+        // the next request on the same worker.
+        $registrar = app(PermissionRegistrar::class);
+        $previousTeamId = $registrar->getPermissionsTeamId();
+        $registrar->setPermissionsTeamId($customer->id);
 
         $route->forgetParameter('customer');
 
@@ -69,6 +83,10 @@ class InitializeTenancyByPath
             $user->settings()->merge(['last_customer_slug' => $customer->slug]);
         }
 
-        return $next($request);
+        try {
+            return $next($request);
+        } finally {
+            $registrar->setPermissionsTeamId($previousTeamId);
+        }
     }
 }

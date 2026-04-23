@@ -10,6 +10,13 @@ import { useCommandToasts } from '@/composables/useCommandToasts';
 
 defineOptions({ layout: CommandLayout });
 
+interface CustomerRoleCell {
+    id: number;
+    name: string;
+    slug: string;
+    roles: string[];
+}
+
 interface UserDetail {
     id: number;
     first_name: string;
@@ -17,7 +24,8 @@ interface UserDetail {
     email: string;
     email_verified_at: string | null;
     two_factor_enabled: boolean;
-    roles: string[];
+    is_super_admin: boolean;
+    customer_roles: CustomerRoleCell[];
     created_at: string | null;
 }
 
@@ -38,7 +46,23 @@ const props = defineProps<Props>();
 const { push } = useCommandToasts();
 const { t } = useI18n();
 
-const primaryRole = computed(() => props.userDetail.roles[0] ?? t('home.role_fallback'));
+// "Primary" role surfaces SuperAdmin first (platform-level), then the first
+// customer-scoped role we know about (Admin on any customer beats Editor on
+// any customer, beats User). The match is on the raw identifier; the return
+// is a translated label so the badge respects the user's locale. Falls back
+// to `home.role_fallback` for accounts with no customer role yet.
+const primaryRole = computed(() => {
+    if (props.userDetail.is_super_admin) return t('roles.super_admin');
+    const ranking: Array<['Admin' | 'Editor' | 'User', string]> = [
+        ['Admin', 'roles.admin'],
+        ['Editor', 'roles.editor'],
+        ['User', 'roles.user'],
+    ];
+    for (const [id, key] of ranking) {
+        if (props.userDetail.customer_roles.some((c) => c.roles.includes(id))) return t(key);
+    }
+    return t('home.role_fallback');
+});
 
 function formatDate(iso: string | null): string {
     if (!iso) return '—';

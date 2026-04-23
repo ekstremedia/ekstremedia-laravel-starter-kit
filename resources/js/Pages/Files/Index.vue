@@ -10,9 +10,10 @@ import VideoPlayer from '@/Components/Files/VideoPlayer.vue';
 import ItemActionsMenu from '@/Components/Files/ItemActionsMenu.vue';
 import ConfirmDialog from 'primevue/confirmdialog';
 import { useConfirm } from 'primevue/useconfirm';
-import Dialog from 'primevue/dialog';
-import InputText from 'primevue/inputtext';
-import Button from 'primevue/button';
+import CommandDialog from '@/Components/Command/Dialog.vue';
+import Field from '@/Components/Command/Field.vue';
+import CmdSelect from '@/Components/Command/Select.vue';
+import CmdButton from '@/Components/Command/Button.vue';
 import { useToast } from 'primevue/usetoast';
 import { useCustomer } from '@/composables/useCustomer';
 import type { LightboxItem } from '@/types/lightbox';
@@ -1151,175 +1152,121 @@ const usageLabel = computed(() => {
         </Teleport>
 
         <!-- New folder dialog -->
-        <Dialog
+        <CommandDialog
             v-model:visible="newFolderOpen"
-            :header="t('files.new_folder')"
-            modal
-            :style="{ width: '24rem' }"
-            :draggable="false"
-            @show="() => { /* autofocus hook */ }"
+            :title="t('files.new_folder')"
+            width="380px"
         >
-            <form @submit.prevent="submitNewFolder" class="space-y-3">
-                <label class="block text-sm">
-                    <span class="mb-1 block text-slate-600 dark:text-slate-300">{{ t('common.name') }}</span>
-                    <InputText
-                        v-model="newFolderName"
-                        class="w-full"
-                        autofocus
-                        :placeholder="t('files.new_folder')"
-                        @keyup.enter="submitNewFolder"
-                    />
-                </label>
+            <form @submit.prevent="submitNewFolder">
+                <Field
+                    v-model="newFolderName"
+                    :label="t('common.name')"
+                    :placeholder="t('files.new_folder')"
+                    autofocus
+                    @keyup.enter="submitNewFolder"
+                />
             </form>
             <template #footer>
-                <Button :label="t('common.cancel')" severity="secondary" text @click="newFolderOpen = false" />
-                <Button :label="t('files.new_folder')" icon="pi pi-folder-plus" @click="submitNewFolder" />
+                <CmdButton variant="ghost" size="sm" @click="newFolderOpen = false">
+                    {{ t('common.cancel') }}
+                </CmdButton>
+                <CmdButton variant="primary" size="sm" @click="submitNewFolder">
+                    <template #icon>
+                        <Icon name="disk" :size="12" />
+                    </template>
+                    {{ t('files.new_folder') }}
+                </CmdButton>
             </template>
-        </Dialog>
+        </CommandDialog>
 
         <!-- Share dialog -->
-        <div
-            v-if="shareDialogFile"
-            :style="{
-                position: 'fixed',
-                inset: 0,
-                zIndex: 50,
-                background: 'rgba(0,0,0,0.55)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '16px',
-            }"
-            @click.self="shareDialogFile = null"
+        <CommandDialog
+            :visible="!!shareDialogFile"
+            width="420px"
+            @update:visible="(v: boolean) => { if (!v) shareDialogFile = null; }"
         >
-            <div
-                :style="{
-                    width: '100%',
-                    maxWidth: '420px',
-                    background: 'var(--panel)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    padding: '20px',
-                    boxShadow: 'var(--shadow-palette)',
-                }"
-            >
+            <template #header>
                 <h2
                     :style="{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        fontSize: '14px',
+                        fontSize: '13px',
                         fontWeight: 600,
                         color: 'var(--fg)',
-                        marginBottom: '14px',
+                        margin: 0,
                     }"
                 >
-                    <i class="pi pi-share-alt" :style="{ color: 'var(--accent)' }" />
-                    <span>{{ t('files.share_title', { name: shareDialogFile.name }) }}</span>
+                    <i class="pi pi-share-alt" :style="{ color: 'var(--accent)', fontSize: '13px' }" />
+                    <span>{{ shareDialogFile ? t('files.share_title', { name: shareDialogFile.name }) : '' }}</span>
                 </h2>
+            </template>
 
-                <div v-if="!shareResultUrl" :style="{ display: 'flex', flexDirection: 'column', gap: '10px' }">
-                    <label :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', fontSize: '12px', color: 'var(--fg-dim)' }">
-                        <span>{{ t('files.share_expiry') }}</span>
-                        <select
-                            v-model.number="shareHours"
-                            :style="{
-                                background: 'var(--panel2)',
-                                border: '1px solid var(--border)',
-                                color: 'var(--fg)',
-                                borderRadius: '4px',
-                                padding: '4px 8px',
-                                fontSize: '12px',
-                                fontFamily: 'inherit',
-                            }"
-                        >
-                            <option :value="1">{{ t('files.share_expiry_hours', { count: 1 }) }}</option>
-                            <option :value="24">{{ t('files.share_expiry_hours', { count: 24 }) }}</option>
-                            <option :value="72">{{ t('files.share_expiry_days', { count: 3 }) }}</option>
-                            <option :value="168">{{ t('files.share_expiry_days', { count: 7 }) }}</option>
-                        </select>
-                    </label>
-                    <label :style="{ display: 'block', fontSize: '12px', color: 'var(--fg-dim)' }">
-                        <span :style="{ display: 'block', marginBottom: '4px' }">{{ t('files.share_password_optional') }}</span>
-                        <input
-                            v-model="sharePassword"
-                            type="password"
-                            autocomplete="new-password"
-                            :placeholder="t('files.share_password_placeholder')"
-                            :style="{
-                                width: '100%',
-                                background: 'var(--panel2)',
-                                border: '1px solid var(--border)',
-                                color: 'var(--fg)',
-                                borderRadius: '4px',
-                                padding: '6px 10px',
-                                fontSize: '12px',
-                                fontFamily: 'inherit',
-                            }"
-                        />
-                    </label>
-                </div>
-
-                <div v-else :style="{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }">
-                    <p :style="{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '5px', margin: 0 }">
-                        <i class="pi pi-check-circle" />
-                        <span>{{ t('files.share_created_copied') }}</span>
-                    </p>
-                    <div
-                        class="cmd-mono"
-                        :style="{
-                            background: 'var(--panel2)',
-                            border: '1px solid var(--border)',
-                            borderRadius: '4px',
-                            padding: '6px 10px',
-                            fontSize: '11px',
-                            color: 'var(--fg-dim)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                        }"
-                    >{{ shareResultUrl }}</div>
-                </div>
-
-                <div :style="{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }">
-                    <button
-                        v-if="shareDialogFile?.type === 'file' && !shareResultUrl"
-                        type="button"
-                        @click="quickShare(shareDialogFile)"
-                        class="cmd-ghost-btn"
-                    >{{ t('files.quick_link') }}</button>
-                    <button
-                        type="button"
-                        @click="shareDialogFile = null"
-                        class="cmd-ghost-btn"
-                    >{{ t('common.close') }}</button>
-                    <button
-                        v-if="!shareResultUrl"
-                        type="button"
-                        :disabled="shareCreating"
-                        @click="createShare"
-                        :style="{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            background: 'var(--accent)',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '5px',
-                            padding: '5px 12px',
-                            fontSize: '12px',
-                            fontWeight: 500,
-                            cursor: shareCreating ? 'not-allowed' : 'pointer',
-                            opacity: shareCreating ? 0.55 : 1,
-                            fontFamily: 'inherit',
-                        }"
-                    >
-                        <i class="pi pi-link" :style="{ fontSize: '11px' }" />
-                        <span>{{ t('files.create_share') }}</span>
-                    </button>
-                </div>
+            <div v-if="!shareResultUrl" :style="{ display: 'flex', flexDirection: 'column', gap: '12px' }">
+                <CmdSelect
+                    v-model="shareHours"
+                    :label="t('files.share_expiry')"
+                    :options="[
+                        { value: 1, label: t('files.share_expiry_hours', { count: 1 }) },
+                        { value: 24, label: t('files.share_expiry_hours', { count: 24 }) },
+                        { value: 72, label: t('files.share_expiry_days', { count: 3 }) },
+                        { value: 168, label: t('files.share_expiry_days', { count: 7 }) },
+                    ]"
+                />
+                <Field
+                    v-model="sharePassword"
+                    type="password"
+                    autocomplete="new-password"
+                    :label="t('files.share_password_optional')"
+                    :placeholder="t('files.share_password_placeholder')"
+                />
             </div>
-        </div>
+
+            <div v-else :style="{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }">
+                <p :style="{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '5px', margin: 0 }">
+                    <i class="pi pi-check-circle" />
+                    <span>{{ t('files.share_created_copied') }}</span>
+                </p>
+                <div
+                    class="cmd-mono"
+                    :style="{
+                        background: 'var(--panel2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '4px',
+                        padding: '6px 10px',
+                        fontSize: '11px',
+                        color: 'var(--fg-dim)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                    }"
+                >{{ shareResultUrl }}</div>
+            </div>
+
+            <template #footer>
+                <CmdButton
+                    v-if="shareDialogFile?.type === 'file' && !shareResultUrl"
+                    variant="ghost"
+                    size="sm"
+                    @click="quickShare(shareDialogFile)"
+                >{{ t('files.quick_link') }}</CmdButton>
+                <CmdButton variant="ghost" size="sm" @click="shareDialogFile = null">
+                    {{ t('common.close') }}
+                </CmdButton>
+                <CmdButton
+                    v-if="!shareResultUrl"
+                    variant="primary"
+                    size="sm"
+                    :loading="shareCreating"
+                    @click="createShare"
+                >
+                    <template #icon>
+                        <i class="pi pi-link" :style="{ fontSize: '11px' }" />
+                    </template>
+                    {{ t('files.create_share') }}
+                </CmdButton>
+            </template>
+        </CommandDialog>
     </div>
 </template>
 

@@ -107,7 +107,7 @@ it('lets admins enter any customer without a pivot row', function () {
     $customer = createCustomer('acme');
 
     $admin = User::factory()->create();
-    $admin->assignRole('Admin');
+    $admin->forceFill(['is_super_admin' => true])->save();
     // note: NOT attached via joinCustomer
 
     expect($admin->belongsToCustomer($customer))->toBeFalse();

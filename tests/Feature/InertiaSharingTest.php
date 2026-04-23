@@ -14,7 +14,6 @@ beforeEach(function () {
 
 it('shares avatar urls as null when no photo uploaded', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
     joinCustomer($user, $this->customer);
 
     $this->actingAs($user)
@@ -28,7 +27,6 @@ it('shares avatar urls as null when no photo uploaded', function () {
 
 it('shares avatar urls after upload', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
     joinCustomer($user, $this->customer);
 
     $user->addMedia(UploadedFile::fake()->image('a.png', 400, 400))
@@ -43,16 +41,16 @@ it('shares avatar urls after upload', function () {
         );
 });
 
-it('shares roles and permissions for authenticated users', function () {
+it('shares customer-scoped roles and permissions for authenticated users', function () {
     $user = User::factory()->create();
-    $user->assignRole('Editor');
-    joinCustomer($user, $this->customer);
+    grantRoleOnCustomer($user, 'Editor', $this->customer);
 
     $this->actingAs($user)
         ->get($this->dashboardUrl)
         ->assertInertia(fn ($page) => $page
             ->where('auth.user.roles', ['Editor'])
             ->has('auth.user.permissions')
+            ->where('auth.user.is_super_admin', false)
         );
 });
 
@@ -64,7 +62,6 @@ it('shares null auth.user for guests', function () {
 
 it('shares user settings for authenticated users', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
     joinCustomer($user, $this->customer);
 
     $this->actingAs($user)

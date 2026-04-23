@@ -34,11 +34,16 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $banned_at
  * @property Carbon|null $last_login_at
  */
+// `is_super_admin` is intentionally *not* fillable — it must only be set via
+// explicit `forceFill(['is_super_admin' => ...])` or the dedicated setRole
+// flow in UserController. Allowing mass-assignment here would let a crafted
+// payload on `/admin/users` or `/register` elevate the account without
+// going through the SuperAdmin-gated code path.
 #[Fillable(['first_name', 'last_name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements HasLocalePreference, HasMedia, MustVerifyEmail
 {
-    public const ROLE_ADMIN = 'Admin';
+    public const ROLE_SUPER_ADMIN = 'SuperAdmin';
 
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasRoles, Impersonate, InteractsWithMedia, LogsActivity, Notifiable, Searchable, TwoFactorAuthenticatable;
@@ -89,12 +94,28 @@ class User extends Authenticatable implements HasLocalePreference, HasMedia, Mus
 
     public function canImpersonate(): bool
     {
-        return $this->hasRole(self::ROLE_ADMIN);
+        return $this->isSuperAdmin();
     }
 
     public function canBeImpersonated(): bool
     {
-        return ! $this->hasRole(self::ROLE_ADMIN);
+        return ! $this->isSuperAdmin();
+    }
+
+    /**
+     * Platform super-user flag. Stored as a plain column on users rather than
+     * a Spatie role: Spatie's team schema forces `model_has_roles.team_id` to
+     * be non-null, so "global, not attached to any customer" isn't
+     * representable there. Keeping it as a boolean also makes the distinction
+     * crystal-clear — SuperAdmin is a platform property of the account, not a
+     * per-customer assignment.
+     */
+    public function isSuperAdmin(): bool
+    {
+        // Read through `getAttribute` so the boolean cast declared in
+        // casts() + any mutator layer applies consistently. Previously this
+        // poked `$this->attributes` directly and bypassed the cast pipeline.
+        return (bool) $this->getAttribute('is_super_admin');
     }
 
     public function isBanned(): bool
@@ -323,6 +344,7 @@ class User extends Authenticatable implements HasLocalePreference, HasMedia, Mus
             'last_login_at' => 'datetime',
             'password' => 'hashed',
             'storage_used_bytes' => 'integer',
+            'is_super_admin' => 'boolean',
         ];
     }
 }

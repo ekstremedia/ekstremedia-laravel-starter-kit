@@ -9,14 +9,13 @@ beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
 
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
 });
 
 // ---------- Access control ----------
 
 it('forbids non-admins from the landlord index', function () {
     $user = User::factory()->create();
-    $user->assignRole('User');
 
     $this->actingAs($user)->get('/admin/customers')->assertForbidden();
 });
@@ -165,7 +164,7 @@ it('attaches an existing user to a customer by email', function () {
     $user = User::factory()->create(['email' => 'new.member@example.test']);
 
     $this->actingAs($this->admin)
-        ->post("/admin/customers/{$customer->id}/members", ['email' => 'new.member@example.test'])
+        ->post("/admin/customers/{$customer->id}/members", ['email' => 'new.member@example.test', 'roles' => ['User']])
         ->assertSessionHasNoErrors();
 
     expect($user->belongsToCustomer($customer))->toBeTrue();
@@ -176,11 +175,11 @@ it('is idempotent when attaching the same user twice', function () {
     $user = User::factory()->create(['email' => 'repeat@example.test']);
 
     $this->actingAs($this->admin)
-        ->post("/admin/customers/{$customer->id}/members", ['email' => 'repeat@example.test'])
+        ->post("/admin/customers/{$customer->id}/members", ['email' => 'repeat@example.test', 'roles' => ['User']])
         ->assertSessionHasNoErrors();
 
     $this->actingAs($this->admin)
-        ->post("/admin/customers/{$customer->id}/members", ['email' => 'repeat@example.test'])
+        ->post("/admin/customers/{$customer->id}/members", ['email' => 'repeat@example.test', 'roles' => ['User']])
         ->assertSessionHasNoErrors();
 
     expect($customer->users()->whereKey($user->id)->count())->toBe(1);

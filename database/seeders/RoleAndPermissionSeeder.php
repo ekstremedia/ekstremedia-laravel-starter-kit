@@ -7,22 +7,34 @@ use App\Models\Role;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\PermissionRegistrar;
 
+/**
+ * Seeds the customer-scoped role templates.
+ *
+ * `Admin`, `Editor`, and `User` are role **templates**: the role rows
+ * themselves carry `team_id = null` (they're definitions, not assignments),
+ * and each per-customer assignment in `model_has_roles` stamps the customer
+ * id as `team_id`. Every `hasRole`/`can` check then auto-scopes to whichever
+ * customer is active.
+ *
+ * Platform-wide super-user access is NOT a role — it's a boolean flag on the
+ * user row (`users.is_super_admin`). Spatie's team schema forces
+ * `model_has_roles.team_id` to be non-null, so "global" role assignments
+ * aren't representable there; seeding + checking SuperAdmin via a column
+ * keeps that distinction clean.
+ */
 class RoleAndPermissionSeeder extends Seeder
 {
     public function run(): void
     {
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-        $permissions = [
+        $customerPermissions = [
             'view dashboard',
-            'manage users',
-            'manage roles',
-            'manage resources',
-            'manage settings',
+            'manage customer users',     // invite / remove members of the active customer
+            'manage customer settings',  // toggle customer-level feature flags
             'manage profile',
-            'manage storage',
-            // File manager — gate each mutation individually so admins can
-            // carve out read-only roles by removing a subset of these.
+            // File manager — gate each mutation individually so customer-Admins
+            // can carve out read-only roles by removing a subset of these.
             'upload files',
             'create folders',
             'rename files',
@@ -30,18 +42,18 @@ class RoleAndPermissionSeeder extends Seeder
             'share files',
         ];
 
-        foreach ($permissions as $permission) {
+        foreach ($customerPermissions as $permission) {
             Permission::firstOrCreate(['name' => $permission]);
         }
 
+        // Customer-scoped role templates. The role rows are team-agnostic;
+        // the assignment in model_has_roles carries the team id.
         $adminRole = Role::firstOrCreate(['name' => 'Admin']);
-        $adminRole->givePermissionTo(Permission::all());
+        $adminRole->syncPermissions($customerPermissions);
 
         $editorRole = Role::firstOrCreate(['name' => 'Editor']);
-        $editorRole->givePermissionTo([
+        $editorRole->syncPermissions([
             'view dashboard',
-            'manage resources',
-            'manage settings',
             'manage profile',
             'upload files',
             'create folders',
@@ -51,9 +63,8 @@ class RoleAndPermissionSeeder extends Seeder
         ]);
 
         $userRole = Role::firstOrCreate(['name' => 'User']);
-        $userRole->givePermissionTo([
+        $userRole->syncPermissions([
             'view dashboard',
-            'manage settings',
             'manage profile',
             'upload files',
             'create folders',

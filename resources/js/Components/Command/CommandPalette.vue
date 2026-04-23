@@ -20,7 +20,7 @@ const { t } = useI18n();
 const { setTheme, setAccent, setDensity } = useTweaks();
 const { push } = useCommandToasts();
 const page = usePage<PageProps>();
-const isAdmin = computed(() => (page.props.auth?.user?.roles ?? []).includes('Admin'));
+const isAdmin = computed(() => page.props.auth?.user?.is_super_admin === true);
 const chatEnabled = computed(() => page.props.chat?.enabled ?? false);
 const customerSlug = computed(() => page.props.customer?.slug ?? null);
 const globalFilesEnabled = computed(() => page.props.app_settings?.files_feature_enabled ?? false);

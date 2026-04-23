@@ -10,19 +10,19 @@ use Spatie\Permission\Models\Role;
 beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
     $this->admin = User::factory()->create();
-    $this->admin->assignRole('Admin');
+    $this->admin->forceFill(['is_super_admin' => true])->save();
 });
 
 it('logs role creation with permissions', function () {
     $this->actingAs($this->admin)->post('/admin/roles', [
         'name' => 'Curator',
-        'permissions' => ['view dashboard', 'manage resources'],
+        'permissions' => ['view dashboard', 'manage profile'],
     ])->assertRedirect();
 
     $log = Activity::where('log_name', 'role')->where('event', 'created')->latest()->first();
     expect($log)->not->toBeNull()
         ->and($log->description)->toContain('Curator')
-        ->and($log->properties['permissions'])->toEqualCanonicalizing(['view dashboard', 'manage resources'])
+        ->and($log->properties['permissions'])->toEqualCanonicalizing(['view dashboard', 'manage profile'])
         ->and($log->causer_id)->toBe($this->admin->id);
 });
 
@@ -66,14 +66,13 @@ it('logs permission creation and deletion', function () {
         ->and($deleted->properties['name'])->toBe('frobnicate');
 });
 
-it('logs admin user creation and role changes', function () {
+it('logs admin user creation and password changes', function () {
     $this->actingAs($this->admin)->post('/admin/users', [
         'first_name' => 'New',
         'last_name' => 'Guy',
         'email' => 'newguy@example.test',
         'password' => 'Password#1',
         'password_confirmation' => 'Password#1',
-        'roles' => ['User'],
     ])->assertRedirect();
 
     $created = Activity::where('log_name', 'user')->where('event', 'created')->latest()->first();
@@ -84,13 +83,13 @@ it('logs admin user creation and role changes', function () {
         'first_name' => 'New',
         'last_name' => 'Guy',
         'email' => 'newguy@example.test',
-        'roles' => ['Editor'],
+        'password' => 'DifferentPassword#2',
+        'password_confirmation' => 'DifferentPassword#2',
     ])->assertRedirect();
 
     $updated = Activity::where('log_name', 'user')->where('event', 'admin_updated')->latest()->first();
     expect($updated)->not->toBeNull()
-        ->and($updated->properties['roles_added'])->toBe(['Editor'])
-        ->and($updated->properties['roles_removed'])->toBe(['User']);
+        ->and($updated->properties['password_changed'])->toBeTrue();
 });
 
 it('logs mail settings updates', function () {

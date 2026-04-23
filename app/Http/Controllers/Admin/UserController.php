@@ -12,6 +12,7 @@ use App\Notifications\AccountBannedNotification;
 use App\Notifications\AdminTestNotification;
 use App\Notifications\CustomerMemberAddedNotification;
 use App\Notifications\CustomerMemberRemovedNotification;
+use App\Support\CustomerMembership;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -55,7 +56,7 @@ class UserController extends Controller
         // Inertia produces from a paginator, so the Vue page is unchanged.
         $payload = Cache::remember($key, 300, function () use ($search, $sort, $direction) {
             $users = User::query()
-                ->with(['roles:id,name', 'media', 'setting'])
+                ->with(['media', 'setting', 'customers:tenants.id,name,slug'])
                 ->when($search !== '', function ($q) use ($search) {
                     $driver = $q->getModel()->getConnection()->getDriverName();
                     $op = $driver === 'pgsql' ? 'ilike' : 'like';
@@ -77,7 +78,38 @@ class UserController extends Controller
                 ->paginate(15)
                 ->withQueryString();
 
-            $users->getCollection()->transform(function (User $user) {
+            // Single batched lookup of (user_id, team_id) → role name for the
+            // page worth of users. Avoids an N×M hit from calling
+            // CustomerMembership::rolesOn per row.
+            $pageUserIds = $users->getCollection()->pluck('id')->all();
+            $rolesByUserAndTeam = [];
+            if ($pageUserIds !== []) {
+                $mhr = config('permission.table_names.model_has_roles');
+                $rolesTable = config('permission.table_names.roles');
+                $teamKey = config('permission.column_names.team_foreign_key');
+
+                // `model_has_roles` / `roles` live on the central schema.
+                // Stancl swaps the default connection to the tenant mid-
+                // request, so pin raw queries explicitly — a bare DB::table
+                // here would silently hit the tenant schema when reached
+                // from inside `/c/{customer}/...`.
+                $central = (string) config('tenancy.database.central_connection');
+                $rows = DB::connection($central)->table($mhr)
+                    ->join($rolesTable, "{$rolesTable}.id", '=', "{$mhr}.role_id")
+                    ->where("{$mhr}.model_type", User::class)
+                    ->whereIn("{$mhr}.model_id", $pageUserIds)
+                    ->get([
+                        "{$mhr}.model_id as user_id",
+                        "{$mhr}.{$teamKey} as team_id",
+                        "{$rolesTable}.name as name",
+                    ]);
+
+                foreach ($rows as $row) {
+                    $rolesByUserAndTeam[$row->user_id][$row->team_id][] = $row->name;
+                }
+            }
+
+            $users->getCollection()->transform(function (User $user) use ($rolesByUserAndTeam) {
                 $user->setAttribute('avatar_thumb_url', $user->avatarUrl('thumb'));
                 // `setting` is eager-loaded above — reach through it directly so
                 // each row doesn't hit firstOrCreate (N+1 across a 15-row page).
@@ -85,6 +117,19 @@ class UserController extends Controller
                     ? array_merge(UserSetting::$defaults, $user->setting->settings ?? [])
                     : UserSetting::$defaults;
                 $user->setAttribute('storage_quota_bytes', $resolved['storage_quota_bytes'] ?? null);
+
+                // Compact per-customer role mapping for the hover tooltip.
+                $customerRoles = [];
+                foreach ($user->customers as $c) {
+                    /** @var Tenant $c */
+                    $customerRoles[] = [
+                        'id' => $c->id,
+                        'name' => $c->name,
+                        'slug' => $c->slug,
+                        'roles' => array_values(array_unique($rolesByUserAndTeam[$user->id][$c->id] ?? [])),
+                    ];
+                }
+                $user->setAttribute('customer_roles', $customerRoles);
 
                 return $user;
             });
@@ -115,48 +160,51 @@ class UserController extends Controller
             return back()->with('error', 'You cannot change your own role.');
         }
 
+        // Platform admin now only toggles the SuperAdmin flag. Customer-scoped
+        // roles (Admin/Editor/User) are managed per customer on the members
+        // page — there's no natural "which customer" context at this endpoint.
         $data = $request->validate([
-            'role' => [
-                'required',
-                'string',
-                // Use a closure rule rather than `exists:` so validation resolves
-                // against the central `roles` table even in tenancy contexts.
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (! is_string($value) || ! Role::query()->where('name', $value)->exists()) {
-                        $fail(__('validation.exists', ['attribute' => $attribute]));
-                    }
-                },
-            ],
+            'role' => ['required', 'string', 'in:SuperAdmin,none'],
         ]);
 
-        $before = $user->getRoleNames()->all();
+        $before = $user->isSuperAdmin() ? ['SuperAdmin'] : [];
 
-        // Transaction + row-level lock on Admin role pivots so two concurrent
-        // role changes can't both pass the last-admin guard and leave the
-        // system without an Admin.
-        $locked = DB::transaction(function () use ($user, $data) {
-            if ($user->hasRole('Admin') && $data['role'] !== 'Admin') {
-                $adminRoleId = Role::where('name', 'Admin')->value('id');
-                if ($adminRoleId !== null) {
-                    DB::table(config('permission.table_names.model_has_roles'))
-                        ->where('role_id', $adminRoleId)
-                        ->lockForUpdate()
-                        ->get();
-                }
+        // Transaction + row-level lock so two concurrent demotions can't
+        // both pass the last-super-admin guard. Force the central connection
+        // — this endpoint can be reached via an admin action inside a
+        // tenancy-initialized session. We also read the target user's
+        // `is_super_admin` through a locked SELECT inside the transaction
+        // so a concurrent flip between route-model binding and this block
+        // can't make us take the wrong branch.
+        $central = (string) config('tenancy.database.central_connection');
+        $locked = DB::connection($central)->transaction(function () use ($user, $data, $central) {
+            $current = (bool) DB::connection($central)->table('users')
+                ->where('id', $user->id)
+                ->lockForUpdate()
+                ->value('is_super_admin');
 
-                $remainingAdmins = User::role('Admin')->where('id', '!=', $user->id)->count();
-                if ($remainingAdmins === 0) {
+            if ($current && $data['role'] !== 'SuperAdmin') {
+                // Lock every SuperAdmin row so a concurrent request can't
+                // slip past the "last admin" count check.
+                DB::connection($central)->table('users')->where('is_super_admin', true)->lockForUpdate()->get();
+
+                $remaining = User::where('is_super_admin', true)
+                    ->where('id', '!=', $user->id)
+                    ->count();
+                if ($remaining === 0) {
                     return false;
                 }
-            }
 
-            $user->syncRoles([$data['role']]);
+                $user->forceFill(['is_super_admin' => false])->save();
+            } elseif (! $current && $data['role'] === 'SuperAdmin') {
+                $user->forceFill(['is_super_admin' => true])->save();
+            }
 
             return true;
         });
 
         if ($locked === false) {
-            return back()->with('error', 'Cannot demote the last admin.');
+            return back()->with('error', 'Cannot demote the last super admin.');
         }
 
         User::bumpUsersListVersion();
@@ -218,11 +266,11 @@ class UserController extends Controller
             'email_verified_at' => now(),
         ]);
 
-        $user->syncRoles($data['roles'] ?? []);
-
+        // Roles are customer-scoped now, so platform user-creation only
+        // produces the account. Customer-Admins assign per-customer roles
+        // from the /c/{customer}/members page (or via attachCustomer below).
         activity('user')
             ->performedOn($user)
-            ->withProperties(['roles' => $data['roles'] ?? []])
             ->event('created')
             ->log("Created user {$user->email}");
 
@@ -231,13 +279,13 @@ class UserController extends Controller
 
     public function show(User $user): Response
     {
-        $tenancyEnabled = (bool) config('tenancy.enabled');
-
-        $user->load('roles:id,name', 'media');
-
-        if ($tenancyEnabled) {
-            $user->load('customers');
-        }
+        // Eager-load `customers` with the ordering/columns we render so the
+        // closure below can reuse the already-loaded collection instead of
+        // firing a second SELECT.
+        $user->load([
+            'media',
+            'customers' => fn ($q) => $q->orderBy('name'),
+        ]);
 
         $recentActivity = Activity::query()
             ->where(function ($q) use ($user) {
@@ -258,6 +306,35 @@ class UserController extends Controller
                 'causer_id' => $a->causer_id,
             ]);
 
+        // Per-customer role for each customer the user belongs to. Resolved in
+        // one batch lookup rather than N queries through CustomerMembership,
+        // since the admin show page is SuperAdmin-only and we want it to
+        // render fast regardless of membership size.
+        $customerIds = $user->customers->pluck('id')->all();
+        $rolesByTeam = [];
+        if ($customerIds !== []) {
+            $mhr = config('permission.table_names.model_has_roles');
+            $rolesTable = config('permission.table_names.roles');
+            $teamKey = config('permission.column_names.team_foreign_key');
+
+            // `team_id` lives on both tables (roles.team_id for shared/global
+            // role rows, model_has_roles.team_id for per-assignment scope), so
+            // every reference has to be fully qualified — otherwise Postgres
+            // raises "column reference team_id is ambiguous". Pin to central
+            // since these tables live in the landlord schema.
+            $central = (string) config('tenancy.database.central_connection');
+            $rows = DB::connection($central)->table($mhr)
+                ->join($rolesTable, "{$rolesTable}.id", '=', "{$mhr}.role_id")
+                ->where("{$mhr}.model_type", User::class)
+                ->where("{$mhr}.model_id", $user->id)
+                ->whereIn("{$mhr}.{$teamKey}", $customerIds)
+                ->get([$mhr.'.'.$teamKey.' as team_id', $rolesTable.'.name as name']);
+
+            foreach ($rows as $row) {
+                $rolesByTeam[$row->team_id][] = $row->name;
+            }
+        }
+
         return Inertia::render('Admin/Users/Show', [
             'user' => [
                 'id' => $user->id,
@@ -271,22 +348,51 @@ class UserController extends Controller
                 'last_login_at' => optional($user->last_login_at)->toIso8601String(),
                 'created_at' => $user->created_at->toIso8601String(),
                 'two_factor_enabled' => $user->two_factor_confirmed_at !== null,
-                'roles' => $user->roles->pluck('name')->toArray(),
+                'is_super_admin' => $user->isSuperAdmin(),
                 'avatar_url' => $user->avatarUrl('avatar'),
                 'avatar_thumb_url' => $user->avatarUrl('thumb'),
                 'unread_notifications_count' => $user->unreadNotifications()->count(),
-                'customers' => $tenancyEnabled
-                    ? $user->customers()->orderBy('name')->get(['tenants.id', 'name', 'slug'])->toArray()
-                    : [],
+                'customers' => (function () use ($user, $rolesByTeam): array {
+                    /** @var array<int, Tenant> $list */
+                    $list = $user->customers->all();
+
+                    return array_map(fn (Tenant $c) => [
+                        'id' => $c->id,
+                        'name' => $c->name,
+                        'slug' => $c->slug,
+                        'roles' => array_values(array_unique($rolesByTeam[$c->id] ?? [])),
+                    ], $list);
+                })(),
             ],
+            'assignable_roles' => CustomerMembership::assignableRoles(),
             'activity' => $recentActivity,
-            'tenancy_enabled' => $tenancyEnabled,
         ]);
     }
 
     public function edit(User $user): Response
     {
-        $tenancyEnabled = (bool) config('tenancy.enabled');
+        /** @var array<int, Tenant> $customersList */
+        $customersList = $user->customers()->orderBy('name')->get(['tenants.id', 'name', 'slug'])->all();
+        $customerIds = array_map(fn (Tenant $c) => $c->id, $customersList);
+
+        $rolesByTeam = [];
+        if ($customerIds !== []) {
+            $mhr = config('permission.table_names.model_has_roles');
+            $rolesTable = config('permission.table_names.roles');
+            $teamKey = config('permission.column_names.team_foreign_key');
+
+            $central = (string) config('tenancy.database.central_connection');
+            $rows = DB::connection($central)->table($mhr)
+                ->join($rolesTable, "{$rolesTable}.id", '=', "{$mhr}.role_id")
+                ->where("{$mhr}.model_type", User::class)
+                ->where("{$mhr}.model_id", $user->id)
+                ->whereIn("{$mhr}.{$teamKey}", $customerIds)
+                ->get([$mhr.'.'.$teamKey.' as team_id', $rolesTable.'.name as name']);
+
+            foreach ($rows as $row) {
+                $rolesByTeam[$row->team_id][] = $row->name;
+            }
+        }
 
         return Inertia::render('Admin/Users/Edit', [
             'user' => [
@@ -294,16 +400,15 @@ class UserController extends Controller
                 'first_name' => $user->first_name,
                 'last_name' => $user->last_name,
                 'email' => $user->email,
-                'roles' => $user->roles->pluck('name')->toArray(),
-                'customers' => $tenancyEnabled
-                    ? $user->customers()->orderBy('name')->get(['tenants.id', 'name', 'slug'])->toArray()
-                    : [],
+                'customers' => array_map(fn (Tenant $c) => [
+                    'id' => $c->id,
+                    'name' => $c->name,
+                    'slug' => $c->slug,
+                    'roles' => array_values(array_unique($rolesByTeam[$c->id] ?? [])),
+                ], $customersList),
             ],
-            'roles' => Role::orderBy('name')->get(['id', 'name']),
-            'tenancy_enabled' => $tenancyEnabled,
-            'all_customers' => $tenancyEnabled
-                ? Tenant::query()->where('status', 'active')->orderBy('name')->get(['id', 'name', 'slug'])->toArray()
-                : [],
+            'assignable_roles' => CustomerMembership::assignableRoles(),
+            'all_customers' => Tenant::query()->where('status', 'active')->orderBy('name')->get(['id', 'name', 'slug'])->toArray(),
         ]);
     }
 
@@ -336,8 +441,8 @@ class UserController extends Controller
         if ($user->id === $request->user()->id) {
             return back()->with('error', 'You cannot ban yourself.');
         }
-        if ($user->hasRole('Admin')) {
-            return back()->with('error', 'You cannot ban another admin.');
+        if ($user->isSuperAdmin()) {
+            return back()->with('error', 'You cannot ban another super admin.');
         }
 
         $data = $request->validate([
@@ -427,9 +532,12 @@ class UserController extends Controller
     {
         $data = $request->validated();
 
-        $previousRoles = $user->getRoleNames()->sort()->values()->all();
-        $newRoles = collect($data['roles'] ?? [])->sort()->values()->all();
         $passwordChanged = ! empty($data['password']);
+
+        // Capture the "before" snapshot for audit-log diffing so the activity
+        // entry records which fields actually changed (pure profile edits
+        // used to be silently unlogged while only password changes surfaced).
+        $before = $user->only(['first_name', 'last_name', 'email']);
 
         $user->fill([
             'first_name' => $data['first_name'],
@@ -442,15 +550,19 @@ class UserController extends Controller
         }
 
         $user->save();
-        $user->syncRoles($data['roles'] ?? []);
 
-        if ($previousRoles !== $newRoles || $passwordChanged) {
+        $after = $user->only(['first_name', 'last_name', 'email']);
+        $changedFields = array_keys(array_udiff_assoc($after, $before, fn ($a, $b) => $a === $b ? 0 : 1));
+
+        // Log every admin update, not just password changes. Roles are
+        // customer-scoped and managed from `/c/{customer}/members` so they
+        // don't appear here.
+        if ($passwordChanged || $changedFields !== []) {
             activity('user')
                 ->performedOn($user)
                 ->withProperties([
-                    'roles_added' => array_values(array_diff($newRoles, $previousRoles)),
-                    'roles_removed' => array_values(array_diff($previousRoles, $newRoles)),
                     'password_changed' => $passwordChanged,
+                    'changed_fields' => $changedFields,
                 ])
                 ->event('admin_updated')
                 ->log("Admin updated user {$user->email}");
@@ -461,11 +573,25 @@ class UserController extends Controller
 
     public function attachCustomer(Request $request, User $user): RedirectResponse
     {
+        // `exists:tenants,id` would resolve through the default DB connection,
+        // which swaps to the tenant mid-request. Tenant lives on the central
+        // schema — use a closure against the Eloquent model so the check
+        // honours `Tenant::$connection` regardless of ambient tenancy state.
         $data = $request->validate([
             'customer_ids' => ['required', 'array', 'min:1'],
             'customer_ids.*' => [
-                Rule::exists('tenants', 'id')->where(fn ($query) => $query->where('status', 'active')),
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $exists = Tenant::query()
+                        ->where('id', $value)
+                        ->where('status', 'active')
+                        ->exists();
+                    if (! $exists) {
+                        $fail(__('validation.exists', ['attribute' => $attribute]));
+                    }
+                },
             ],
+            'roles' => ['required', 'array', 'min:1'],
+            'roles.*' => ['string', Rule::in(CustomerMembership::assignableRoles())],
             'notify' => ['boolean'],
         ]);
 
@@ -478,7 +604,11 @@ class UserController extends Controller
         $existingIds = $user->customers()->pluck('tenants.id')->all();
         $newCustomers = $customers->reject(fn (Tenant $c) => in_array($c->id, $existingIds, true));
 
-        $user->customers()->syncWithoutDetaching($customers->pluck('id')->all());
+        $roles = array_values(array_unique($data['roles']));
+        foreach ($customers as $attaching) {
+            /** @var Tenant $attaching */
+            CustomerMembership::attach($user, $attaching, $roles);
+        }
 
         $newNames = [];
         foreach ($newCustomers as $customer) {
@@ -509,6 +639,40 @@ class UserController extends Controller
         return back()->with('success', __('flash.users.customers_attached', ['email' => $user->email, 'names' => $names]));
     }
 
+    public function setCustomerRole(Request $request, User $user, Tenant $customer): RedirectResponse
+    {
+        // Require at least one role — posting `roles: []` would otherwise
+        // leave the user as a member with zero roles (matching nothing in
+        // `can()` checks), which breaks the pivot+role atomicity that
+        // `CustomerMembership` explicitly promises. Removing membership is
+        // a separate flow (`detachCustomer`).
+        $data = $request->validate([
+            'roles' => ['required', 'array', 'min:1'],
+            'roles.*' => ['string', Rule::in(CustomerMembership::assignableRoles())],
+        ]);
+
+        if (! $user->belongsToCustomer($customer)) {
+            return back()->with('error', __('flash.customers.not_member', ['email' => $user->email, 'name' => $customer->name]));
+        }
+
+        $roles = array_values(array_unique($data['roles']));
+        CustomerMembership::syncRoles($user, $customer, $roles);
+
+        activity('user')
+            ->performedOn($user)
+            ->withProperties(['customer' => $customer->name, 'roles' => $roles])
+            ->event('customer_role_changed')
+            ->log("Set {$user->email}'s roles on {$customer->name} to ".(empty($roles) ? '(none)' : implode(', ', $roles)));
+
+        User::bumpUsersListVersion();
+
+        return back()->with('success', __('flash.users.customer_role_updated', [
+            'email' => $user->email,
+            'name' => $customer->name,
+            'role' => empty($roles) ? __('admin.users.no_roles') : implode(', ', $roles),
+        ]));
+    }
+
     public function detachCustomer(Request $request, User $user, Tenant $customer): RedirectResponse
     {
         $data = $request->validate([
@@ -516,11 +680,12 @@ class UserController extends Controller
         ]);
 
         $customerName = $customer->name;
-        $detached = $user->customers()->detach($customer->id);
 
-        if ($detached === 0) {
-            return back()->with('error', "{$user->email} is not a member of {$customerName}.");
+        if (! $user->belongsToCustomer($customer)) {
+            return back()->with('error', __('flash.customers.not_member', ['email' => $user->email, 'name' => $customerName]));
         }
+
+        CustomerMembership::detach($user, $customer);
 
         if ($data['notify'] ?? false) {
             $user->notify(new CustomerMemberRemovedNotification($customerName));
@@ -542,11 +707,19 @@ class UserController extends Controller
         }
 
         $email = $user->email;
-        $roles = $user->getRoleNames()->all();
+        // Snapshot the audit facts BEFORE delete(): after the row is gone,
+        // `isSuperAdmin()` reads a stripped attribute set (always false) and
+        // the customers() relation resolves against a detached model.
+        $wasSuperAdmin = $user->isSuperAdmin();
+        $memberships = $user->customers()->pluck('slug')->all();
         $user->delete();
 
         activity('user')
-            ->withProperties(['email' => $email, 'roles' => $roles])
+            ->withProperties([
+                'email' => $email,
+                'was_super_admin' => $wasSuperAdmin,
+                'memberships' => $memberships,
+            ])
             ->event('deleted')
             ->log("Deleted user {$email}");
 

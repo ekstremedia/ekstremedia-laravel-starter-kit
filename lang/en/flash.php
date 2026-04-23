@@ -16,6 +16,10 @@ return [
         'saved' => 'Settings saved.',
     ],
 
+    'session' => [
+        'expired' => 'The page expired, please try again.',
+    ],
+
     'avatar' => [
         'updated' => 'Profile photo updated.',
         'removed' => 'Profile photo removed.',
@@ -32,6 +36,7 @@ return [
         'updated' => 'Customer updated.',
         'deleted' => 'Customer ":name" deleted.',
         'member_added' => 'Added :email to :name.',
+        'already_member' => ':email is already a member of :name — edit their role from the members list instead.',
         'member_removed' => 'Removed :email from :name.',
     ],
 
@@ -80,5 +85,7 @@ return [
         'customer_attached' => 'Added :email to :name.',
         'customers_attached' => 'Added :email to :names.',
         'customer_detached' => 'Removed :email from :name.',
+        'customer_role_updated' => 'Set :email as :role on :name.',
+        'not_member' => ':email is not a member of :name.',
     ],
 ];

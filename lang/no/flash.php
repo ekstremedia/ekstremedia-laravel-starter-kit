@@ -16,6 +16,10 @@ return [
         'saved' => 'Innstillinger lagret.',
     ],
 
+    'session' => [
+        'expired' => 'Siden har utløpt, prøv igjen.',
+    ],
+
     'avatar' => [
         'updated' => 'Profilbildet er oppdatert.',
         'removed' => 'Profilbildet er fjernet.',
@@ -32,6 +36,7 @@ return [
         'updated' => 'Kunden er oppdatert.',
         'deleted' => 'Kunden «:name» ble slettet.',
         'member_added' => 'La til :email i :name.',
+        'already_member' => ':email er allerede medlem av :name — endre rollen fra medlemslisten i stedet.',
         'member_removed' => 'Fjernet :email fra :name.',
     ],
 
@@ -80,5 +85,7 @@ return [
         'customer_attached' => 'La til :email i :name.',
         'customers_attached' => 'La til :email i :names.',
         'customer_detached' => 'Fjernet :email fra :name.',
+        'customer_role_updated' => 'Satte :email som :role på :name.',
+        'not_member' => ':email er ikke medlem av :name.',
     ],
 ];

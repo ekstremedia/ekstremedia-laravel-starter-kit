@@ -576,7 +576,7 @@ defineExpose({
                                     :title="t('lightbox.background_transparent')"
                                     class="rounded-lg p-2 transition-colors"
                                     :class="
-                                        imageBackground === 'transparent' ? 'bg-purple-500/50 text-white' : 'bg-white/10 text-white hover:bg-white/20'
+                                        imageBackground === 'transparent' ? 'cmd-lightbox-active' : 'bg-white/10 text-white hover:bg-white/20'
                                     "
                                 >
                                     <Grid3x3 class="h-5 w-5" />
@@ -586,7 +586,7 @@ defineExpose({
                                     :aria-label="t('lightbox.background_black')"
                                     :title="t('lightbox.background_black')"
                                     class="rounded-lg p-2 transition-colors"
-                                    :class="imageBackground === 'black' ? 'bg-purple-500/50 text-white' : 'bg-white/10 text-white hover:bg-white/20'"
+                                    :class="imageBackground === 'black' ? 'cmd-lightbox-active' : 'bg-white/10 text-white hover:bg-white/20'"
                                 >
                                     <Circle class="h-5 w-5 fill-black" />
                                 </button>
@@ -595,7 +595,7 @@ defineExpose({
                                     :aria-label="t('lightbox.background_white')"
                                     :title="t('lightbox.background_white')"
                                     class="rounded-lg p-2 transition-colors"
-                                    :class="imageBackground === 'white' ? 'bg-purple-500/50 text-white' : 'bg-white/10 text-white hover:bg-white/20'"
+                                    :class="imageBackground === 'white' ? 'cmd-lightbox-active' : 'bg-white/10 text-white hover:bg-white/20'"
                                 >
                                     <Circle class="h-5 w-5 fill-white" />
                                 </button>
@@ -608,7 +608,7 @@ defineExpose({
                                 :title="originalTooltip"
                                 @click.stop="toggleOriginal"
                                 class="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm transition-colors"
-                                :class="originalActive ? 'bg-purple-500/50 text-white' : 'bg-white/10 text-white hover:bg-white/20'"
+                                :class="originalActive ? 'cmd-lightbox-active' : 'bg-white/10 text-white hover:bg-white/20'"
                                 :disabled="originalLoading"
                             >
                                 <Loader2 v-if="originalLoading" class="h-4 w-4 animate-spin" />
@@ -797,3 +797,10 @@ defineExpose({
         </Transition>
     </Teleport>
 </template>
+
+<style scoped>
+.cmd-lightbox-active {
+    background: var(--accent);
+    color: #fff;
+}
+</style>

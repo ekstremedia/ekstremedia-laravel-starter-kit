@@ -1,10 +1,18 @@
 <?php
 
+use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RoleAndPermissionSeeder;
+use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function () {
     $this->seed(RoleAndPermissionSeeder::class);
+    // Fortify's CreateNewUser attaches new sign-ups to the default customer
+    // with the platform's default role, so that customer has to exist.
+    Tenant::firstOrCreate(
+        ['slug' => config('tenancy.default_customer_slug', 'default')],
+        ['name' => 'Default', 'status' => 'active'],
+    );
 });
 
 it('shows the registration page', function () {
@@ -28,6 +36,8 @@ it('registers a new user', function () {
     expect($user)->not->toBeNull();
     expect($user->first_name)->toBe('John');
     expect($user->last_name)->toBe('Doe');
+    $defaultCustomer = Tenant::where('slug', config('tenancy.default_customer_slug', 'default'))->first();
+    app(PermissionRegistrar::class)->setPermissionsTeamId($defaultCustomer->id);
     expect($user->hasRole('User'))->toBeTrue();
     expect($user->hasVerifiedEmail())->toBeFalse();
 });
