@@ -45,6 +45,16 @@ const descriptionKey = computed(() => {
 
 const pageTitle = computed(() => `${props.status} · ${t(titleKey.value)}`);
 
+// Don't surface raw exception messages for server-side faults — they can leak
+// internal stack detail (DB host, file path, etc.). Client-error statuses
+// (403/404/419) use the message as-is so access-denied reasons like
+// "You are not a member of [slug]." still reach the user.
+const showRawMessage = computed(() => {
+    const s = props.status;
+    return s === 403 || s === 404 || s === 419;
+});
+const body = computed(() => (showRawMessage.value && props.message) ? props.message : t(descriptionKey.value));
+
 function goBack() {
     if (typeof window !== 'undefined' && window.history.length > 1) {
         window.history.back();
@@ -53,7 +63,6 @@ function goBack() {
 </script>
 
 <template>
-    <Head :title="pageTitle" />
     <div
         class="cmd-shell"
         :style="{
@@ -64,6 +73,7 @@ function goBack() {
             flexDirection: 'column',
         }"
     >
+        <Head :title="pageTitle" />
         <PublicTopbar />
 
         <section :style="{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 24px' }">
@@ -103,7 +113,7 @@ function goBack() {
                         maxWidth: '420px',
                         lineHeight: 1.55,
                     }"
-                >{{ message || t(descriptionKey) }}</p>
+                >{{ body }}</p>
 
                 <div :style="{ display: 'inline-flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }">
                     <CmdButton variant="ghost" size="md" @click="goBack">

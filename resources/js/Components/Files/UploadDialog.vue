@@ -484,6 +484,9 @@ defineExpose({
         <!-- State 3: Dropzone -->
         <div v-else :style="{ padding: '16px' }">
             <div
+                role="button"
+                tabindex="0"
+                :aria-label="t('upload.dragAndDrop')"
                 :style="{
                     position: 'relative',
                     cursor: 'pointer',
@@ -492,8 +495,11 @@ defineExpose({
                     background: isDragging ? 'var(--accent-soft)' : 'var(--panel2)',
                     padding: '32px 24px',
                     transition: 'background 0.18s, border-color 0.18s',
+                    outline: 'none',
                 }"
                 @click="openFilePicker"
+                @keydown.enter.prevent="openFilePicker"
+                @keydown.space.prevent="openFilePicker"
                 @dragenter="onDragEnter"
                 @dragleave="onDragLeave"
                 @dragover="onDragOver"

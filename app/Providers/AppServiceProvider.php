@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Activitylog\Models\Activity;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -38,6 +39,19 @@ class AppServiceProvider extends ServiceProvider
         // Production stays permissive regardless, so a stray unknown attribute
         // never takes the site down in the field.
         Model::preventLazyLoading(! $this->app->isProduction());
+
+        // Stamp the active customer on every activity_log row. Without this,
+        // customer-scoped dashboards that filter activity by "members of
+        // this customer" would leak rows from other customers the same
+        // users belong to (a user who's Admin on A and User on B would see
+        // B's actions on A's dashboard). Null tenant_id is preserved for
+        // genuine central-only events (password reset, profile edit from
+        // the picker page, etc.).
+        Activity::creating(function (Activity $activity): void {
+            if ($activity->tenant_id === null && tenancy()->initialized) {
+                $activity->tenant_id = tenancy()->tenant?->getKey();
+            }
+        });
 
         // Authenticated users visiting guest-only pages (/login, /register, ...)
         // land on the tenant landing page, which dispatches them into their

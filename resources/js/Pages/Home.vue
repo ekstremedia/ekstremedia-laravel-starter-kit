@@ -10,6 +10,13 @@ import { useCommandToasts } from '@/composables/useCommandToasts';
 
 defineOptions({ layout: CommandLayout });
 
+interface CustomerRoleCell {
+    id: number;
+    name: string;
+    slug: string;
+    roles: string[];
+}
+
 interface UserDetail {
     id: number;
     first_name: string;
@@ -17,7 +24,8 @@ interface UserDetail {
     email: string;
     email_verified_at: string | null;
     two_factor_enabled: boolean;
-    roles: string[];
+    is_super_admin: boolean;
+    customer_roles: CustomerRoleCell[];
     created_at: string | null;
 }
 
@@ -38,7 +46,19 @@ const props = defineProps<Props>();
 const { push } = useCommandToasts();
 const { t } = useI18n();
 
-const primaryRole = computed(() => props.userDetail.roles[0] ?? t('home.role_fallback'));
+// "Primary" role surfaces SuperAdmin first (platform-level), then the first
+// customer-scoped role we know about (Admin on any customer beats Editor on
+// any customer, beats User). Falls back to the localized `home.role_fallback`
+// for accounts with no customer role yet (e.g. fresh invitees before an
+// admin assigns one).
+const primaryRole = computed(() => {
+    if (props.userDetail.is_super_admin) return 'SuperAdmin';
+    const ranking = ['Admin', 'Editor', 'User'];
+    for (const role of ranking) {
+        if (props.userDetail.customer_roles.some((c) => c.roles.includes(role))) return role;
+    }
+    return t('home.role_fallback');
+});
 
 function formatDate(iso: string | null): string {
     if (!iso) return '—';

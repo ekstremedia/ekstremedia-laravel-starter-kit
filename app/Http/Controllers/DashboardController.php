@@ -42,19 +42,19 @@ class DashboardController extends Controller
             ];
         }
 
-        // Tenant-scoped activity: filter by tenant members. An empty member
-        // list would otherwise broadcast every causer's activity across all
-        // tenants, so short-circuit to an empty list. Force the central
-        // connection because `activity_log` lives in the shared schema, not
-        // in tenant DBs (stancl/tenancy switches the default connection
-        // when a tenant is initialized).
-        $memberIds = $customer?->users()->pluck('users.id')->all() ?? [];
+        // Customer-scoped activity: stamped via the `Activity::creating`
+        // hook in AppServiceProvider, so we filter directly on `tenant_id`.
+        // A user who's Admin on A and plain User on B would otherwise
+        // surface B's actions on A's dashboard — a causer-id IN (members)
+        // filter can't separate them because the same user is in both
+        // member lists. `activity_log` lives on the landlord schema; pin
+        // to central since stancl swaps the default connection once
+        // tenancy initializes.
         $activity = [];
-        if (! empty($memberIds)) {
+        if ($customer !== null) {
             $centralConnection = (string) config('tenancy.database.central_connection');
             $activity = Activity::on($centralConnection)
-                ->whereIn('causer_id', $memberIds)
-                ->where('causer_type', $user::class)
+                ->where('tenant_id', $customer->getKey())
                 ->latest()
                 ->limit(8)
                 ->get()

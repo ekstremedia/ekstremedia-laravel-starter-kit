@@ -91,11 +91,19 @@ return Application::configure(basePath: dirname(__DIR__))
             $inertiaSafeStatuses = $isLocalOrTesting ? [403, 404] : [403, 404, 500, 503];
 
             if (in_array($status, $inertiaSafeStatuses, true)) {
+                // Only forward the exception message for client-safe statuses.
+                // For 500/503 we suppress it — a raw message on the error page
+                // can leak connection strings, file paths, or stack detail
+                // from the underlying exception. The Vue page falls back to
+                // the localized generic description when message is empty.
+                $clientSafeStatus = in_array($status, [403, 404], true);
+                $message = ($clientSafeStatus && $exception instanceof HttpExceptionInterface)
+                    ? $exception->getMessage()
+                    : '';
+
                 return Inertia::render('Errors/Error', [
                     'status' => $status,
-                    'message' => $exception instanceof HttpExceptionInterface
-                        ? $exception->getMessage()
-                        : '',
+                    'message' => $message,
                 ])->toResponse($request)->setStatusCode($status);
             }
 
