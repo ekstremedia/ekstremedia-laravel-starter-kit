@@ -5,6 +5,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useTweaks } from '@/composables/useTweaks';
+import { useLocale } from '@/composables/useLocale';
 import type { CommandAccent, CommandDensity, CommandTheme } from '@/types';
 
 interface Props { open: boolean }
@@ -13,6 +14,7 @@ const emit = defineEmits<{ close: [] }>();
 
 const { t } = useI18n();
 const { state, setTheme, setAccent, setDensity, setShowKbdHints } = useTweaks();
+const { currentLocale, setLocale, locales } = useLocale();
 
 const themes = computed<{ id: CommandTheme; label: string }[]>(() => [
     { id: 'dark', label: t('tweaks.theme_dark') },
@@ -122,6 +124,28 @@ function chipStyle(active: boolean) {
                     @click="setDensity(d.id)"
                     :style="chipStyle(state.density === d.id)"
                 >{{ d.label }}</button>
+            </div>
+        </div>
+
+        <div :style="{ marginBottom: '12px' }">
+            <div class="cmd-mono" :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '6px' }">{{ t('tweaks.language_heading') }}</div>
+            <div :style="{ display: 'flex', gap: '4px', flexWrap: 'wrap' }">
+                <button
+                    v-for="loc in locales"
+                    :key="loc.code"
+                    type="button"
+                    @click="setLocale(loc.code)"
+                    :aria-pressed="currentLocale === loc.code"
+                    :style="{
+                        ...chipStyle(currentLocale === loc.code),
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                    }"
+                >
+                    <span :style="{ fontSize: '12px', lineHeight: 1 }">{{ loc.flag }}</span>
+                    <span>{{ loc.name }}</span>
+                </button>
             </div>
         </div>
 

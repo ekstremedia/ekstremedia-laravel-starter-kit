@@ -339,6 +339,7 @@ export default {
         theme_heading: 'Tema',
         accent_heading: 'Aksent',
         density_heading: 'Tetthet',
+        language_heading: 'Språk',
         theme_dark: 'Mørk',
         theme_hc: 'Kontrast',
         theme_light: 'Lys',

@@ -339,6 +339,7 @@ export default {
         theme_heading: 'Theme',
         accent_heading: 'Accent',
         density_heading: 'Density',
+        language_heading: 'Language',
         theme_dark: 'Dark',
         theme_hc: 'Contrast',
         theme_light: 'Light',
