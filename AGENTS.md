@@ -273,6 +273,20 @@ Websockets: Reverb runs in Supervisor. `VITE_REVERB_HOST` = public hostname for 
 
 `.mcp.json.example` → copy to `.mcp.json`, replace `<PROJECT_ROOT>` with your clone path. Runs inside the `app` container via `docker compose exec -T app php artisan boost:mcp`.
 
+**Agents MUST prefer Boost tools over manual alternatives** whenever they apply. Boost gives you first-class, schema-aware access to this app's state — reaching for raw shell, `grep`, or guessed URLs when Boost has a tool is a smell.
+
+Use Boost for these tasks (non-exhaustive):
+
+- **Database inspection** → `database-query` (read-only SQL), `database-schema` (tables/columns/indexes), `database-connections`. Do not `psql` the container or read migration files to guess schema.
+- **Logs & errors** → `read-log-entries` for `storage/logs/laravel.log` (handles multi-line PSR-3 properly, beats `tail`/`cat`), `last-error` for the most recent backend exception, `browser-logs` for JS console output.
+- **Documentation lookup** → `search-docs` for Laravel ecosystem docs pinned to this project's package versions. Use this before web search for anything Laravel / Inertia / Pest / Pulse / Horizon / Reverb / Scout / Livewire / Tailwind.
+- **Project facts** → `application-info` (PHP/Laravel versions, installed packages, Eloquent models). `get-absolute-url` for URLs from paths or named routes.
+- **Browser automation** → the Chrome DevTools MCP tools (`mcp__chrome-devtools__*`) to reproduce UI bugs, capture console messages, and script clicks / uploads against a running dev build.
+
+Caveats:
+- Boost's MCP set here does NOT include a PHP evaluator / `tinker` tool. For dispatching events, running jobs, or mutating state ad-hoc, `docker compose exec app php artisan tinker --execute='…'` is still the right call.
+- `database-query` is read-only — it rejects writes. Use `tinker` or a proper migration for mutations.
+
 ## Maintenance Rules
 
 - Keep behavior generic — no domain-specific nouns or seed data
