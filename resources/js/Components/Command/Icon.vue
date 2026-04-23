@@ -2,7 +2,8 @@
 export type IconName =
     | 'home' | 'users' | 'user' | 'customer' | 'role' | 'key' | 'cog'
     | 'mail' | 'disk' | 'shield' | 'server' | 'log' | 'bell' | 'search'
-    | 'chevR' | 'chevD' | 'plus' | 'edit' | 'trash' | 'restore' | 'arrow';
+    | 'chevR' | 'chevD' | 'plus' | 'edit' | 'trash' | 'restore' | 'arrow'
+    | 'check' | 'x' | 'alert' | 'link';
 </script>
 
 <script setup lang="ts">
@@ -100,6 +101,18 @@ const side = computed(() => props.size);
         </template>
         <template v-else-if="name === 'arrow'">
             <path d="M3 8h10M9 4l4 4-4 4" />
+        </template>
+        <template v-else-if="name === 'check'">
+            <path d="M3 8l3 3 7-7" stroke-linecap="round" stroke-linejoin="round" />
+        </template>
+        <template v-else-if="name === 'x'">
+            <path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round" />
+        </template>
+        <template v-else-if="name === 'alert'">
+            <path d="M8 2l6.5 11h-13L8 2zM8 6v3M8 11.5v.01" stroke-linecap="round" stroke-linejoin="round" />
+        </template>
+        <template v-else-if="name === 'link'">
+            <path d="M6.5 9.5a2.5 2.5 0 010-3.5L9 4a2.5 2.5 0 013.5 3.5l-1.25 1.25M9.5 6.5a2.5 2.5 0 010 3.5L7 12.5A2.5 2.5 0 013.5 9l1.25-1.25" stroke-linecap="round" />
         </template>
     </svg>
 </template>

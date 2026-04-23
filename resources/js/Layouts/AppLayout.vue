@@ -6,7 +6,7 @@ import Toast from 'primevue/toast';
 import LanguageSwitcher from '@/Components/LanguageSwitcher.vue';
 import DarkModeToggle from '@/Components/DarkModeToggle.vue';
 import ChatDropdown from '@/Components/Chat/ChatDropdown.vue';
-import CustomerSwitcher from '@/Components/CustomerSwitcher.vue';
+import CustomerSwitcher from '@/Components/Command/CustomerSwitcher.vue';
 import NotificationBell from '@/Components/NotificationBell.vue';
 import { useFlashToast } from '@/composables/useFlashToast';
 import { useCustomer } from '@/composables/useCustomer';

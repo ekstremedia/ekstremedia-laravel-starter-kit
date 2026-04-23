@@ -3,15 +3,14 @@ import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import AdminLayout from '@/Layouts/CommandLayout.vue';
-import InputText from 'primevue/inputtext';
-import Password from 'primevue/password';
 import MultiSelect from 'primevue/multiselect';
-import Button from 'primevue/button';
-import Tag from 'primevue/tag';
-import Dialog from 'primevue/dialog';
-import Checkbox from 'primevue/checkbox';
+import Password from 'primevue/password';
 import ConfirmDialog from 'primevue/confirmdialog';
-import { useConfirm } from 'primevue/useconfirm';
+import CommandDialog from '@/Components/Command/Dialog.vue';
+import Field from '@/Components/Command/Field.vue';
+import CmdButton from '@/Components/Command/Button.vue';
+import Toggle from '@/Components/Command/Toggle.vue';
+import Icon from '@/Components/Command/Icon.vue';
 
 defineOptions({ layout: AdminLayout });
 
@@ -42,8 +41,6 @@ function submit() {
     form.put(`/admin/users/${props.user.id}`);
 }
 
-// ── Customer membership management ──────────────────────────────
-const confirm = useConfirm();
 const addCustomerDialog = ref(false);
 const selectedCustomerIds = ref<number[]>([]);
 const notifyOnAdd = ref(true);
@@ -99,118 +96,230 @@ function confirmRemove() {
 </script>
 
 <template>
-    <div>
-    <Head :title="`Edit ${user.email} · Admin`" />
-    <ConfirmDialog />
+    <div :style="{ padding: '24px 32px', maxWidth: '1100px', margin: '0 auto' }">
+        <Head :title="`Edit ${user.email} · Admin`" />
+        <ConfirmDialog />
 
-    <!-- Add customer dialog -->
-    <Dialog v-model:visible="addCustomerDialog" :header="t('admin.users.add_to_customer')" modal :style="{ width: '28rem' }">
-        <div class="space-y-4">
-            <div>
-                <label class="block text-sm mb-1">{{ t('admin.customers.title') }}</label>
-                <MultiSelect
-                    v-model="selectedCustomerIds"
-                    :options="availableCustomers()"
-                    optionLabel="name"
-                    optionValue="id"
-                    :placeholder="t('admin.users.select_customer')"
-                    :filter="true"
-                    filterPlaceholder="Search…"
-                    display="chip"
-                    class="w-full"
+        <!-- Add customer dialog -->
+        <CommandDialog
+            v-model:visible="addCustomerDialog"
+            :title="t('admin.users.add_to_customer')"
+            width="460px"
+        >
+            <div :style="{ display: 'flex', flexDirection: 'column', gap: '14px' }">
+                <div>
+                    <label
+                        class="cmd-mono cmd-uc"
+                        :style="{ display: 'block', fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '6px', letterSpacing: '0.06em', fontWeight: 500 }"
+                    >{{ t('admin.customers.title') }}</label>
+                    <MultiSelect
+                        v-model="selectedCustomerIds"
+                        :options="availableCustomers()"
+                        optionLabel="name"
+                        optionValue="id"
+                        :placeholder="t('admin.users.select_customer')"
+                        :filter="true"
+                        :filterPlaceholder="t('common.search')"
+                        display="chip"
+                        class="w-full"
+                    />
+                </div>
+                <label :style="{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12.5px', color: 'var(--fg)', cursor: 'pointer' }">
+                    <Toggle v-model="notifyOnAdd" />
+                    <span>{{ t('admin.users.notify_user') }}</span>
+                </label>
+            </div>
+            <template #footer>
+                <CmdButton variant="ghost" size="sm" @click="addCustomerDialog = false">
+                    {{ t('common.cancel') }}
+                </CmdButton>
+                <CmdButton
+                    variant="primary"
+                    size="sm"
+                    :disabled="!selectedCustomerIds.length"
+                    :loading="addingCustomer"
+                    @click="confirmAdd"
+                >
+                    {{ t('common.add') }}
+                </CmdButton>
+            </template>
+        </CommandDialog>
+
+        <!-- Remove customer dialog -->
+        <CommandDialog
+            v-model:visible="removeDialog"
+            :title="t('admin.users.remove_from_customer')"
+            width="440px"
+        >
+            <p :style="{ margin: '0 0 14px', fontSize: '13px', color: 'var(--fg-dim)', lineHeight: 1.5 }">
+                Remove <strong :style="{ color: 'var(--fg)' }">{{ user.email }}</strong>
+                from <strong :style="{ color: 'var(--fg)' }">{{ removingCustomer?.name }}</strong>?
+            </p>
+            <label :style="{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12.5px', color: 'var(--fg)', cursor: 'pointer' }">
+                <Toggle v-model="notifyOnRemove" />
+                <span>{{ t('admin.users.notify_user') }}</span>
+            </label>
+            <template #footer>
+                <CmdButton variant="ghost" size="sm" @click="removeDialog = false">
+                    {{ t('common.cancel') }}
+                </CmdButton>
+                <CmdButton
+                    variant="danger"
+                    size="sm"
+                    :loading="removingCustomerRequest"
+                    @click="confirmRemove"
+                >
+                    {{ t('common.delete') }}
+                </CmdButton>
+            </template>
+        </CommandDialog>
+
+        <div :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }">
+            <h1 :style="{ margin: 0, fontSize: '24px', fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--fg)' }">
+                {{ t('admin.users.edit_user') }}
+            </h1>
+            <Link
+                href="/admin/users"
+                :style="{ fontSize: '12px', color: 'var(--fg-dim)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }"
+            >{{ t('common.back') }}</Link>
+        </div>
+
+        <div
+            :style="{
+                display: 'grid',
+                gridTemplateColumns: tenancy_enabled ? 'minmax(0, 1fr) minmax(0, 1fr)' : 'minmax(0, 720px)',
+                gap: '20px',
+            }"
+        >
+            <form
+                @submit.prevent="submit"
+                class="cmd-card"
+                :style="{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }"
+            >
+                <div :style="{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }">
+                    <Field
+                        v-model="form.first_name"
+                        :label="t('admin.users.first_name')"
+                        :error="form.errors.first_name"
+                    />
+                    <Field
+                        v-model="form.last_name"
+                        :label="t('admin.users.last_name')"
+                        :error="form.errors.last_name"
+                    />
+                </div>
+                <Field
+                    v-model="form.email"
+                    type="email"
+                    :label="t('admin.users.email')"
+                    :error="form.errors.email"
                 />
-            </div>
-            <div class="flex items-center gap-2">
-                <Checkbox v-model="notifyOnAdd" :binary="true" inputId="notifyAdd" />
-                <label for="notifyAdd" class="text-sm">{{ t('admin.users.notify_user') }}</label>
-            </div>
-        </div>
-        <template #footer>
-            <Button :label="t('common.cancel')" severity="secondary" @click="addCustomerDialog = false" />
-            <Button :label="t('common.add')" icon="pi pi-plus" :disabled="!selectedCustomerIds.length" :loading="addingCustomer" @click="confirmAdd" />
-        </template>
-    </Dialog>
-
-    <!-- Remove customer dialog -->
-    <Dialog v-model:visible="removeDialog" :header="t('admin.users.remove_from_customer')" modal :style="{ width: '28rem' }">
-        <p class="text-sm text-gray-500 mb-4">
-            Remove <strong>{{ user.email }}</strong> from <strong>{{ removingCustomer?.name }}</strong>?
-        </p>
-        <div class="flex items-center gap-2">
-            <Checkbox v-model="notifyOnRemove" :binary="true" inputId="notifyRemove" />
-            <label for="notifyRemove" class="text-sm">{{ t('admin.users.notify_user') }}</label>
-        </div>
-        <template #footer>
-            <Button :label="t('common.cancel')" severity="secondary" @click="removeDialog = false" />
-            <Button :label="t('common.delete')" icon="pi pi-times" severity="danger" :loading="removingCustomerRequest" @click="confirmRemove" />
-        </template>
-    </Dialog>
-
-    <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-semibold">{{ t('admin.users.edit_user') }}</h1>
-        <Link href="/admin/users" class="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">{{ t('common.back') }}</Link>
-    </div>
-
-    <div class="grid gap-6" :class="tenancy_enabled ? 'lg:grid-cols-2' : 'max-w-2xl'">
-        <form @submit.prevent="submit" class="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl p-6 space-y-4">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm mb-1">{{ t('admin.users.first_name') }}</label>
-                    <InputText v-model="form.first_name" class="w-full" />
-                    <p v-if="form.errors.first_name" class="text-xs text-red-500 mt-1">{{ form.errors.first_name }}</p>
-                </div>
-                <div>
-                    <label class="block text-sm mb-1">{{ t('admin.users.last_name') }}</label>
-                    <InputText v-model="form.last_name" class="w-full" />
-                    <p v-if="form.errors.last_name" class="text-xs text-red-500 mt-1">{{ form.errors.last_name }}</p>
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm mb-1">{{ t('admin.users.email') }}</label>
-                <InputText v-model="form.email" type="email" class="w-full" />
-                <p v-if="form.errors.email" class="text-xs text-red-500 mt-1">{{ form.errors.email }}</p>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm mb-1">{{ t('admin.users.new_password') }}</label>
-                    <Password v-model="form.password" toggleMask :feedback="false" class="w-full" inputClass="w-full" />
-                    <p v-if="form.errors.password" class="text-xs text-red-500 mt-1">{{ form.errors.password }}</p>
-                </div>
-                <div>
-                    <label class="block text-sm mb-1">{{ t('admin.users.confirm_password') }}</label>
-                    <Password v-model="form.password_confirmation" toggleMask :feedback="false" class="w-full" inputClass="w-full" />
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm mb-1">{{ t('admin.users.roles') }}</label>
-                <MultiSelect v-model="form.roles" :options="roles" optionLabel="name" optionValue="name" placeholder="Select roles" class="w-full" />
-            </div>
-            <div class="flex gap-2">
-                <Button type="submit" :label="t('common.save')" icon="pi pi-check" :loading="form.processing" />
-                <Link href="/admin/users"><Button :label="t('common.cancel')" severity="secondary" /></Link>
-            </div>
-        </form>
-
-        <!-- Customer memberships panel -->
-        <section v-if="tenancy_enabled" class="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-800 rounded-xl p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-medium">{{ t('admin.users.customer_memberships') }} ({{ user.customers.length }})</h2>
-                <Button :label="t('common.add')" icon="pi pi-plus" size="small" @click="openAddDialog" :disabled="availableCustomers().length === 0" />
-            </div>
-
-            <ul v-if="user.customers.length" class="divide-y divide-gray-100 dark:divide-dark-800">
-                <li v-for="customer in user.customers" :key="customer.id" class="flex items-center justify-between py-2">
+                <div :style="{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }">
                     <div>
-                        <Link :href="`/admin/customers/${customer.id}/edit`" class="text-sm font-medium hover:text-indigo-600">
-                            {{ customer.name }}
-                        </Link>
-                        <p class="text-xs text-gray-500">/c/{{ customer.slug }}</p>
+                        <label
+                            class="cmd-mono cmd-uc"
+                            :style="{ display: 'block', fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '6px', letterSpacing: '0.06em', fontWeight: 500 }"
+                        >{{ t('admin.users.new_password') }}</label>
+                        <Password v-model="form.password" toggleMask :feedback="false" class="w-full" inputClass="w-full" />
+                        <p v-if="form.errors.password" :style="{ color: 'var(--danger)', fontSize: '11px', marginTop: '4px' }">{{ form.errors.password }}</p>
                     </div>
-                    <Button icon="pi pi-times" severity="secondary" size="small" text :aria-label="`Remove ${customer.name}`" @click="openRemoveDialog(customer)" />
-                </li>
-            </ul>
-            <p v-else class="text-sm text-gray-400 italic">{{ t('admin.users.not_member') }}</p>
-        </section>
-    </div>
+                    <div>
+                        <label
+                            class="cmd-mono cmd-uc"
+                            :style="{ display: 'block', fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '6px', letterSpacing: '0.06em', fontWeight: 500 }"
+                        >{{ t('admin.users.confirm_password') }}</label>
+                        <Password v-model="form.password_confirmation" toggleMask :feedback="false" class="w-full" inputClass="w-full" />
+                    </div>
+                </div>
+                <div>
+                    <label
+                        class="cmd-mono cmd-uc"
+                        :style="{ display: 'block', fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '6px', letterSpacing: '0.06em', fontWeight: 500 }"
+                    >{{ t('admin.users.roles') }}</label>
+                    <MultiSelect
+                        v-model="form.roles"
+                        :options="roles"
+                        optionLabel="name"
+                        optionValue="name"
+                        :placeholder="t('admin.users.select_roles')"
+                        class="w-full"
+                    />
+                </div>
+                <div :style="{ display: 'flex', gap: '8px', marginTop: '4px' }">
+                    <CmdButton type="submit" variant="primary" size="md" :loading="form.processing">
+                        <template #icon>
+                            <Icon name="check" :size="13" />
+                        </template>
+                        {{ t('common.save') }}
+                    </CmdButton>
+                    <Link href="/admin/users" :style="{ textDecoration: 'none' }">
+                        <CmdButton variant="ghost" size="md">
+                            {{ t('common.cancel') }}
+                        </CmdButton>
+                    </Link>
+                </div>
+            </form>
+
+            <section
+                v-if="tenancy_enabled"
+                class="cmd-card"
+                :style="{ padding: '20px' }"
+            >
+                <div :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }">
+                    <h2 :style="{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--fg)' }">
+                        {{ t('admin.users.customer_memberships') }} ({{ user.customers.length }})
+                    </h2>
+                    <CmdButton
+                        variant="primary"
+                        size="sm"
+                        :disabled="availableCustomers().length === 0"
+                        @click="openAddDialog"
+                    >
+                        {{ t('common.add') }}
+                    </CmdButton>
+                </div>
+
+                <ul
+                    v-if="user.customers.length"
+                    :style="{ listStyle: 'none', padding: 0, margin: 0 }"
+                >
+                    <li
+                        v-for="(customer, i) in user.customers"
+                        :key="customer.id"
+                        :style="{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '10px 0',
+                            borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+                        }"
+                    >
+                        <div>
+                            <Link
+                                :href="`/admin/customers/${customer.id}/edit`"
+                                :style="{ fontSize: '13px', fontWeight: 500, color: 'var(--fg)', textDecoration: 'none' }"
+                            >
+                                {{ customer.name }}
+                            </Link>
+                            <p class="cmd-mono" :style="{ margin: '2px 0 0', fontSize: '11px', color: 'var(--fg-mute)' }">
+                                /c/{{ customer.slug }}
+                            </p>
+                        </div>
+                        <CmdButton
+                            variant="ghost"
+                            size="sm"
+                            :aria-label="`Remove ${customer.name}`"
+                            @click="openRemoveDialog(customer)"
+                        >
+                            {{ t('common.remove') }}
+                        </CmdButton>
+                    </li>
+                </ul>
+                <p
+                    v-else
+                    :style="{ fontSize: '12.5px', color: 'var(--fg-mute)', fontStyle: 'italic', margin: 0 }"
+                >{{ t('admin.users.not_member') }}</p>
+            </section>
+        </div>
     </div>
 </template>

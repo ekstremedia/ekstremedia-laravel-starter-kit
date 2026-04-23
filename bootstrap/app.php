@@ -12,8 +12,12 @@ use App\Http\Middleware\SetLocaleFromUser;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 use Sentry\Laravel\Integration;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
@@ -65,4 +69,41 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         Integration::handles($exceptions);
+
+        // Render a token-styled Inertia error page for the common HTTP
+        // error codes outside local/testing (so stack traces still surface
+        // during development). 419 falls back to the standard "page expired"
+        // redirect so form resubmits keep their old behavior.
+        $exceptions->respond(function (Response $response, \Throwable $exception, Request $request) {
+            if ($request->expectsJson()) {
+                return $response;
+            }
+
+            $status = $response->getStatusCode();
+            $isLocalOrTesting = app()->environment(['local', 'testing']);
+
+            if ($status === 419) {
+                return back()->with('flash', [
+                    'level' => 'warning',
+                    'message' => 'The page expired, please try again.',
+                ]);
+            }
+
+            // 403 / 404 always get the friendly Inertia page — there's no
+            // stack trace to inspect, and a plain Symfony error page is a
+            // worse developer experience than a styled in-app 404. For 500
+            // / 503 in local/testing we let Ignition render the stack trace.
+            $inertiaSafeStatuses = $isLocalOrTesting ? [403, 404] : [403, 404, 500, 503];
+
+            if (in_array($status, $inertiaSafeStatuses, true)) {
+                return Inertia::render('Errors/Error', [
+                    'status' => $status,
+                    'message' => $exception instanceof HttpExceptionInterface
+                        ? $exception->getMessage()
+                        : '',
+                ])->toResponse($request)->setStatusCode($status);
+            }
+
+            return $response;
+        });
     })->create();

@@ -34,6 +34,9 @@ export default {
         feature_backups: 'Planlagte sikkerhetskopier',
         shortcuts_title: 'Snarveier',
         get_started_title: 'Kom i gang',
+        footer_privacy: 'Personvern',
+        footer_terms: 'Vilkår',
+        footer_status: 'Status',
         quick: {
             login: 'Logg inn',
             login_hint: 'Kom i gang med eksisterende konto',
@@ -114,6 +117,7 @@ export default {
     dashboard: {
         welcome: 'Velkommen, {name}',
         subtitle: 'Her er en oversikt over kontoen din.',
+        tenant_subtitle: 'Aktivitet og forbruk i arbeidsområdet.',
         role: 'Rolle',
         email_status: 'E-post',
         two_factor_status: 'Tofaktorautentisering',
@@ -123,6 +127,18 @@ export default {
         enabled: 'Aktivert',
         disabled: 'Deaktivert',
         manage_profile: 'Administrer profil',
+        customer: 'Kunde',
+        members: 'Medlemmer',
+        manage_members: 'Administrer',
+        files_usage: 'Filer',
+        files_count_suffix: 'filer',
+        open_files: 'Åpne filer',
+        chat: 'Chat',
+        chat_unread_suffix: 'uleste',
+        open_chat: 'Åpne chat',
+        recent_tenant_activity: 'Siste aktivitet i arbeidsområdet',
+        no_tenant_activity: 'Ingen nylig aktivitet i dette arbeidsområdet.',
+        go_personal_home: 'Min konto',
     },
     profile: {
         title: 'Profil',
@@ -170,6 +186,7 @@ export default {
         delete: 'Slett',
         edit: 'Rediger',
         add: 'Legg til',
+        remove: 'Fjern',
         back: '← Tilbake',
         search: 'Søk',
         actions: 'Handlinger',
@@ -982,5 +999,32 @@ export default {
         view_list: 'Liste',
         share_expiry_hours: '{count} time | {count} timer',
         share_expiry_days: '{count} dag | {count} dager',
+    },
+    errors: {
+        eyebrow: 'Noe gikk galt',
+        go_back: 'Tilbake',
+        go_home: 'Hjem',
+        go_welcome: 'Til forsiden',
+        request_id: 'Forespørsels-id: {id}',
+        403: {
+            title: 'Ingen tilgang',
+            description: 'Du har ikke tilgang til denne siden. Ta kontakt med en administrator om du mener dette er feil.',
+        },
+        404: {
+            title: 'Fant ikke siden',
+            description: 'Vi fant ikke siden du lette etter. Den kan ha blitt flyttet, fjernet eller aldri ha eksistert.',
+        },
+        419: {
+            title: 'Økten utløpt',
+            description: 'Økten din har utløpt. Prøv å laste siden på nytt.',
+        },
+        500: {
+            title: 'Noe feilet',
+            description: 'En uventet feil oppstod hos oss. Vi har blitt varslet og ser på saken.',
+        },
+        503: {
+            title: 'Vedlikehold',
+            description: 'Applikasjonen er midlertidig nede for vedlikehold. Prøv igjen om litt.',
+        },
     },
 };

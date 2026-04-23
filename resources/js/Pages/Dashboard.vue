@@ -1,4 +1,12 @@
 <script setup lang="ts">
+/*
+ * Customer-scoped dashboard. Differs from /home (personal account overview)
+ * by showing tenant-level stats: customer identity, member count, files
+ * usage (when the feature is on), chat backlog (when chat is on), and
+ * cross-member recent activity. Non-admins only see cells relevant to
+ * them — the Admin deep-link on the member tile is hidden when they lack
+ * the role.
+ */
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import { computed } from 'vue';
@@ -6,47 +14,68 @@ import AppLayout from '@/Layouts/CommandLayout.vue';
 import Dot from '@/Components/Command/Dot.vue';
 import Icon from '@/Components/Command/Icon.vue';
 import { useCustomer } from '@/composables/useCustomer';
-import { formatDate } from '@/composables/useDateTime';
 import type { PageProps } from '@/types';
+
+interface ActivityRow {
+    id: number;
+    created_at: string | null;
+    description: string;
+    event: string | null;
+    log_name: string | null;
+}
+interface FilesStats { count: number; bytes: number }
+interface ChatStats { unread: number }
+interface Props {
+    memberCount: number;
+    filesStats: FilesStats | null;
+    chatStats: ChatStats | null;
+    activity: ActivityRow[];
+}
+
+const props = defineProps<Props>();
 
 const { t } = useI18n();
 const page = usePage<PageProps>();
 const user = computed(() => page.props.auth.user!);
 const customer = computed(() => page.props.customer);
+const isAdmin = computed(() => (user.value.roles ?? []).includes('Admin'));
 const { customerUrl } = useCustomer();
-const profileUrl = computed(() => customerUrl('/profile'));
-const primaryRole = computed(() => user.value.roles?.[0] ?? 'User');
-
-function roleTone(r: string) {
-    if (r === 'Admin') return { color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.33)' };
-    if (r === 'Editor') return { color: 'var(--warning)', bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.33)' };
-    return { color: 'var(--accent)', bg: 'var(--accent-soft)', border: 'var(--accent-border)' };
-}
 
 const headerMeta = computed(() => {
     const now = new Date();
     const date = now.toLocaleDateString('nb-NO', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const time = now.toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
-    const tenant = customer.value?.name ?? '';
-    return tenant ? `${date} · ${time} · ${tenant}` : `${date} · ${time}`;
+    return `${date} · ${time}`;
 });
+
+function formatBytes(bytes: number): string {
+    if (!bytes) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+}
+
+function formatTime(iso: string | null): string {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDate(iso: string | null): string {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('nb-NO', { day: '2-digit', month: '2-digit' });
+}
 </script>
 
 <template>
     <AppLayout>
         <Head :title="t('nav.dashboard')" />
 
-        <div :style="{ maxWidth: '780px', margin: '0 auto', padding: '32px 16px' }">
+        <div :style="{ maxWidth: '880px', margin: '0 auto', padding: '32px 16px' }">
             <div
                 class="cmd-mono"
-                :style="{
-                    fontSize: '10.5px',
-                    color: 'var(--fg-mute)',
-                    marginBottom: '10px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                }"
+                :style="{ fontSize: '10.5px', color: 'var(--fg-mute)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }"
             >
                 <span>{{ headerMeta }}</span>
                 <span>·</span>
@@ -56,22 +85,17 @@ const headerMeta = computed(() => {
             </div>
 
             <h1
-                :style="{
-                    margin: 0,
-                    fontSize: '32px',
-                    fontWeight: 700,
-                    letterSpacing: '-0.02em',
-                    color: 'var(--fg)',
-                }"
-            >{{ t('dashboard.welcome', { name: user.first_name }) }}</h1>
+                :style="{ margin: 0, fontSize: '32px', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--fg)' }"
+            >{{ customer?.name ?? t('nav.dashboard') }}</h1>
             <p :style="{ fontSize: '13px', color: 'var(--fg-dim)', margin: '8px 0 0' }">
-                {{ t('dashboard.subtitle') }}
+                {{ t('dashboard.tenant_subtitle') }}
             </p>
 
+            <!-- Tenant stats grid -->
             <div
                 :style="{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
                     gap: '1px',
                     background: 'var(--border)',
                     border: '1px solid var(--border)',
@@ -80,79 +104,134 @@ const headerMeta = computed(() => {
                     overflow: 'hidden',
                 }"
             >
+                <!-- Customer identity -->
                 <div :style="{ background: 'var(--panel)', padding: '14px 16px' }">
                     <div
                         class="cmd-mono cmd-uc"
                         :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '8px', fontWeight: 500 }"
-                    >{{ t('dashboard.role') }}</div>
-                    <span
-                        class="cmd-mono"
-                        :style="{
-                            fontSize: '11px',
-                            color: roleTone(primaryRole).color,
-                            background: roleTone(primaryRole).bg,
-                            border: `1px solid ${roleTone(primaryRole).border}`,
-                            padding: '2px 8px',
-                            borderRadius: '3px',
-                        }"
-                    >{{ primaryRole }}</span>
+                    >{{ t('dashboard.customer') }}</div>
+                    <div :style="{ display: 'flex', alignItems: 'center', gap: '8px' }">
+                        <span
+                            class="cmd-mono"
+                            :style="{
+                                fontSize: '11px',
+                                color: 'var(--accent)',
+                                background: 'var(--accent-soft)',
+                                border: '1px solid var(--accent-border)',
+                                padding: '2px 8px',
+                                borderRadius: '3px',
+                            }"
+                        >{{ customer?.slug ?? '—' }}</span>
+                        <span :style="{ fontSize: '13px', color: 'var(--fg)' }">{{ customer?.name ?? '—' }}</span>
+                    </div>
                 </div>
 
+                <!-- Members -->
                 <div :style="{ background: 'var(--panel)', padding: '14px 16px' }">
                     <div
                         class="cmd-mono cmd-uc"
                         :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '8px', fontWeight: 500 }"
-                    >{{ t('dashboard.email_status') }}</div>
-                    <div :style="{ display: 'flex', alignItems: 'center', gap: '7px' }">
-                        <Dot :color="user.email_verified_at ? 'var(--success)' : 'var(--warning)'" :size="6" />
-                        <span :style="{ fontSize: '13px', color: 'var(--fg)' }">
-                            {{ user.email_verified_at ? t('dashboard.verified') : t('dashboard.unverified') }}
+                    >{{ t('dashboard.members') }}</div>
+                    <div :style="{ display: 'flex', alignItems: 'baseline', gap: '8px' }">
+                        <span class="cmd-mono" :style="{ fontSize: '20px', color: 'var(--fg)', fontWeight: 600 }">{{ memberCount }}</span>
+                        <Link
+                            v-if="isAdmin"
+                            href="/admin/users"
+                            :style="{ fontSize: '11.5px', color: 'var(--accent)', textDecoration: 'none' }"
+                        >{{ t('dashboard.manage_members') }} →</Link>
+                    </div>
+                </div>
+
+                <!-- Files -->
+                <div
+                    v-if="filesStats"
+                    :style="{ background: 'var(--panel)', padding: '14px 16px' }"
+                >
+                    <div
+                        class="cmd-mono cmd-uc"
+                        :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '8px', fontWeight: 500 }"
+                    >{{ t('dashboard.files_usage') }}</div>
+                    <div :style="{ display: 'flex', alignItems: 'baseline', gap: '8px' }">
+                        <span class="cmd-mono" :style="{ fontSize: '20px', color: 'var(--fg)', fontWeight: 600 }">{{ filesStats.count }}</span>
+                        <span :style="{ fontSize: '12px', color: 'var(--fg-dim)' }">{{ t('dashboard.files_count_suffix') }}</span>
+                        <span class="cmd-mono" :style="{ fontSize: '11.5px', color: 'var(--fg-mute)', marginLeft: 'auto' }">{{ formatBytes(filesStats.bytes) }}</span>
+                    </div>
+                    <Link
+                        :href="customerUrl('/files')"
+                        :style="{ fontSize: '11.5px', color: 'var(--accent)', textDecoration: 'none', display: 'inline-block', marginTop: '6px' }"
+                    >{{ t('dashboard.open_files') }} →</Link>
+                </div>
+
+                <!-- Chat -->
+                <div
+                    v-if="chatStats"
+                    :style="{ background: 'var(--panel)', padding: '14px 16px' }"
+                >
+                    <div
+                        class="cmd-mono cmd-uc"
+                        :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '8px', fontWeight: 500 }"
+                    >{{ t('dashboard.chat') }}</div>
+                    <div :style="{ display: 'flex', alignItems: 'baseline', gap: '8px' }">
+                        <span class="cmd-mono" :style="{ fontSize: '20px', color: chatStats.unread > 0 ? 'var(--accent)' : 'var(--fg)', fontWeight: 600 }">
+                            {{ chatStats.unread }}
                         </span>
+                        <span :style="{ fontSize: '12px', color: 'var(--fg-dim)' }">{{ t('dashboard.chat_unread_suffix') }}</span>
                     </div>
-                </div>
-
-                <div :style="{ background: 'var(--panel)', padding: '14px 16px' }">
-                    <div
-                        class="cmd-mono cmd-uc"
-                        :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '8px', fontWeight: 500 }"
-                    >{{ t('dashboard.two_factor_status') }}</div>
-                    <div :style="{ display: 'flex', alignItems: 'center', gap: '7px' }">
-                        <Dot :color="user.two_factor_enabled ? 'var(--success)' : 'var(--warning)'" :size="6" />
-                        <span :style="{ fontSize: '13px', color: 'var(--fg)' }">
-                            {{ user.two_factor_enabled ? t('dashboard.enabled') : t('dashboard.disabled') }}
-                        </span>
-                    </div>
-                </div>
-
-                <div :style="{ background: 'var(--panel)', padding: '14px 16px' }">
-                    <div
-                        class="cmd-mono cmd-uc"
-                        :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '8px', fontWeight: 500 }"
-                    >{{ t('dashboard.member_since') }}</div>
-                    <div class="cmd-mono" :style="{ fontSize: '16px', color: 'var(--fg)' }">
-                        {{ formatDate(user.created_at) }}
-                    </div>
+                    <Link
+                        href="/chat"
+                        :style="{ fontSize: '11.5px', color: 'var(--accent)', textDecoration: 'none', display: 'inline-block', marginTop: '6px' }"
+                    >{{ t('dashboard.open_chat') }} →</Link>
                 </div>
             </div>
 
-            <div :style="{ marginTop: '24px' }">
+            <!-- Tenant activity -->
+            <div
+                class="cmd-mono cmd-uc"
+                :style="{ marginTop: '32px', fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '10px', fontWeight: 500 }"
+            >{{ t('dashboard.recent_tenant_activity') }}</div>
+
+            <div class="cmd-card" :style="{ padding: '12px 16px', fontSize: '12px' }">
+                <div
+                    v-if="activity.length === 0"
+                    :style="{ padding: '6px 0', color: 'var(--fg-mute)', fontStyle: 'italic' }"
+                >{{ t('dashboard.no_tenant_activity') }}</div>
+                <div
+                    v-for="(row, i) in activity"
+                    :key="row.id"
+                    :style="{
+                        display: 'grid',
+                        gridTemplateColumns: '90px 1fr',
+                        gap: '12px',
+                        padding: '6px 0',
+                        borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+                    }"
+                >
+                    <span class="cmd-mono" :style="{ color: 'var(--fg-mute)' }">
+                        {{ formatDate(row.created_at) }} {{ formatTime(row.created_at) }}
+                    </span>
+                    <span :style="{ color: 'var(--fg-dim)' }">{{ row.description }}</span>
+                </div>
+            </div>
+
+            <!-- Quick link back to personal home -->
+            <div :style="{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '8px' }">
                 <Link
-                    :href="profileUrl"
+                    href="/home"
                     :style="{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        background: 'var(--accent)',
-                        color: '#fff',
-                        padding: '7px 12px',
+                        gap: '5px',
+                        background: 'transparent',
+                        color: 'var(--fg-dim)',
+                        border: '1px solid var(--border)',
+                        padding: '6px 11px',
                         borderRadius: '5px',
-                        fontSize: '12px',
-                        fontWeight: 500,
+                        fontSize: '11.5px',
                         textDecoration: 'none',
                     }"
                 >
-                    {{ t('dashboard.manage_profile') }}
-                    <Icon name="arrow" :size="12" />
+                    <Icon name="user" :size="12" />
+                    {{ t('dashboard.go_personal_home') }}
                 </Link>
             </div>
         </div>

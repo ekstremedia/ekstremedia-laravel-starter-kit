@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useLocale } from '@/composables/useLocale';
+import Icon from '@/Components/Command/Icon.vue';
 
 const { currentLocale, setLocale, locales } = useLocale();
 
@@ -26,43 +27,101 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
 </script>
 
 <template>
-    <div class="relative" data-lang-switcher>
+    <div :style="{ position: 'relative' }" data-lang-switcher>
         <button
-            @click="toggle"
-            class="flex items-center gap-1 px-2 py-1.5 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-dark-800 cursor-pointer"
+            type="button"
+            class="cmd-lang-trigger"
             :title="current.name"
             :aria-label="`Current language: ${current.name}`"
+            @click="toggle"
+            :style="{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '5px 8px',
+                borderRadius: '5px',
+                background: 'transparent',
+                border: '1px solid transparent',
+                color: 'var(--fg-dim)',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                transition: 'background 0.12s, border-color 0.12s',
+            }"
         >
-            <span class="text-xl leading-none">{{ current.flag }}</span>
-            <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
+            <span :style="{ fontSize: '16px', lineHeight: 1 }">{{ current.flag }}</span>
+            <Icon name="chevD" :size="10" :style="{ color: 'var(--fg-mute)' }" />
         </button>
 
         <Transition
-            enter-active-class="transition ease-out duration-100"
-            enter-from-class="opacity-0 scale-95"
-            enter-to-class="opacity-100 scale-100"
-            leave-active-class="transition ease-in duration-75"
-            leave-from-class="opacity-100 scale-100"
-            leave-to-class="opacity-0 scale-95"
+            enter-active-class="cmd-lang-enter"
+            leave-active-class="cmd-lang-leave"
         >
             <div
                 v-if="open"
-                class="absolute right-0 mt-2 w-40 rounded-xl bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 shadow-lg py-1 z-50"
+                :style="{
+                    position: 'absolute',
+                    right: 0,
+                    marginTop: '6px',
+                    width: '170px',
+                    background: 'var(--panel)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    boxShadow: 'var(--shadow-palette)',
+                    padding: '4px',
+                    zIndex: 60,
+                }"
             >
                 <button
                     v-for="loc in locales"
                     :key="loc.code"
+                    type="button"
                     @click="pick(loc.code)"
-                    class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-800 cursor-pointer"
-                    :class="{ 'bg-gray-50 dark:bg-dark-800 font-medium': loc.code === currentLocale }"
+                    :style="{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '6px 8px',
+                        borderRadius: '4px',
+                        background: loc.code === currentLocale ? 'var(--accent-soft)' : 'transparent',
+                        border: 'none',
+                        color: loc.code === currentLocale ? 'var(--fg)' : 'var(--fg-dim)',
+                        fontWeight: loc.code === currentLocale ? 500 : 400,
+                        fontSize: '12.5px',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        textAlign: 'left',
+                    }"
+                    class="cmd-lang-item"
                 >
-                    <span class="text-lg">{{ loc.flag }}</span>
+                    <span :style="{ fontSize: '15px', lineHeight: 1 }">{{ loc.flag }}</span>
                     <span>{{ loc.name }}</span>
-                    <i v-if="loc.code === currentLocale" class="pi pi-check text-xs text-indigo-500 ml-auto"></i>
+                    <Icon
+                        v-if="loc.code === currentLocale"
+                        name="check"
+                        :size="11"
+                        :style="{ color: 'var(--accent)', marginLeft: 'auto' }"
+                    />
                 </button>
             </div>
         </Transition>
     </div>
 </template>
+
+<style scoped>
+.cmd-lang-trigger:hover {
+    background: var(--panel2);
+    border-color: var(--border);
+}
+.cmd-lang-item:hover {
+    background: var(--accent-soft) !important;
+    color: var(--fg) !important;
+}
+.cmd-lang-enter {
+    animation: cmdFadeIn 0.12s ease-out;
+}
+.cmd-lang-leave {
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+</style>

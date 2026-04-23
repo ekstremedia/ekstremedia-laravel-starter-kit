@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\AvatarController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FileItemController;
 use App\Http\Controllers\FileShareController;
 use App\Http\Controllers\FileTrashController;
@@ -27,7 +28,7 @@ use Inertia\Inertia;
 | `middleware()`, or `name()` wrappers here. The mounting side decides that.
 */
 
-Route::get('/dashboard', fn () => Inertia::render('Dashboard'))->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
 Route::get('/profile', fn () => Inertia::render('Profile'))->name('profile');
 Route::post('/profile/avatar', [AvatarController::class, 'store'])->name('profile.avatar.store');

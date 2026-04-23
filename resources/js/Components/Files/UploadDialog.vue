@@ -3,8 +3,9 @@ import { router } from '@inertiajs/vue3';
 import { Check, CheckCircle, Upload, X } from 'lucide-vue-next';
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import CommandDialog from '@/Components/Command/Dialog.vue';
+import CmdButton from '@/Components/Command/Button.vue';
 
-// ============ Types ============
 interface UploadingFile {
     id: string;
     file: File;
@@ -15,13 +16,12 @@ interface UploadingFile {
     error?: string;
 }
 
-// ============ Props & Emits ============
 const props = withDefaults(
     defineProps<{
         open: boolean;
         uploadUrl: string;
         extraData?: Record<string, string | number | null>;
-        maxFileSize?: number; // in MB
+        maxFileSize?: number;
         multiple?: boolean;
         accept?: string;
     }>(),
@@ -40,7 +40,6 @@ const emit = defineEmits<{
     error: [error: string];
 }>();
 
-// ============ State ============
 const { t } = useI18n();
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const fileListRef = ref<HTMLElement | null>(null);
@@ -48,7 +47,6 @@ const fileItemRefs = ref<Map<string, HTMLElement>>(new Map());
 const isDragging = ref(false);
 const dragCounter = ref(0);
 
-// Upload tracking
 const files = ref<UploadingFile[]>([]);
 const rejectedFiles = ref<{ name: string; size: number; reason: string }[]>([]);
 const isUploading = ref(false);
@@ -63,31 +61,22 @@ onUnmounted(() => {
     }
 });
 
-// Auto-scroll to current uploading file
 function scrollToCurrentFile() {
     if (currentFileIndex.value < 0 || currentFileIndex.value >= files.value.length) return;
-
     const currentFile = files.value[currentFileIndex.value];
     const element = fileItemRefs.value.get(currentFile.id);
-
     if (element && fileListRef.value) {
-        // Calculate if element is visible in the container
         const container = fileListRef.value;
         const containerRect = container.getBoundingClientRect();
         const elementRect = element.getBoundingClientRect();
-
-        // Check if element is below the visible area
         const isBelow = elementRect.bottom > containerRect.bottom;
-        // Check if element is above the visible area
         const isAbove = elementRect.top < containerRect.top;
-
         if (isBelow || isAbove) {
             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }
 }
 
-// Set ref for file item
 function setFileItemRef(id: string, el: HTMLElement | null) {
     if (el) {
         fileItemRefs.value.set(id, el);
@@ -96,32 +85,20 @@ function setFileItemRef(id: string, el: HTMLElement | null) {
     }
 }
 
-// ============ Computed ============
 const isOpen = computed({
     get: () => props.open,
     set: (value) => emit('update:open', value),
 });
 
-const canClose = computed(() => {
-    // Can close when: not uploading AND (no files OR all uploads finished)
-    return !isUploading.value;
-});
-
-const hasErrors = computed(() => {
-    return files.value.some((f) => f.status === 'error');
-});
-
+const canClose = computed(() => !isUploading.value);
+const hasErrors = computed(() => files.value.some((f) => f.status === 'error'));
 const totalProgress = computed(() => {
     if (files.value.length === 0) return 0;
     const total = files.value.reduce((sum, f) => sum + f.progress, 0);
     return Math.round(total / files.value.length);
 });
+const completedCount = computed(() => files.value.filter((f) => f.status === 'complete').length);
 
-const completedCount = computed(() => {
-    return files.value.filter((f) => f.status === 'complete').length;
-});
-
-// ============ Helpers ============
 function generateId(): string {
     return Math.random().toString(36).substring(2, 9);
 }
@@ -134,9 +111,7 @@ function formatSize(bytes: number): string {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
-// ============ Methods ============
 function resetState() {
-    // Clear any pending auto-close timeout
     if (autoCloseTimeout) {
         clearTimeout(autoCloseTimeout);
         autoCloseTimeout = null;
@@ -158,9 +133,10 @@ function close() {
     }
 }
 
-function handleBackdropClick() {
-    if (canClose.value) {
-        close();
+function onVisibleChange(v: boolean) {
+    if (!v && canClose.value) {
+        resetState();
+        isOpen.value = false;
     }
 }
 
@@ -172,19 +148,11 @@ function validateAndProcessFiles(fileList: FileList | File[]): UploadingFile[] {
 
     for (const file of fileArray) {
         if (file.size > props.maxFileSize * 1024 * 1024) {
-            rejected.push({
-                name: file.name,
-                size: file.size,
-                reason: t('upload.fileTooLarge', { size: props.maxFileSize }),
-            });
+            rejected.push({ name: file.name, size: file.size, reason: t('upload.fileTooLarge', { size: props.maxFileSize }) });
             continue;
         }
         if (singleOnly && validFiles.length >= 1) {
-            rejected.push({
-                name: file.name,
-                size: file.size,
-                reason: t('upload.onlyOneFile'),
-            });
+            rejected.push({ name: file.name, size: file.size, reason: t('upload.onlyOneFile') });
             continue;
         }
         validFiles.push({
@@ -197,24 +165,14 @@ function validateAndProcessFiles(fileList: FileList | File[]): UploadingFile[] {
         });
     }
 
-    // Update rejected files state — append so warnings remain visible even
-    // if validation is called mid-upload (e.g. user drops more files).
     rejectedFiles.value = [...rejectedFiles.value, ...rejected];
-
     return validFiles;
 }
 
 function handleFiles(fileList: FileList | File[]) {
     const validFiles = validateAndProcessFiles(fileList);
-
-    if (validFiles.length === 0) {
-        return;
-    }
-
-    // Add files to the list
+    if (validFiles.length === 0) return;
     files.value = validFiles;
-
-    // Start uploading
     startUpload();
 }
 
@@ -224,19 +182,15 @@ async function startUpload() {
     isUploading.value = true;
     currentFileIndex.value = 0;
 
-    // Upload files one by one using Inertia router
     for (let i = 0; i < files.value.length; i++) {
         currentFileIndex.value = i;
         const uploadFile = files.value[i];
 
         try {
             uploadFile.status = 'uploading';
-
-            // Scroll to keep current file visible
             await nextTick();
             scrollToCurrentFile();
 
-            // Use Inertia router.post with progress tracking
             await new Promise<void>((resolve) => {
                 let settled = false;
                 const settle = () => {
@@ -247,17 +201,12 @@ async function startUpload() {
                 };
                 router.post(
                     props.uploadUrl,
-                    {
-                        files: [uploadFile.file],
-                        ...props.extraData,
-                    },
+                    { files: [uploadFile.file], ...props.extraData },
                     {
                         forceFormData: true,
                         preserveScroll: true,
                         preserveState: true,
                         onProgress: (progress) => {
-                            // Existence check, not truthiness — 0% is a valid
-                            // initial progress value and was being dropped.
                             if (progress && typeof progress.percentage === 'number') {
                                 uploadFile.progress = progress.percentage;
                             }
@@ -274,7 +223,7 @@ async function startUpload() {
                             uploadFile.status = 'error';
                             uploadFile.error = errorMsg;
                             emit('error', errorMsg ?? fallback);
-                            settle(); // Continue to next file even on error
+                            settle();
                         },
                         onCancel: () => {
                             const msg = t('upload.cancelled');
@@ -297,17 +246,13 @@ async function startUpload() {
         }
     }
 
-    // All done
     isUploading.value = false;
     currentFileIndex.value = -1;
 
-    // Check if all completed successfully
     const allSuccessful = files.value.every((f) => f.status === 'complete');
     if (allSuccessful) {
         allComplete.value = true;
         emit('all-complete');
-
-        // Auto-close after showing completion (3.5 seconds for better feedback)
         autoCloseTimeout = setTimeout(() => {
             autoCloseTimeout = null;
             resetState();
@@ -316,7 +261,6 @@ async function startUpload() {
     }
 }
 
-// Drag and drop
 function onDragEnter(e: DragEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -328,9 +272,7 @@ function onDragLeave(e: DragEvent) {
     e.preventDefault();
     e.stopPropagation();
     dragCounter.value--;
-    if (dragCounter.value === 0) {
-        isDragging.value = false;
-    }
+    if (dragCounter.value === 0) isDragging.value = false;
 }
 
 function onDragOver(e: DragEvent) {
@@ -343,14 +285,12 @@ function onDrop(e: DragEvent) {
     e.stopPropagation();
     isDragging.value = false;
     dragCounter.value = 0;
-
     const droppedFiles = e.dataTransfer?.files;
     if (droppedFiles && droppedFiles.length > 0) {
         handleFiles(droppedFiles);
     }
 }
 
-// File input
 function openFilePicker() {
     fileInputRef.value?.click();
 }
@@ -359,21 +299,44 @@ function onFileInputChange(e: Event) {
     const input = e.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
         handleFiles(input.files);
-        input.value = ''; // Reset input
+        input.value = '';
     }
 }
 
-// Reset when dialog opens
 watch(
     () => props.open,
     (newValue) => {
-        if (newValue) {
-            resetState();
-        }
+        if (newValue) resetState();
     },
 );
 
-// Expose for parent if needed
+function statusBorder(f: UploadingFile) {
+    if (f.status === 'complete') return 'rgba(94, 229, 154, 0.33)';
+    if (f.status === 'error') return 'rgba(255, 138, 138, 0.33)';
+    if (f.status === 'uploading') return 'var(--accent-border)';
+    return 'var(--border)';
+}
+
+function statusBg(f: UploadingFile) {
+    if (f.status === 'complete') return 'rgba(94, 229, 154, 0.06)';
+    if (f.status === 'error') return 'rgba(255, 138, 138, 0.06)';
+    if (f.status === 'uploading') return 'var(--accent-soft)';
+    return 'var(--panel2)';
+}
+
+function statusFg(f: UploadingFile) {
+    if (f.status === 'complete') return 'var(--success)';
+    if (f.status === 'error') return 'var(--danger)';
+    if (f.status === 'uploading') return 'var(--accent)';
+    return 'var(--fg-dim)';
+}
+
+function barFill(f: UploadingFile) {
+    if (f.status === 'complete') return 'var(--success)';
+    if (f.status === 'error') return 'var(--danger)';
+    return 'var(--accent)';
+}
+
 defineExpose({
     resetState,
     handleFiles,
@@ -381,269 +344,240 @@ defineExpose({
 </script>
 
 <template>
-    <Teleport to="body">
-        <Transition name="modal">
+    <CommandDialog
+        :visible="isOpen"
+        :title="t('share.upload')"
+        width="640px"
+        :close-on-backdrop="canClose"
+        :show-close="canClose"
+        :padded="false"
+        @update:visible="onVisibleChange"
+    >
+        <!-- State 1: All complete -->
+        <div v-if="allComplete" :style="{ padding: '40px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }">
             <div
-                v-if="isOpen"
-                class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-                @click.self="handleBackdropClick"
+                :style="{
+                    width: '72px',
+                    height: '72px',
+                    borderRadius: '50%',
+                    background: 'rgba(94, 229, 154, 0.12)',
+                    border: '1px solid rgba(94, 229, 154, 0.33)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--success)',
+                }"
             >
-                <div class="bg-surface-900/95 w-full max-w-2xl overflow-hidden rounded-2xl border border-purple-500/20 shadow-2xl backdrop-blur-xl">
-                    <!-- Header -->
-                    <div class="flex items-center justify-between border-b border-purple-500/20 px-6 py-4">
-                        <h3 class="text-lg font-semibold text-white">{{ t('share.upload') }}</h3>
-                        <button
-                            v-if="canClose"
-                            type="button"
-                            class="rounded-lg p-2 text-gray-400 transition-colors hover:bg-purple-500/20 hover:text-white"
-                            @click="close"
-                        >
-                            <X class="h-5 w-5" />
-                        </button>
-                    </div>
+                <CheckCircle :style="{ width: '40px', height: '40px' }" />
+            </div>
+            <span :style="{ fontSize: '16px', fontWeight: 500, color: 'var(--success)' }">
+                {{ t('upload.filesUploaded', files.length) }}
+            </span>
+        </div>
 
-                    <!-- Content -->
-                    <div class="p-6">
-                        <!-- State 1: All Complete -->
-                        <div v-if="allComplete" class="py-8">
-                            <div class="flex flex-col items-center justify-center gap-4">
-                                <div class="flex h-20 w-20 items-center justify-center rounded-full bg-green-500/20">
-                                    <CheckCircle class="h-12 w-12 text-green-400" />
-                                </div>
-                                <span class="text-xl font-medium text-green-300">
-                                    {{ t('upload.filesUploaded', files.length) }}
-                                </span>
-                            </div>
-                        </div>
+        <!-- State 2: Uploading files -->
+        <div v-else-if="files.length > 0" :style="{ padding: '16px' }">
+            <div :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }">
+                <div :style="{ display: 'flex', alignItems: 'center', gap: '8px' }">
+                    <Upload v-if="isUploading" :style="{ width: '16px', height: '16px', color: 'var(--accent)', animation: 'cmdBounce 0.9s infinite' }" />
+                    <CheckCircle v-else :style="{ width: '16px', height: '16px', color: 'var(--success)' }" />
+                    <span :style="{ fontSize: '12.5px', fontWeight: 500, color: 'var(--fg)' }">
+                        {{ isUploading ? t('upload.uploadingFiles', files.length) : t('upload.complete') }}
+                    </span>
+                </div>
+                <span class="cmd-mono" :style="{ fontSize: '11.5px', color: 'var(--fg-dim)' }">{{ completedCount }} / {{ files.length }}</span>
+            </div>
 
-                        <!-- State 2: Uploading Files -->
-                        <div v-else-if="files.length > 0" class="py-4">
-                            <!-- Overall progress header -->
-                            <div class="mb-4 flex items-center justify-between">
-                                <div class="flex items-center gap-2">
-                                    <Upload v-if="isUploading" class="h-5 w-5 animate-bounce text-purple-400" />
-                                    <CheckCircle v-else class="h-5 w-5 text-green-400" />
-                                    <span class="text-sm font-medium text-purple-300">
-                                        {{ isUploading ? t('upload.uploadingFiles', files.length) : t('upload.complete') }}
-                                    </span>
-                                </div>
-                                <span class="text-sm text-purple-400">{{ completedCount }} / {{ files.length }}</span>
-                            </div>
+            <div :style="{ height: '6px', borderRadius: '999px', background: 'var(--panel2)', overflow: 'hidden', marginBottom: '16px' }">
+                <div
+                    :style="{
+                        height: '100%',
+                        width: `${totalProgress}%`,
+                        background: 'var(--accent)',
+                        transition: 'width 0.25s ease',
+                    }"
+                ></div>
+            </div>
 
-                            <!-- Overall progress bar -->
-                            <div class="mb-6 h-2 overflow-hidden rounded-full bg-purple-900/50">
-                                <div
-                                    class="h-full rounded-full bg-gradient-to-r from-purple-500 to-violet-500 transition-all duration-300"
-                                    :style="{ width: `${totalProgress}%` }"
-                                ></div>
-                            </div>
-
-                            <!-- File list with individual progress -->
-                            <div ref="fileListRef" class="max-h-80 space-y-3 overflow-y-auto scroll-smooth">
-                                <div
-                                    v-for="(uploadFile, index) in files"
-                                    :key="uploadFile.id"
-                                    :ref="(el) => setFileItemRef(uploadFile.id, el as HTMLElement)"
-                                    :class="[
-                                        'rounded-lg border p-3 transition-all',
-                                        uploadFile.status === 'complete'
-                                            ? 'border-green-500/30 bg-green-900/20'
-                                            : uploadFile.status === 'error'
-                                              ? 'border-red-500/30 bg-red-900/20'
-                                              : uploadFile.status === 'uploading'
-                                                ? 'border-purple-500/30 bg-purple-900/20'
-                                                : 'border-purple-500/10 bg-purple-900/10',
-                                    ]"
-                                >
-                                    <!-- File info row -->
-                                    <div class="mb-2 flex items-center gap-3">
-                                        <!-- Status icon -->
-                                        <div class="flex-shrink-0">
-                                            <div
-                                                v-if="uploadFile.status === 'complete'"
-                                                class="flex h-6 w-6 items-center justify-center rounded-full bg-green-500"
-                                            >
-                                                <Check class="h-4 w-4 text-white" />
-                                            </div>
-                                            <div
-                                                v-else-if="uploadFile.status === 'error'"
-                                                class="flex h-6 w-6 items-center justify-center rounded-full bg-red-500"
-                                            >
-                                                <X class="h-4 w-4 text-white" />
-                                            </div>
-                                            <div
-                                                v-else-if="uploadFile.status === 'uploading'"
-                                                class="h-6 w-6 animate-spin rounded-full border-2 border-purple-500 border-t-transparent"
-                                            ></div>
-                                            <div
-                                                v-else
-                                                class="flex h-6 w-6 items-center justify-center rounded-full bg-purple-500/30 text-xs font-bold text-purple-300"
-                                            >
-                                                {{ index + 1 }}
-                                            </div>
-                                        </div>
-
-                                        <!-- File name and size -->
-                                        <div class="min-w-0 flex-1">
-                                            <p
-                                                class="truncate text-sm font-medium"
-                                                :class="
-                                                    uploadFile.status === 'complete'
-                                                        ? 'text-green-300'
-                                                        : uploadFile.status === 'error'
-                                                          ? 'text-red-300'
-                                                          : 'text-purple-200'
-                                                "
-                                            >
-                                                {{ uploadFile.name }}
-                                            </p>
-                                            <p class="text-xs text-purple-400/70">{{ formatSize(uploadFile.size) }}</p>
-                                        </div>
-
-                                        <!-- Progress percentage -->
-                                        <span
-                                            class="flex-shrink-0 text-sm font-medium"
-                                            :class="
-                                                uploadFile.status === 'complete'
-                                                    ? 'text-green-400'
-                                                    : uploadFile.status === 'error'
-                                                      ? 'text-red-400'
-                                                      : 'text-purple-400'
-                                            "
-                                        >
-                                            {{ uploadFile.progress }}%
-                                        </span>
-                                    </div>
-
-                                    <!-- Individual progress bar -->
-                                    <div class="h-1.5 overflow-hidden rounded-full bg-purple-900/50">
-                                        <div
-                                            :class="[
-                                                'h-full rounded-full transition-all duration-300',
-                                                uploadFile.status === 'complete'
-                                                    ? 'bg-green-500'
-                                                    : uploadFile.status === 'error'
-                                                      ? 'bg-red-500'
-                                                      : 'bg-gradient-to-r from-purple-500 to-violet-500',
-                                            ]"
-                                            :style="{ width: `${uploadFile.progress}%` }"
-                                        ></div>
-                                    </div>
-
-                                    <!-- Error message -->
-                                    <p v-if="uploadFile.error" class="mt-2 text-xs text-red-400">
-                                        {{ uploadFile.error }}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <!-- Close button when there are errors -->
-                            <div v-if="hasErrors && !isUploading" class="mt-6 flex justify-end">
-                                <button
-                                    type="button"
-                                    class="rounded-lg bg-purple-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-purple-500"
-                                    @click="close"
-                                >
-                                    {{ t('common.close') }}
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- State 3: File Selection (Dropzone) -->
-                        <div
-                            v-else
-                            :class="[
-                                'relative cursor-pointer rounded-xl border-2 border-dashed p-8 transition-all duration-200',
-                                isDragging
-                                    ? 'border-purple-500 bg-purple-500/10'
-                                    : 'border-purple-500/30 bg-purple-900/10 hover:border-purple-500/50 hover:bg-purple-900/20',
-                            ]"
-                            @click="openFilePicker"
-                            @dragenter="onDragEnter"
-                            @dragleave="onDragLeave"
-                            @dragover="onDragOver"
-                            @drop="onDrop"
-                        >
-                            <input ref="fileInputRef" type="file" class="hidden" :multiple="multiple" :accept="accept" @change="onFileInputChange" />
-
-                            <div class="flex flex-col items-center justify-center text-center">
-                                <div class="mb-4">
-                                    <Upload class="h-12 w-12" :class="isDragging ? 'animate-bounce text-purple-400' : 'text-purple-500/70'" />
-                                </div>
-                                <p class="text-base font-medium" :class="isDragging ? 'text-purple-300' : 'text-gray-300'">
-                                    {{ isDragging ? t('upload.dropHere') : t('upload.dragAndDrop') }}
-                                </p>
-                                <p class="mt-2 text-sm text-gray-500">
-                                    {{ t('upload.or') }}
-                                    <span class="font-medium text-purple-400">
-                                        {{ t('upload.browse') }}
-                                    </span>
-                                </p>
-                                <p class="mt-3 text-xs text-gray-600">
-                                    {{ t('upload.maxSize', { size: maxFileSize }) }}
-                                </p>
-                            </div>
-
-                            <!-- Rejected files warning -->
+            <div
+                ref="fileListRef"
+                :style="{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', scrollBehavior: 'smooth' }"
+            >
+                <div
+                    v-for="(uploadFile, index) in files"
+                    :key="uploadFile.id"
+                    :ref="(el) => setFileItemRef(uploadFile.id, el as HTMLElement)"
+                    :style="{
+                        border: `1px solid ${statusBorder(uploadFile)}`,
+                        background: statusBg(uploadFile),
+                        borderRadius: '6px',
+                        padding: '10px 12px',
+                        transition: 'background 0.12s, border-color 0.12s',
+                    }"
+                >
+                    <div :style="{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }">
+                        <div :style="{ flexShrink: 0 }">
                             <div
-                                v-if="rejectedFiles.length > 0"
-                                class="mt-6 w-full rounded-lg border border-red-500/30 bg-red-500/10 p-4"
-                                @click.stop
+                                v-if="uploadFile.status === 'complete'"
+                                :style="{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center' }"
                             >
-                                <div class="flex items-start gap-3">
-                                    <div class="shrink-0">
-                                        <X class="h-5 w-5 text-red-400" />
-                                    </div>
-                                    <div class="min-w-0 flex-1">
-                                        <p class="text-sm font-medium text-red-300">
-                                            {{ t('upload.filesRejected', rejectedFiles.length) }}
-                                        </p>
-                                        <ul class="mt-2 space-y-1">
-                                            <li v-for="(file, index) in rejectedFiles" :key="index" class="text-xs text-red-400/80">
-                                                <span class="font-medium">{{ file.name }}</span>
-                                                <span class="text-red-400/60"> ({{ formatSize(file.size) }}) - {{ file.reason }}</span>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        class="shrink-0 text-red-400 transition-colors hover:text-red-300"
-                                        @click.stop="rejectedFiles = []"
-                                    >
-                                        <X class="h-4 w-4" />
-                                    </button>
-                                </div>
+                                <Check :style="{ width: '14px', height: '14px', color: '#000' }" />
+                            </div>
+                            <div
+                                v-else-if="uploadFile.status === 'error'"
+                                :style="{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }"
+                            >
+                                <X :style="{ width: '14px', height: '14px', color: '#000' }" />
+                            </div>
+                            <div
+                                v-else-if="uploadFile.status === 'uploading'"
+                                :style="{ width: '22px', height: '22px', borderRadius: '50%', border: '2px solid var(--accent)', borderTopColor: 'transparent', animation: 'cmdSpin 0.7s linear infinite' }"
+                            ></div>
+                            <div
+                                v-else
+                                class="cmd-mono"
+                                :style="{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--panel2)', border: '1px solid var(--border)', color: 'var(--fg-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 600 }"
+                            >
+                                {{ index + 1 }}
                             </div>
                         </div>
+
+                        <div :style="{ minWidth: 0, flex: 1 }">
+                            <p :style="{ margin: 0, fontSize: '12.5px', fontWeight: 500, color: statusFg(uploadFile), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">
+                                {{ uploadFile.name }}
+                            </p>
+                            <p class="cmd-mono" :style="{ margin: 0, fontSize: '10.5px', color: 'var(--fg-mute)' }">{{ formatSize(uploadFile.size) }}</p>
+                        </div>
+
+                        <span
+                            class="cmd-mono"
+                            :style="{ flexShrink: 0, fontSize: '12px', fontWeight: 500, color: statusFg(uploadFile) }"
+                        >
+                            {{ uploadFile.progress }}%
+                        </span>
                     </div>
+
+                    <div :style="{ height: '4px', borderRadius: '999px', background: 'var(--panel2)', overflow: 'hidden' }">
+                        <div
+                            :style="{
+                                height: '100%',
+                                width: `${uploadFile.progress}%`,
+                                background: barFill(uploadFile),
+                                transition: 'width 0.25s ease',
+                            }"
+                        ></div>
+                    </div>
+
+                    <p v-if="uploadFile.error" :style="{ marginTop: '6px', fontSize: '11px', color: 'var(--danger)' }">
+                        {{ uploadFile.error }}
+                    </p>
                 </div>
             </div>
-        </Transition>
-    </Teleport>
+
+            <div v-if="hasErrors && !isUploading" :style="{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }">
+                <CmdButton variant="primary" size="sm" @click="close">
+                    {{ t('common.close') }}
+                </CmdButton>
+            </div>
+        </div>
+
+        <!-- State 3: Dropzone -->
+        <div v-else :style="{ padding: '16px' }">
+            <div
+                :style="{
+                    position: 'relative',
+                    cursor: 'pointer',
+                    borderRadius: '8px',
+                    border: `2px dashed ${isDragging ? 'var(--accent)' : 'var(--border)'}`,
+                    background: isDragging ? 'var(--accent-soft)' : 'var(--panel2)',
+                    padding: '32px 24px',
+                    transition: 'background 0.18s, border-color 0.18s',
+                }"
+                @click="openFilePicker"
+                @dragenter="onDragEnter"
+                @dragleave="onDragLeave"
+                @dragover="onDragOver"
+                @drop="onDrop"
+            >
+                <input
+                    ref="fileInputRef"
+                    type="file"
+                    :multiple="multiple"
+                    :accept="accept"
+                    :style="{ display: 'none' }"
+                    @change="onFileInputChange"
+                />
+
+                <div :style="{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', textAlign: 'center' }">
+                    <Upload
+                        :style="{
+                            width: '44px',
+                            height: '44px',
+                            color: isDragging ? 'var(--accent)' : 'var(--fg-mute)',
+                            animation: isDragging ? 'cmdBounce 0.9s infinite' : 'none',
+                        }"
+                    />
+                    <p :style="{ margin: 0, fontSize: '14px', fontWeight: 500, color: isDragging ? 'var(--accent)' : 'var(--fg)' }">
+                        {{ isDragging ? t('upload.dropHere') : t('upload.dragAndDrop') }}
+                    </p>
+                    <p :style="{ margin: 0, fontSize: '12px', color: 'var(--fg-dim)' }">
+                        {{ t('upload.or') }}
+                        <span :style="{ color: 'var(--accent)', fontWeight: 500 }">{{ t('upload.browse') }}</span>
+                    </p>
+                    <p class="cmd-mono" :style="{ margin: 0, fontSize: '10.5px', color: 'var(--fg-mute)' }">
+                        {{ t('upload.maxSize', { size: maxFileSize }) }}
+                    </p>
+                </div>
+            </div>
+
+            <div
+                v-if="rejectedFiles.length > 0"
+                :style="{
+                    marginTop: '14px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(255, 138, 138, 0.33)',
+                    background: 'rgba(255, 138, 138, 0.08)',
+                    padding: '12px',
+                }"
+                @click.stop
+            >
+                <div :style="{ display: 'flex', alignItems: 'flex-start', gap: '10px' }">
+                    <X :style="{ width: '16px', height: '16px', color: 'var(--danger)', flexShrink: 0, marginTop: '2px' }" />
+                    <div :style="{ minWidth: 0, flex: 1 }">
+                        <p :style="{ margin: 0, fontSize: '12px', fontWeight: 500, color: 'var(--danger)' }">
+                            {{ t('upload.filesRejected', rejectedFiles.length) }}
+                        </p>
+                        <ul :style="{ margin: '6px 0 0', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '3px' }">
+                            <li
+                                v-for="(file, index) in rejectedFiles"
+                                :key="index"
+                                :style="{ fontSize: '11px', color: 'var(--fg-dim)' }"
+                            >
+                                <span :style="{ fontWeight: 500, color: 'var(--fg)' }">{{ file.name }}</span>
+                                <span :style="{ color: 'var(--fg-mute)' }"> ({{ formatSize(file.size) }}) — {{ file.reason }}</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <button
+                        type="button"
+                        :aria-label="t('common.close')"
+                        :style="{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '2px', flexShrink: 0 }"
+                        @click.stop="rejectedFiles = []"
+                    >
+                        <X :style="{ width: '14px', height: '14px' }" />
+                    </button>
+                </div>
+            </div>
+        </div>
+    </CommandDialog>
 </template>
 
 <style scoped>
-/* Modal transition */
-.modal-enter-active,
-.modal-leave-active {
-    transition: opacity 0.3s ease;
+@keyframes cmdSpin {
+    to { transform: rotate(360deg); }
 }
-
-.modal-enter-active > div,
-.modal-leave-active > div {
-    transition:
-        transform 0.3s ease,
-        opacity 0.3s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
-    opacity: 0;
-}
-
-.modal-enter-from > div,
-.modal-leave-to > div {
-    transform: scale(0.95) translateY(-10px);
-    opacity: 0;
+@keyframes cmdBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
 }
 </style>

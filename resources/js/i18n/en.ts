@@ -34,6 +34,9 @@ export default {
         feature_backups: 'Scheduled backups',
         shortcuts_title: 'Shortcuts',
         get_started_title: 'Get started',
+        footer_privacy: 'Privacy',
+        footer_terms: 'Terms',
+        footer_status: 'Status',
         quick: {
             login: 'Sign in',
             login_hint: 'Continue with an existing account',
@@ -114,6 +117,7 @@ export default {
     dashboard: {
         welcome: 'Welcome, {name}',
         subtitle: 'Here\'s an overview of your account.',
+        tenant_subtitle: 'Workspace activity and usage at a glance.',
         role: 'Role',
         email_status: 'Email',
         two_factor_status: 'Two-factor auth',
@@ -123,6 +127,18 @@ export default {
         enabled: 'Enabled',
         disabled: 'Disabled',
         manage_profile: 'Manage profile',
+        customer: 'Customer',
+        members: 'Members',
+        manage_members: 'Manage',
+        files_usage: 'Files',
+        files_count_suffix: 'files',
+        open_files: 'Open files',
+        chat: 'Chat',
+        chat_unread_suffix: 'unread',
+        open_chat: 'Open chat',
+        recent_tenant_activity: 'Recent tenant activity',
+        no_tenant_activity: 'No recent activity in this workspace.',
+        go_personal_home: 'My account',
     },
     profile: {
         title: 'Profile',
@@ -170,6 +186,7 @@ export default {
         delete: 'Delete',
         edit: 'Edit',
         add: 'Add',
+        remove: 'Remove',
         back: '← Back',
         search: 'Search',
         actions: 'Actions',
@@ -982,5 +999,32 @@ export default {
         view_list: 'List view',
         share_expiry_hours: '{count} hour | {count} hours',
         share_expiry_days: '{count} day | {count} days',
+    },
+    errors: {
+        eyebrow: 'Something went wrong',
+        go_back: 'Go back',
+        go_home: 'Home',
+        go_welcome: 'To the landing page',
+        request_id: 'Request id: {id}',
+        403: {
+            title: 'Forbidden',
+            description: 'You don\'t have permission to view this page. If you think this is a mistake, contact an admin.',
+        },
+        404: {
+            title: 'Page not found',
+            description: 'We couldn\'t find the page you were looking for. It may have been moved, renamed, or never existed.',
+        },
+        419: {
+            title: 'Page expired',
+            description: 'Your session timed out. Please refresh and try again.',
+        },
+        500: {
+            title: 'Something broke',
+            description: 'An unexpected error occurred on our side. We\'ve been notified and are looking into it.',
+        },
+        503: {
+            title: 'In maintenance',
+            description: 'The app is temporarily down for maintenance. Check back shortly.',
+        },
     },
 };

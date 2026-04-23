@@ -11,6 +11,7 @@ import { computed, onMounted } from 'vue';
 import { useTweaks } from '@/composables/useTweaks';
 import Icon from '@/Components/Command/Icon.vue';
 import Dot from '@/Components/Command/Dot.vue';
+import PublicTopbar from '@/Components/Command/PublicTopbar.vue';
 import type { PageProps } from '@/types';
 
 // Apply tweaks tokens even for unauthenticated visitors so fonts/accent
@@ -111,103 +112,7 @@ const now = new Date().toLocaleDateString('nb-NO', { day: '2-digit', month: '2-d
             flexDirection: 'column',
         }"
     >
-        <!-- Minimal top bar: logo + auth shortcuts -->
-        <header
-            :style="{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '16px 24px',
-                borderBottom: '1px solid var(--border)',
-            }"
-        >
-            <Link
-                href="/"
-                :style="{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    textDecoration: 'none',
-                    color: 'var(--fg)',
-                }"
-            >
-                <span
-                    :style="{
-                        width: '26px',
-                        height: '26px',
-                        borderRadius: '5px',
-                        background: 'var(--accent)',
-                        color: '#fff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 700,
-                        fontSize: '11px',
-                        fontFamily: 'var(--font-mono)',
-                    }"
-                >SK</span>
-                <span :style="{ fontSize: '13px', fontWeight: 600, letterSpacing: '-0.01em' }">{{ appName }}</span>
-            </Link>
-
-            <div :style="{ display: 'flex', alignItems: 'center', gap: '8px' }">
-                <Link
-                    v-if="!user"
-                    href="/login"
-                    :style="{
-                        fontSize: '11.5px',
-                        color: 'var(--fg-dim)',
-                        padding: '5px 10px',
-                        textDecoration: 'none',
-                    }"
-                >{{ t('nav.login') }}</Link>
-                <Link
-                    v-if="!user && registrationOpen"
-                    href="/register"
-                    :style="{
-                        fontSize: '11.5px',
-                        background: 'var(--accent)',
-                        color: '#fff',
-                        padding: '5px 11px',
-                        borderRadius: '5px',
-                        textDecoration: 'none',
-                        fontWeight: 500,
-                    }"
-                >{{ t('nav.register') }}</Link>
-                <Link
-                    v-if="user"
-                    href="/home"
-                    :style="{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '7px',
-                        padding: '4px 10px 4px 4px',
-                        borderRadius: '5px',
-                        background: 'var(--panel2)',
-                        border: '1px solid var(--border)',
-                        color: 'var(--fg)',
-                        fontSize: '11.5px',
-                        textDecoration: 'none',
-                    }"
-                >
-                    <span
-                        :style="{
-                            width: '20px',
-                            height: '20px',
-                            borderRadius: '3px',
-                            background: 'var(--accent)',
-                            color: '#fff',
-                            fontSize: '9.5px',
-                            fontWeight: 700,
-                            fontFamily: 'var(--font-mono)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                        }"
-                    >{{ ((user.first_name?.[0] ?? '') + (user.last_name?.[0] ?? '')).toUpperCase() }}</span>
-                    <span>{{ user.full_name }}</span>
-                </Link>
-            </div>
-        </header>
+        <PublicTopbar />
 
         <!-- Hero -->
         <section :style="{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 24px' }">
@@ -281,44 +186,45 @@ const now = new Date().toLocaleDateString('nb-NO', { day: '2-digit', month: '2-d
             </div>
         </section>
 
-        <!-- Quick-links grid -->
+        <!-- Quick-links: single-column list so we never leave ghost cells in an
+             uneven auto-fill grid. Each row is a full-width link with a
+             leading icon tile and a trailing chevron. -->
         <section :style="{ borderTop: '1px solid var(--border)', padding: '0 24px', background: 'var(--bg2)' }">
             <div :style="{ maxWidth: '780px', margin: '0 auto', width: '100%', padding: '32px 0' }">
                 <div
                     class="cmd-mono cmd-uc"
-                    :style="{ fontSize: '10px', color: 'var(--fg-mute)', fontWeight: 500, marginBottom: '20px' }"
+                    :style="{ fontSize: '10px', color: 'var(--fg-mute)', fontWeight: 500, marginBottom: '14px' }"
                 >{{ quickLinksTitle }}</div>
 
                 <div
                     :style="{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-                        gap: '1px',
-                        background: 'var(--border)',
+                        display: 'flex',
+                        flexDirection: 'column',
                         border: '1px solid var(--border)',
                         borderRadius: '6px',
                         overflow: 'hidden',
+                        background: 'var(--panel)',
                     }"
                 >
                     <Link
-                        v-for="l in quickLinks"
+                        v-for="(l, i) in quickLinks"
                         :key="l.key"
                         :href="l.href"
                         class="cmd-quick-link"
                         :style="{
                             display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: '11px',
-                            padding: '14px 16px',
-                            background: 'var(--panel)',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '12px 16px',
                             textDecoration: 'none',
                             transition: 'background 0.12s',
+                            borderTop: i === 0 ? 'none' : '1px solid var(--border)',
                         }"
                     >
                         <span
                             :style="{
-                                width: '26px',
-                                height: '26px',
+                                width: '28px',
+                                height: '28px',
                                 borderRadius: '5px',
                                 background: 'var(--accent-soft)',
                                 border: '1px solid var(--accent-border)',
@@ -331,16 +237,17 @@ const now = new Date().toLocaleDateString('nb-NO', { day: '2-digit', month: '2-d
                         >
                             <Icon :name="l.icon" :size="14" />
                         </span>
-                        <span :style="{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }">
-                            <span :style="{ fontSize: '12.5px', fontWeight: 500, color: 'var(--fg)' }">{{ l.label }}</span>
-                            <span :style="{ fontSize: '11px', color: 'var(--fg-dim)', overflow: 'hidden', textOverflow: 'ellipsis' }">{{ l.hint }}</span>
+                        <span :style="{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }">
+                            <span :style="{ fontSize: '13px', fontWeight: 500, color: 'var(--fg)' }">{{ l.label }}</span>
+                            <span :style="{ fontSize: '11.5px', color: 'var(--fg-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">{{ l.hint }}</span>
                         </span>
+                        <Icon name="chevR" :size="14" :style="{ color: 'var(--fg-mute)', flexShrink: 0 }" />
                     </Link>
                 </div>
             </div>
         </section>
 
-        <!-- Footer -->
+        <!-- Footer — three even cells (copyright · links · version). -->
         <footer :style="{ borderTop: '1px solid var(--border)', padding: '0 24px', background: 'var(--bg)' }">
             <div
                 class="cmd-mono"
@@ -348,16 +255,41 @@ const now = new Date().toLocaleDateString('nb-NO', { day: '2-digit', month: '2-d
                     maxWidth: '780px',
                     margin: '0 auto',
                     width: '100%',
-                    padding: '16px 0',
-                    display: 'flex',
-                    justifyContent: 'space-between',
+                    padding: '14px 0',
+                    display: 'grid',
+                    gridTemplateColumns: '1fr auto 1fr',
                     alignItems: 'center',
+                    gap: '16px',
                     fontSize: '10.5px',
                     color: 'var(--fg-mute)',
                 }"
             >
                 <span>© {{ new Date().getFullYear() }} {{ appName }}</span>
-                <span>v1</span>
+                <span :style="{ display: 'inline-flex', alignItems: 'center', gap: '14px' }">
+                    <Link
+                        href="/privacy"
+                        :style="{ color: 'var(--fg-dim)', textDecoration: 'none' }"
+                        class="cmd-footer-link"
+                    >{{ t('welcome.footer_privacy') }}</Link>
+                    <span :style="{ color: 'var(--fg-mute)' }">·</span>
+                    <Link
+                        href="/terms"
+                        :style="{ color: 'var(--fg-dim)', textDecoration: 'none' }"
+                        class="cmd-footer-link"
+                    >{{ t('welcome.footer_terms') }}</Link>
+                    <span :style="{ color: 'var(--fg-mute)' }">·</span>
+                    <a
+                        href="/up"
+                        target="_blank"
+                        rel="noopener"
+                        :style="{ color: 'var(--fg-dim)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px' }"
+                        class="cmd-footer-link"
+                    >
+                        <Dot color="var(--success)" :size="5" />
+                        {{ t('welcome.footer_status') }}
+                    </a>
+                </span>
+                <span :style="{ justifySelf: 'end' }">v1</span>
             </div>
         </footer>
     </div>
@@ -365,6 +297,9 @@ const now = new Date().toLocaleDateString('nb-NO', { day: '2-digit', month: '2-d
 
 <style scoped>
 .cmd-quick-link:hover {
-    background: var(--panel2) !important;
+    background: var(--panel2);
+}
+.cmd-footer-link:hover {
+    color: var(--fg) !important;
 }
 </style>
