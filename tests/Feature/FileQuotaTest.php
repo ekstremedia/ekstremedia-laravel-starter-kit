@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\AppSetting;
 use App\Models\FileItem;
 use App\Models\Message;
 use App\Models\Tenant;
@@ -40,6 +41,11 @@ beforeEach(function () {
     $this->tenant = Tenant::factory()->create();
     $this->user = User::factory()->create();
     $this->user->customers()->attach($this->tenant);
+    // The production default now seeds a 5 GB global personal quota,
+    // but these tests assume a blank slate (or configure their own
+    // override). Reset the app default so "unlimited" really means
+    // unlimited here.
+    AppSetting::current()->update(['default_personal_storage_bytes' => null]);
 });
 
 it('billable total only counts the FileItem `file` collection', function () {
@@ -122,7 +128,7 @@ it('categorizes billable bytes by mime type', function () {
 });
 
 it('computes per-tenant remaining bytes under a quota', function () {
-    $this->user->settings()->merge(['storage_quota_bytes' => 10_000]);
+    $this->user->settings()->merge(['storage_quota_override' => 10_000]);
     $item = FileItem::factory()->create([
         'tenant_id' => $this->tenant->id,
         'user_id' => $this->user->id,
@@ -140,7 +146,7 @@ it('returns null remaining when unlimited', function () {
 it('fires a notification when crossing the 80% threshold in a tenant', function () {
     Notification::fake();
 
-    $this->user->settings()->merge(['storage_quota_bytes' => 10_000]);
+    $this->user->settings()->merge(['storage_quota_override' => 10_000]);
 
     $item = FileItem::factory()->create([
         'tenant_id' => $this->tenant->id,
@@ -157,7 +163,7 @@ it('fires a notification when crossing the 80% threshold in a tenant', function 
 it('does not re-fire the same threshold twice in the same tenant', function () {
     Notification::fake();
 
-    $this->user->settings()->merge(['storage_quota_bytes' => 10_000]);
+    $this->user->settings()->merge(['storage_quota_override' => 10_000]);
 
     $item = FileItem::factory()->create([
         'tenant_id' => $this->tenant->id,
@@ -176,7 +182,7 @@ it('fires independent threshold alerts per tenant', function () {
 
     $other = Tenant::factory()->create();
     $this->user->customers()->attach($other);
-    $this->user->settings()->merge(['storage_quota_bytes' => 10_000]);
+    $this->user->settings()->merge(['storage_quota_override' => 10_000]);
 
     $a = FileItem::factory()->create(['tenant_id' => $this->tenant->id, 'user_id' => $this->user->id]);
     $b = FileItem::factory()->create(['tenant_id' => $other->id, 'user_id' => $this->user->id]);

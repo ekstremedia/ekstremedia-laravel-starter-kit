@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\AvatarController;
+use App\Http\Controllers\CompanyFileController;
+use App\Http\Controllers\CompanyFileTrashController;
 use App\Http\Controllers\CustomerMembersController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FileItemController;
@@ -51,6 +53,45 @@ Route::delete('/files/trash/{id}', [FileTrashController::class, 'forceDelete'])
     ->whereNumber('id')
     ->name('files.trash.forceDelete');
 Route::delete('/files/trash', [FileTrashController::class, 'empty'])->name('files.trash.empty');
+
+// Company-shared files. Literal segments registered before `/files/{folder}`
+// so "company" isn't swallowed by the numeric folder binding.
+Route::get('/files/company', [CompanyFileController::class, 'index'])->name('files.company.index');
+Route::get('/files/company/trash', [CompanyFileTrashController::class, 'index'])->name('files.company.trash.index');
+Route::post('/files/company/trash/{id}/restore', [CompanyFileTrashController::class, 'restore'])
+    ->whereNumber('id')
+    ->name('files.company.trash.restore');
+Route::delete('/files/company/trash/{id}', [CompanyFileTrashController::class, 'forceDelete'])
+    ->whereNumber('id')
+    ->name('files.company.trash.forceDelete');
+Route::post('/files/company/folder', [CompanyFileController::class, 'storeFolder'])->name('files.company.folder.store');
+Route::post('/files/company', [CompanyFileController::class, 'store'])
+    ->middleware('company.storage.available')
+    ->name('files.company.store');
+Route::get('/files/company/{folder}', [CompanyFileController::class, 'index'])
+    ->whereNumber('folder')
+    ->name('files.company.show');
+Route::patch('/files/company/{file}', [CompanyFileController::class, 'update'])
+    ->whereNumber('file')
+    ->name('files.company.update');
+Route::delete('/files/company/{file}', [CompanyFileController::class, 'destroy'])
+    ->whereNumber('file')
+    ->name('files.company.destroy');
+Route::get('/files/company/{file}/download', [CompanyFileController::class, 'download'])
+    ->whereNumber('file')
+    ->name('files.company.download');
+Route::delete('/files/company/links/{link}', [CompanyFileController::class, 'unlink'])
+    ->whereNumber('link')
+    ->name('files.company.links.destroy');
+
+// Share/unshare a personal file to the customer's company tree.
+Route::post('/files/{file}/share-to-company', [FileItemController::class, 'share'])
+    ->whereNumber('file')
+    ->name('files.shareToCompany');
+Route::delete('/files/{file}/share-to-company', [FileItemController::class, 'unshare'])
+    ->whereNumber('file')
+    ->name('files.unshareFromCompany');
+
 Route::get('/files/{folder}', [FileItemController::class, 'index'])
     ->whereNumber('folder')
     ->name('files.show');

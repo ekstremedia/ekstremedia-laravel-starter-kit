@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnforceAppSettings;
 use App\Http\Middleware\EnsureChatEnabled;
+use App\Http\Middleware\EnsureCompanyStorageAvailable;
 use App\Http\Middleware\EnsureCustomerAdmin;
 use App\Http\Middleware\EnsureStorageAvailable;
 use App\Http\Middleware\EnsureSuperAdmin;
@@ -58,6 +59,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => RoleOrPermissionMiddleware::class,
             'chat.enabled' => EnsureChatEnabled::class,
             'storage.available' => EnsureStorageAvailable::class,
+            'company.storage.available' => EnsureCompanyStorageAvailable::class,
             'customer.admin' => EnsureCustomerAdmin::class,
             'super.admin' => EnsureSuperAdmin::class,
         ]);

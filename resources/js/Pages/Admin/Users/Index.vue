@@ -22,7 +22,10 @@ interface UserRow {
     is_super_admin?: boolean;
     customer_roles: CustomerRoleCell[];
     storage_used_bytes: number;
-    storage_quota_bytes: number | null;
+    // Raw user override. null = inherit, -1 = explicit unlimited,
+    // 0 = blocked, N>0 = cap. Resolution happens server-side for the
+    // main file UI; the admin list only uses it to shade the bar.
+    storage_quota_override: number | null;
     banned_at?: string | null;
 }
 
@@ -103,10 +106,12 @@ function formatBytes(n: number | null | undefined): string {
 }
 
 function storageRatio(u: UserRow): number {
-    if (u.storage_quota_bytes && u.storage_quota_bytes > 0) {
-        return Math.min(1, (u.storage_used_bytes ?? 0) / u.storage_quota_bytes);
+    if (u.storage_quota_override && u.storage_quota_override > 0) {
+        return Math.min(1, (u.storage_used_bytes ?? 0) / u.storage_quota_override);
     }
-    // Unlimited quota — fill by using an arbitrary ceiling so the bar shows something.
+    // Unlimited or inherited quota — fill by using an arbitrary ceiling so
+    // the bar shows something. The real effective cap (3-tier) isn't
+    // exposed to this list; edit the user to see it.
     const ceiling = 1024 * 1024 * 1024; // 1 GB visual ceiling
     return Math.min(1, (u.storage_used_bytes ?? 0) / ceiling);
 }

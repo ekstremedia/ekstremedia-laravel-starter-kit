@@ -22,6 +22,7 @@ class AppSetting extends Model
         'send_welcome_notification' => 'boolean',
         'files_feature_enabled' => 'boolean',
         'max_share_days' => 'integer',
+        'default_personal_storage_bytes' => 'integer',
     ];
 
     public static function current(): self
@@ -35,8 +36,15 @@ class AppSetting extends Model
             'require_2fa_for_admins' => false,
             'send_welcome_notification' => true,
             'announcement_severity' => 'info',
-            'files_feature_enabled' => false,
+            // Files on by default so a fresh install has a usable file
+            // system right away — admins can still flip it off globally
+            // from /admin/settings if they don't want it.
+            'files_feature_enabled' => true,
             'max_share_days' => 7,
+            // 5 GB baseline per user, cascading down through the 3-tier
+            // resolution. Customer/user overrides still take precedence —
+            // this is the "nothing configured" fallback.
+            'default_personal_storage_bytes' => 5 * 1024 * 1024 * 1024,
         ]);
     }
 }

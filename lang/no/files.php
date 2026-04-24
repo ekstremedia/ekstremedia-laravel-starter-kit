@@ -35,4 +35,21 @@ return [
     'force_deleted' => 'Permanent slettet.',
     'trash_emptied' => 'Papirkurven er tømt.',
     'trash' => 'Papirkurv',
+
+    // Bedriftsdeling
+    'company_title' => 'Bedriftsfiler',
+    'company_not_enabled' => 'Bedriftsfiler er ikke aktivert for denne kunden.',
+    'company_quota_disabled' => 'Opplastinger til bedriftsfiler er deaktivert.',
+    'company_quota_exceeded' => 'Opplastingen ville overskride kundens lagringsgrense.',
+    'company_unlinked' => 'Fjernet fra bedriftsfiler.',
+    'cannot_share_folder' => 'Mapper kan ikke deles til bedriften — del filene i mappen i stedet.',
+    'cannot_share_non_personal' => 'Kun personlige filer kan deles med bedriften.',
+    'invalid_company_folder' => 'Den valgte mappen finnes ikke i kundens bedriftsfiler.',
+    'shared_to_company' => 'Delt med bedriften.',
+    'shared_to_company_queued' => 'Deler mappen med bedriften — den dukker opp om et øyeblikk.',
+    'unshared_from_company' => 'Fjernet fra bedriftsfiler.',
+    'company_deleted_title' => ':tenant — delt fil slettet',
+    'company_deleted_body' => ':actor slettet den delte filen «:file» fra :tenant.',
+    'company_unlinked_title' => ':tenant — delt fil fjernet',
+    'company_unlinked_body' => ':actor fjernet filen «:file» fra :tenant sine bedriftsfiler. Din personlige kopi er uendret.',
 ];

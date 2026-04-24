@@ -13,3 +13,18 @@ Broadcast::channel('admin.health', function ($user) {
 Broadcast::channel('chat.conversation.{conversationId}', function ($user, $conversationId) {
     return $user->conversations()->whereKey((int) $conversationId)->exists();
 });
+
+// Per-customer live feed for company-shared files. Every member of the
+// tenant gets auth'd; super admins are allowed through for support /
+// debugging. Presence isn't exposed — clients only see "tree changed"
+// pings carrying a version number, not the names of other connected users.
+Broadcast::channel('customer.{tenantId}.files', function ($user, $tenantId) {
+    if ($user === null) {
+        return false;
+    }
+    if (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
+        return true;
+    }
+
+    return $user->customers()->where('tenants.id', (int) $tenantId)->exists();
+});

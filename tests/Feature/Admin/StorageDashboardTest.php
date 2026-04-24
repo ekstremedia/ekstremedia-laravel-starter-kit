@@ -36,8 +36,8 @@ it('updates a user quota via the admin endpoint', function () {
     $target = User::factory()->create();
 
     $this->actingAs($this->admin)
-        ->patch("/admin/users/{$target->id}/quota", ['storage_quota_bytes' => 5_000_000])
+        ->patch("/admin/users/{$target->id}/quota", ['storage_quota_override' => 5_000_000])
         ->assertRedirect();
 
-    expect($target->fresh()->settings()->resolved()['storage_quota_bytes'])->toBe(5_000_000);
+    expect($target->fresh()->settings()->resolved()['storage_quota_override'])->toBe(5_000_000);
 });

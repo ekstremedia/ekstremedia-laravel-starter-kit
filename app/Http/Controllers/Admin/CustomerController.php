@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\StorageUsageService;
 use App\Support\CustomerMembership;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -85,12 +86,17 @@ class CustomerController extends Controller
             ->with('success', __('flash.customers.created', ['name' => $customer->name]));
     }
 
-    public function edit(Tenant $customer): Response
+    public function edit(Tenant $customer, StorageUsageService $usage): Response
     {
         $customer->load(['users' => function ($q) {
             $q->select('users.id', 'users.first_name', 'users.last_name', 'users.email')
                 ->orderBy('users.email');
         }]);
+
+        // Live usage for the "Used: X GB of Y" caption on the admin edit
+        // page. Cheap per-page query; surface the fresh number rather than
+        // the denormalized column in case it drifted.
+        $companyUsed = $usage->usedBytesForTenantCompany($customer);
 
         return Inertia::render('Admin/Customers/Edit', [
             'customer' => [
@@ -99,6 +105,10 @@ class CustomerController extends Controller
                 'name' => $customer->name,
                 'status' => $customer->status,
                 'files_feature_enabled' => (bool) $customer->files_feature_enabled,
+                'company_files_enabled' => (bool) $customer->company_files_enabled,
+                'storage_quota_bytes' => $customer->storage_quota_bytes,
+                'storage_used_bytes' => $companyUsed,
+                'default_member_storage_bytes' => $customer->default_member_storage_bytes,
                 'users' => $customer->users->map(fn (User $user) => [
                     'id' => $user->id,
                     'email' => $user->email,
@@ -106,6 +116,7 @@ class CustomerController extends Controller
                 ])->values(),
             ],
             'global_files_feature_enabled' => (bool) AppSetting::current()->files_feature_enabled,
+            'global_default_personal_storage_bytes' => AppSetting::current()->default_personal_storage_bytes,
         ]);
     }
 
@@ -125,7 +136,21 @@ class CustomerController extends Controller
                     }
                 },
             ],
+            'company_files_enabled' => ['sometimes', 'boolean'],
+            // -1 = explicit unlimited, null = unlimited (no cap set),
+            // 0 = blocked, N>0 = byte cap.
+            'storage_quota_bytes' => ['sometimes', 'nullable', 'integer', 'min:-1'],
+            'default_member_storage_bytes' => ['sometimes', 'nullable', 'integer', 'min:-1'],
         ]);
+
+        // Company files requires the personal files feature to be on too —
+        // disabling files_feature_enabled implicitly disables company files.
+        $filesEnabled = array_key_exists('files_feature_enabled', $data)
+            ? (bool) $data['files_feature_enabled']
+            : (bool) $customer->files_feature_enabled;
+        if (array_key_exists('company_files_enabled', $data) && $data['company_files_enabled'] && ! $filesEnabled) {
+            $data['company_files_enabled'] = false;
+        }
 
         $customer->update($data);
 

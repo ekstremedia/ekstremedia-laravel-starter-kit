@@ -35,4 +35,21 @@ return [
     'force_deleted' => 'Permanently deleted.',
     'trash_emptied' => 'Trash emptied.',
     'trash' => 'Trash',
+
+    // Company Files
+    'company_title' => 'Company files',
+    'company_not_enabled' => 'Company files are not enabled for this customer.',
+    'company_quota_disabled' => 'Company file uploads are disabled.',
+    'company_quota_exceeded' => 'Upload would exceed this customer\'s storage quota.',
+    'company_unlinked' => 'Removed from company files.',
+    'cannot_share_folder' => 'Folders can\'t be shared to company — link the files inside instead.',
+    'cannot_share_non_personal' => 'Only personal files can be shared to the company.',
+    'invalid_company_folder' => 'The selected folder does not exist in this customer\'s company files.',
+    'shared_to_company' => 'Shared with company.',
+    'shared_to_company_queued' => 'Sharing folder with company — it will appear momentarily.',
+    'unshared_from_company' => 'Removed from company files.',
+    'company_deleted_title' => ':tenant — shared file deleted',
+    'company_deleted_body' => ':actor deleted your shared file ":file" from :tenant.',
+    'company_unlinked_title' => ':tenant — shared file removed',
+    'company_unlinked_body' => ':actor removed your file ":file" from :tenant\'s company files. Your personal copy is untouched.',
 ];

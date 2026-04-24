@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\AppSetting;
 use App\Models\FileItem;
 use App\Models\Message;
 use App\Models\Tenant;
@@ -234,7 +235,7 @@ class StorageUsageService
      */
     public function remainingBytesInTenant(User $user, Tenant $tenant): ?int
     {
-        $quota = $user->settings()->resolved()['storage_quota_bytes'] ?? null;
+        $quota = $this->effectivePersonalQuota($user, $tenant);
 
         if ($quota === null) {
             return null;
@@ -242,19 +243,139 @@ class StorageUsageService
 
         $used = $this->usedBytesForUserInTenant($user, $tenant);
 
-        return max(0, (int) $quota - $used);
+        return max(0, $quota - $used);
     }
 
     /** 0-100(+) percent of quota consumed by this tenant's files. */
     public function percentUsedInTenant(User $user, Tenant $tenant): float
     {
-        $quota = $user->settings()->resolved()['storage_quota_bytes'] ?? null;
+        $quota = $this->effectivePersonalQuota($user, $tenant);
 
         if ($quota === null || $quota <= 0) {
             return 0.0;
         }
 
         return round(($this->usedBytesForUserInTenant($user, $tenant) / $quota) * 100, 2);
+    }
+
+    /**
+     * Resolve a user's effective personal-storage quota following the 3-tier
+     * fallback order: user override → customer default → global default →
+     * unlimited. Returns `null` for unlimited, `0` for hard-disabled, and a
+     * positive byte cap otherwise.
+     *
+     * Sentinels:
+     *   - `-1` at any level = explicit unlimited (returns null so existing
+     *     "null = no cap" checks keep working).
+     *   - `0` is a hard block (returns 0) — never inherited past.
+     *   - null at a given level means "defer to the next level"; only the
+     *     final fallback (app default) treats null as unlimited.
+     */
+    public function effectivePersonalQuota(User $user, Tenant $tenant): ?int
+    {
+        $override = $user->settings()->resolved()['storage_quota_override'] ?? null;
+        if ($override !== null) {
+            $override = (int) $override;
+            if ($override < 0) {
+                return null;
+            }
+
+            return $override;
+        }
+
+        $tenantDefault = $tenant->default_member_storage_bytes;
+        if ($tenantDefault !== null) {
+            $tenantDefault = (int) $tenantDefault;
+            if ($tenantDefault < 0) {
+                return null;
+            }
+
+            return $tenantDefault;
+        }
+
+        $appDefault = AppSetting::current()->default_personal_storage_bytes;
+        if ($appDefault !== null) {
+            $appDefault = (int) $appDefault;
+            if ($appDefault < 0) {
+                return null;
+            }
+
+            return $appDefault;
+        }
+
+        return null;
+    }
+
+    /**
+     * Bytes consumed by the company-shared bucket for this tenant: the sum of
+     * native company-scope uploads plus every personal file currently linked
+     * into this tenant's company tree. A linked file counts toward BOTH its
+     * owner's personal bucket and the company bucket — intentional: the
+     * shared copy increases the tenant's footprint without affecting the
+     * user's own storage accounting.
+     */
+    public function usedBytesForTenantCompany(Tenant $tenant): int
+    {
+        $conn = $this->central();
+
+        $native = DB::connection($conn)
+            ->table('media')
+            ->join('file_items', function ($join): void {
+                $join->on('file_items.id', '=', 'media.model_id')
+                    ->where('media.model_type', FileItem::class);
+            })
+            ->where('media.collection_name', self::BILLABLE_COLLECTION)
+            ->where('file_items.scope', FileItem::SCOPE_COMPANY)
+            ->where('file_items.tenant_id', $tenant->id)
+            ->sum('media.size');
+
+        $linked = DB::connection($conn)
+            ->table('media')
+            ->join('file_items', function ($join): void {
+                $join->on('file_items.id', '=', 'media.model_id')
+                    ->where('media.model_type', FileItem::class);
+            })
+            ->join('company_file_links', 'company_file_links.file_item_id', '=', 'file_items.id')
+            ->where('media.collection_name', self::BILLABLE_COLLECTION)
+            ->where('company_file_links.tenant_id', $tenant->id)
+            ->sum('media.size');
+
+        return (int) $native + (int) $linked;
+    }
+
+    /**
+     * Remaining bytes in the company bucket. `null` = unlimited,
+     * `0` = disabled or cap reached.
+     */
+    public function remainingBytesForTenantCompany(Tenant $tenant): ?int
+    {
+        $quota = $tenant->storage_quota_bytes;
+
+        if ($quota === null) {
+            return null;
+        }
+
+        $quota = (int) $quota;
+
+        if ($quota < 0) {
+            return null;
+        }
+
+        $used = $this->usedBytesForTenantCompany($tenant);
+
+        return max(0, $quota - $used);
+    }
+
+    /** Sync the denormalized `tenants.storage_used_bytes` column from media. */
+    public function recomputeForTenant(Tenant $tenant): int
+    {
+        $bytes = $this->usedBytesForTenantCompany($tenant);
+
+        if ((int) $tenant->storage_used_bytes !== $bytes) {
+            $tenant->forceFill(['storage_used_bytes' => $bytes])->saveQuietly();
+        }
+
+        return $bytes;
     }
 
     /**
@@ -267,7 +388,7 @@ class StorageUsageService
     {
         $settings = $user->settings();
         $resolved = $settings->resolved();
-        $quota = $resolved['storage_quota_bytes'] ?? null;
+        $quota = $this->effectivePersonalQuota($user, $tenant);
 
         if ($quota === null || $quota <= 0) {
             return;

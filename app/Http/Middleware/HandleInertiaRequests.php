@@ -130,6 +130,7 @@ class HandleInertiaRequests extends Middleware
             'slug' => $customer->slug,
             'name' => $customer->name,
             'files_feature_enabled' => (bool) $customer->files_feature_enabled,
+            'company_files_enabled' => (bool) $customer->company_files_enabled,
         ];
     }
 

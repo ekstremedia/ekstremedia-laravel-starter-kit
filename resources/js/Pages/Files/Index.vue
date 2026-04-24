@@ -35,6 +35,11 @@ interface FileItem {
     video_ready?: boolean;
     preview_processing?: boolean;
     has_doc_preview?: boolean;
+    // Marks a file as currently linked into the active customer's Company
+    // Files. Purely informational on personal items — the file itself is
+    // unchanged either way.
+    shared_to_company?: boolean;
+    company_link_id?: number | null;
     thumbnail_url: string | null;
     preview_url: string | null;
     original_url: string | null;
@@ -95,6 +100,37 @@ const sharePassword = ref('');
 const shareHours = ref(24);
 const shareCreating = ref(false);
 const shareResultUrl = ref<string | null>(null);
+
+// Surface the Share-to-Company action only when (a) the tenant has the
+// feature on and (b) the user has the permission. Permissions are a flat
+// list of names on auth.user.permissions (shared by HandleInertiaRequests).
+const canShareToCompany = computed<boolean>(() => {
+    const customer = page.props.customer;
+    const perms = (page.props.auth?.user as { permissions?: string[] } | undefined)?.permissions ?? [];
+    return !!customer?.company_files_enabled && perms.includes('share files to company');
+});
+
+function shareToCompany(item: FileItem) {
+    if (item.type !== 'file') return;
+    router.post(customerUrl(`/files/${item.id}/share-to-company`), {}, {
+        preserveScroll: true,
+        onSuccess: () => toast.add({
+            severity: 'success', summary: t('files.share_to_company'), detail: t('files.shared_to_company'), life: 3000,
+        }),
+        onError: () => toast.add({
+            severity: 'error', summary: t('files.share_to_company'), detail: t('files.share_failed'), life: 4000,
+        }),
+    });
+}
+
+function unshareFromCompany(item: FileItem) {
+    router.delete(customerUrl(`/files/${item.id}/share-to-company`), {
+        preserveScroll: true,
+        onSuccess: () => toast.add({
+            severity: 'success', summary: t('files.unshare_from_company'), detail: t('files.company_unlinked'), life: 3000,
+        }),
+    });
+}
 
 function openShareDialog(item: FileItem) {
     shareDialogFile.value = item;
@@ -873,6 +909,9 @@ const usageLabel = computed(() => {
                             @rename="startRename(item)"
                             @share="openShareDialog(item)"
                             @delete="confirmDelete(item)"
+                            :canShareToCompany="canShareToCompany"
+                            @shareToCompany="shareToCompany(item)"
+                            @unshareFromCompany="unshareFromCompany(item)"
                         />
                     </div>
                 </div>

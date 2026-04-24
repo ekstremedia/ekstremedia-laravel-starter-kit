@@ -48,10 +48,23 @@ class FileItemResource extends JsonResource
         // stuck forever.
         $previewProcessing = $videoProcessing || $docPreviewProcessing;
 
+        // `shared_to_company` drives the "shared" badge + unshare action in
+        // My Files. Callers MUST eager-load `companyLink` (and `user` if
+        // the owner chip is needed) before handing the FileItem to this
+        // resource — a missing relation is treated as "not loaded" and the
+        // flags default off, rather than issuing per-item lookups that
+        // would N+1 across a listing.
+        $companyLink = $this->relationLoaded('companyLink')
+            ? $this->getRelation('companyLink')
+            : null;
+
+        $owner = $this->relationLoaded('user') ? $this->getRelation('user') : null;
+
         return [
             'id' => $this->id,
             'uuid' => $this->uuid,
             'type' => $this->type,
+            'scope' => $this->scope,
             'name' => $this->name,
             'mime_type' => $this->mime_type,
             'size' => (int) $this->size,
@@ -61,6 +74,13 @@ class FileItemResource extends JsonResource
             'video_processing' => $videoProcessing,
             'video_ready' => $videoReady,
             'preview_processing' => $previewProcessing,
+            'shared_to_company' => $companyLink !== null,
+            'company_link_id' => $companyLink?->id,
+            'owner' => $owner ? [
+                'id' => $owner->id,
+                'name' => $owner->fullName(),
+                'avatar_thumb_url' => $owner->avatarUrl('thumb'),
+            ] : null,
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),
 

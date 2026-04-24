@@ -32,8 +32,16 @@ class EnsureStorageAvailable
             return $next($request);
         }
 
-        $settings = $user->settings()->resolved();
-        $quota = $settings['storage_quota_bytes'] ?? null;
+        // Quota is applied per-tenant. On customer-scoped routes
+        // `InitializeTenancyByPath` stashes the tenant in request attributes.
+        // If this middleware is ever hit outside a customer route (shouldn't
+        // happen in practice), skip — there's nothing to scope against.
+        $tenant = $request->attributes->get('customer');
+        if (! $tenant instanceof Tenant) {
+            return $next($request);
+        }
+
+        $quota = $this->usage->effectivePersonalQuota($user, $tenant);
 
         // 0 = hard disabled.
         if ($quota === 0) {
@@ -42,15 +50,6 @@ class EnsureStorageAvailable
 
         // null = unlimited. Nothing to check.
         if ($quota === null) {
-            return $next($request);
-        }
-
-        // Quota is applied per-tenant. On customer-scoped routes
-        // `InitializeTenancyByPath` stashes the tenant in request attributes.
-        // If this middleware is ever hit outside a customer route (shouldn't
-        // happen in practice), skip — there's nothing to scope against.
-        $tenant = $request->attributes->get('customer');
-        if (! $tenant instanceof Tenant) {
             return $next($request);
         }
 

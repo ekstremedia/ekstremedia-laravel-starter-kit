@@ -40,6 +40,15 @@ class RoleAndPermissionSeeder extends Seeder
             'rename files',
             'delete files',
             'share files',
+            // Company-shared Files. `manage company files` is the catch-all
+            // for admin-level actions (delete anyone's shared file, unshare a
+            // link, edit any folder regardless of creator) — it doesn't grant
+            // the basic `view`/`upload`/... permissions on its own.
+            'view company files',
+            'upload to company files',
+            'create company folders',
+            'share files to company',
+            'manage company files',
         ];
 
         foreach ($customerPermissions as $permission) {
@@ -60,6 +69,10 @@ class RoleAndPermissionSeeder extends Seeder
             'rename files',
             'delete files',
             'share files',
+            'view company files',
+            'upload to company files',
+            'create company folders',
+            'share files to company',
         ]);
 
         $userRole = Role::firstOrCreate(['name' => 'User']);
@@ -71,6 +84,11 @@ class RoleAndPermissionSeeder extends Seeder
             'rename files',
             'delete files',
             'share files',
+            // Users can see the company area and contribute their own files,
+            // but can't upload-into or manage the native company tree —
+            // Editors+ handle folder organisation.
+            'view company files',
+            'share files to company',
         ]);
     }
 }
