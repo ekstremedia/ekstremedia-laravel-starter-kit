@@ -341,13 +341,13 @@ const quotaLabel = computed(() => {
                             v-if="item.type === 'file'"
                             @click="download(item)"
                             :title="t('files.download')"
-                            :style="{ background: 'rgba(10,12,18,0.7)', border: 'none', color: '#fff', cursor: 'pointer', padding: '5px 7px', borderRadius: '9999px' }"
+                            :style="{ background: 'var(--overlay)', border: 'none', color: 'var(--fg-inverse)', cursor: 'pointer', padding: '5px 7px', borderRadius: '9999px' }"
                         ><i class="pi pi-download" :style="{ fontSize: '10px' }" /></button>
                         <button
                             v-if="item.can_manage"
                             @click="openDelete(item)"
                             :title="item.linked ? t('files.unshare_from_company') : t('files.delete')"
-                            :style="{ background: 'rgba(10,12,18,0.7)', border: 'none', color: '#fff', cursor: 'pointer', padding: '5px 7px', borderRadius: '9999px' }"
+                            :style="{ background: 'var(--overlay)', border: 'none', color: 'var(--fg-inverse)', cursor: 'pointer', padding: '5px 7px', borderRadius: '9999px' }"
                         ><i class="pi pi-trash" :style="{ fontSize: '10px' }" /></button>
                     </div>
                 </div>

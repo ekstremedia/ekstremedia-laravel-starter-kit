@@ -98,9 +98,9 @@ const triggerStyle = computed(() => props.variant === 'inline'
         fontFamily: 'inherit',
     }
     : {
-        background: 'rgba(10,12,18,0.7)',
+        background: 'var(--overlay)',
         border: 'none',
-        color: '#fff',
+        color: 'var(--fg-inverse)',
         borderRadius: '9999px',
         padding: '5px 7px',
         cursor: 'pointer',

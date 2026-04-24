@@ -44,6 +44,7 @@ return [
     'company_unlinked' => 'Removed from company files.',
     'cannot_share_folder' => 'Folders can\'t be shared to company — link the files inside instead.',
     'cannot_share_non_personal' => 'Only personal files can be shared to the company.',
+    'cannot_unshare_non_personal' => 'Only personal files can be unshared from the company.',
     'invalid_company_folder' => 'The selected folder does not exist in this customer\'s company files.',
     'shared_to_company' => 'Shared with company.',
     'shared_to_company_queued' => 'Sharing folder with company — it will appear momentarily.',

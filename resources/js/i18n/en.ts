@@ -749,6 +749,7 @@ export default {
             custom: 'Custom',
             blocked: 'Blocked',
             global_default_member_storage: 'Global default: {value}',
+            custom_quota_required: 'Enter a positive number of GB, or pick "Blocked".',
         },
         mail: {
             title: 'Mail',

@@ -57,6 +57,15 @@ function gbToBytes(gb: number | string | null): number | null {
     return Math.round(n * BYTES_PER_GB);
 }
 
+// Custom mode requires a positive GB number. gbToBytes returns null for
+// empty/invalid/non-positive — treating that as "unlimited" silently
+// would let admins block storage by accident, so guard before submit.
+function isValidCustomGb(gb: number | string | null): boolean {
+    if (gb === '' || gb === null || gb === undefined) return false;
+    const n = typeof gb === 'string' ? Number(gb) : gb;
+    return isFinite(n) && n > 0;
+}
+
 type QuotaMode = 'unlimited' | 'custom' | 'blocked';
 type MemberMode = 'inherit' | 'unlimited' | 'custom' | 'blocked';
 
@@ -116,6 +125,15 @@ function humanBytes(n: number | null | undefined): string {
 }
 
 function save() {
+    if (companyMode.value === 'custom' && !isValidCustomGb(companyCustomGb.value)) {
+        push(t('admin.customers.custom_quota_required'), 'danger');
+        return;
+    }
+    if (memberMode.value === 'custom' && !isValidCustomGb(memberCustomGb.value)) {
+        push(t('admin.customers.custom_quota_required'), 'danger');
+        return;
+    }
+
     form.storage_quota_bytes = materializeCompanyQuota();
     form.default_member_storage_bytes = materializeMemberQuota();
 

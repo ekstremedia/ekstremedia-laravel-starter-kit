@@ -44,6 +44,7 @@ return [
     'company_unlinked' => 'Fjernet fra bedriftsfiler.',
     'cannot_share_folder' => 'Mapper kan ikke deles til bedriften — del filene i mappen i stedet.',
     'cannot_share_non_personal' => 'Kun personlige filer kan deles med bedriften.',
+    'cannot_unshare_non_personal' => 'Kun personlige filer kan fjernes fra bedriften.',
     'invalid_company_folder' => 'Den valgte mappen finnes ikke i kundens bedriftsfiler.',
     'shared_to_company' => 'Delt med bedriften.',
     'shared_to_company_queued' => 'Deler mappen med bedriften — den dukker opp om et øyeblikk.',

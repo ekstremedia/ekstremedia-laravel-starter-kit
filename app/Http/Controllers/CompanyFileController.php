@@ -430,6 +430,10 @@ class CompanyFileController extends Controller
             $filename = $file->name;
         }
 
+        if (! is_file($path)) {
+            abort(404);
+        }
+
         return response()->download($path, $filename);
     }
 

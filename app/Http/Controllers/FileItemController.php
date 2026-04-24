@@ -335,6 +335,10 @@ class FileItemController extends Controller
         $this->assertFeatureAvailable($request, $tenant);
         $this->authorizeOwn($file, $user->id, $tenant->id);
 
+        if ($file->scope !== FileItem::SCOPE_PERSONAL) {
+            abort(422, __('files.cannot_unshare_non_personal'));
+        }
+
         DB::connection((string) config('tenancy.database.central_connection'))
             ->transaction(function () use ($file, $tenant): void {
                 if ($file->isFolder()) {
