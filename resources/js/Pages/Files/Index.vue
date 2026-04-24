@@ -8,6 +8,7 @@ import UploadDialog from '@/Components/Files/UploadDialog.vue';
 import ImageLightbox from '@/Components/Files/ImageLightbox.vue';
 import VideoPlayer from '@/Components/Files/VideoPlayer.vue';
 import ItemActionsMenu from '@/Components/Files/ItemActionsMenu.vue';
+import ScopeSwitcher from '@/Components/Files/ScopeSwitcher.vue';
 import ConfirmDialog from 'primevue/confirmdialog';
 import { useConfirm } from 'primevue/useconfirm';
 import CommandDialog from '@/Components/Command/Dialog.vue';
@@ -108,6 +109,16 @@ const canShareToCompany = computed<boolean>(() => {
     const customer = page.props.customer;
     const perms = (page.props.auth?.user as { permissions?: string[] } | undefined)?.permissions ?? [];
     return !!customer?.company_files_enabled && perms.includes('share files to company');
+});
+
+// Scope-switcher pill — shown above the breadcrumbs on every personal
+// Files page. The Shared tab is hidden client-side when the viewer
+// lacks the permission (we still double-check server-side on every
+// company-files endpoint).
+const switcherPermissions = computed(() => {
+    const perms = (page.props.auth?.user as { permissions?: string[] } | undefined)?.permissions ?? [];
+    const isSuperAdmin = (page.props.auth?.user as { is_super_admin?: boolean } | undefined)?.is_super_admin === true;
+    return { canViewShared: isSuperAdmin || perms.includes('view company files') };
 });
 
 function shareToCompany(item: FileItem) {
@@ -540,10 +551,13 @@ const usageLabel = computed(() => {
 
             <!-- Header: meta + breadcrumbs + actions -->
             <header :style="{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }">
-                <div
-                    class="cmd-mono cmd-uc"
-                    :style="{ fontSize: '10.5px', color: 'var(--fg-mute)', letterSpacing: '0.06em' }"
-                >{{ t('files.title') }}</div>
+                <div :style="{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }">
+                    <div
+                        class="cmd-mono cmd-uc"
+                        :style="{ fontSize: '10.5px', color: 'var(--fg-mute)', letterSpacing: '0.06em' }"
+                    >{{ t('files.title') }}</div>
+                    <ScopeSwitcher active="private" :permissions="switcherPermissions" />
+                </div>
                 <div :style="{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }">
                     <div :style="{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', flexWrap: 'wrap' }">
                         <Link

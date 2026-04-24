@@ -246,7 +246,8 @@ export default {
         aria_label: 'Primary navigation',
         home: 'Home',
         dashboard: 'Dashboard',
-        files: 'Files',
+        files: 'Private files',
+        company_files: 'Shared files',
         chat: 'Chat',
         admin_overview: 'Overview',
         users: 'Users',
@@ -1046,6 +1047,10 @@ export default {
         view_list: 'List view',
         share_expiry_hours: '{count} hour | {count} hours',
         share_expiry_days: '{count} day | {count} days',
+        // Scope switcher — shared between /files and /files/company
+        scope_switcher: 'File scope',
+        scope_private: 'Private',
+        scope_shared: 'Shared',
         // Company Files
         company_title: 'Company files',
         breadcrumb_root: 'Root',

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import CommandLayout from '@/Layouts/CommandLayout.vue';
 import Icon from '@/Components/Command/Icon.vue';
 import CommandDialog from '@/Components/Command/Dialog.vue';
 import CmdButton from '@/Components/Command/Button.vue';
+import ScopeSwitcher from '@/Components/Files/ScopeSwitcher.vue';
+import type { PageProps } from '@/types';
 import { useConfirm } from 'primevue/useconfirm';
 import { useCommandToasts } from '@/composables/useCommandToasts';
 import { useCustomer } from '@/composables/useCustomer';
@@ -60,8 +62,17 @@ const { t } = useI18n();
 const { customerUrl, customer } = useCustomer();
 const { push } = useCommandToasts();
 const confirmer = useConfirm();
+const page = usePage<PageProps>();
 
 const parentId = computed(() => props.current_folder?.id ?? null);
+
+// The scope switcher needs to know whether the viewer can still see the
+// Shared tab — reuse the same permission gate as the server.
+const switcherPermissions = computed(() => {
+    const perms = (page.props.auth?.user as { permissions?: string[] } | undefined)?.permissions ?? [];
+    const isSuperAdmin = (page.props.auth?.user as { is_super_admin?: boolean } | undefined)?.is_super_admin === true;
+    return { canViewShared: isSuperAdmin || perms.includes('view company files') };
+});
 
 // ------------ Websocket live updates ------------
 // Subscribe to the tenant's private files channel on mount; when any member
@@ -246,6 +257,12 @@ const quotaLabel = computed(() => {
 <template>
     <div>
         <Head :title="t('files.company_title')" />
+
+        <!-- Scope switcher — same pill appears on both pages so the two
+             surfaces feel like two tabs of one app, not two pages. -->
+        <div :style="{ marginBottom: '14px' }">
+            <ScopeSwitcher active="shared" :permissions="switcherPermissions" />
+        </div>
 
         <!-- Header -->
         <div :style="{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '16px', gap: '16px' }">
