@@ -56,9 +56,8 @@ function destroy(c: CustomerRow) {
         acceptLabel: t('common.delete'),
         rejectLabel: t('common.cancel'),
         accept: () => {
-            router.delete(`/admin/customers/${c.id}`, {
-                onSuccess: () => push(t('admin.customers.toast_deleted', { name: c.name }), 'danger'),
-            });
+            // Server flashes flash.customers.deleted via useFlashToast.
+            router.delete(`/admin/customers/${c.id}`);
         },
     });
 }

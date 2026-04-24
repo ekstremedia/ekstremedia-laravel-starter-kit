@@ -119,21 +119,18 @@ function save() {
     form.storage_quota_bytes = materializeCompanyQuota();
     form.default_member_storage_bytes = materializeMemberQuota();
 
-    form.put(`/admin/customers/${props.customer.id}`, {
-        preserveScroll: true,
-        onSuccess: () => push(t('admin.customers.toast_updated'), 'success'),
-    });
+    // Server flashes flash.customers.updated via useFlashToast.
+    form.put(`/admin/customers/${props.customer.id}`, { preserveScroll: true });
 }
 
 const memberForm = useForm({ email: '' });
 
 function attach() {
+    // Server flashes flash.customers.member_added — reset the input
+    // here but let the flash surface the confirmation toast.
     memberForm.post(`/admin/customers/${props.customer.id}/members`, {
         preserveScroll: true,
-        onSuccess: () => {
-            memberForm.reset('email');
-            push(t('admin.customers.toast_member_added'), 'success');
-        },
+        onSuccess: () => memberForm.reset('email'),
     });
 }
 
@@ -147,10 +144,8 @@ function detach(member: Member) {
         acceptLabel: t('admin.customers.detach'),
         rejectLabel: t('common.cancel'),
         accept: () => {
-            router.delete(`/admin/customers/${props.customer.id}/members/${member.id}`, {
-                preserveScroll: true,
-                onSuccess: () => push(t('admin.customers.toast_member_removed', { email: member.email }), 'danger'),
-            });
+            // Server flashes flash.customers.member_removed.
+            router.delete(`/admin/customers/${props.customer.id}/members/${member.id}`, { preserveScroll: true });
         },
     });
 }

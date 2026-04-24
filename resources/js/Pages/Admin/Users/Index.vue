@@ -175,27 +175,21 @@ function deleteOne(u: UserRow) {
         acceptLabel: t('common.delete'),
         rejectLabel: t('common.cancel'),
         accept: () => {
-            router.delete(`/admin/users/${u.id}`, {
-                preserveScroll: true,
-                onSuccess: () => push(t('admin.users.toast_deleted', { name: `${u.first_name} ${u.last_name}` }), 'danger'),
-            });
+            // Server flashes flash.users.deleted; useFlashToast shows it.
+            router.delete(`/admin/users/${u.id}`, { preserveScroll: true });
         },
     });
 }
 
 function sendTest(u: UserRow) {
-    router.post(`/admin/users/${u.id}/notify-test`, {}, {
-        preserveScroll: true,
-        onSuccess: () => push(t('admin.users.toast_test_notification_sent'), 'success'),
-    });
+    // Server flashes flash.users.test_notification_sent.
+    router.post(`/admin/users/${u.id}/notify-test`, {}, { preserveScroll: true });
 }
 
 function unban(u: UserRow) {
     if (!u.banned_at) { push(t('admin.users.toast_not_banned'), 'info'); return; }
-    router.post(`/admin/users/${u.id}/unban`, {}, {
-        preserveScroll: true,
-        onSuccess: () => push(t('admin.users.toast_restored', { name: u.first_name }), 'success'),
-    });
+    // Server flashes flash.users.unbanned.
+    router.post(`/admin/users/${u.id}/unban`, {}, { preserveScroll: true });
 }
 
 function pageStart(): number {

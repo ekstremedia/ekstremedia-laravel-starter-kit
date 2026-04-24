@@ -53,9 +53,8 @@ function destroy(p: Permission) {
         acceptLabel: t('common.delete'),
         rejectLabel: t('common.cancel'),
         accept: () => {
-            router.delete(`/admin/permissions/${p.id}`, {
-                onSuccess: () => push(t('admin.permissions.toast_deleted', { name: p.name }), 'danger'),
-            });
+            // Server flashes flash.permissions.deleted via useFlashToast.
+            router.delete(`/admin/permissions/${p.id}`);
         },
     });
 }

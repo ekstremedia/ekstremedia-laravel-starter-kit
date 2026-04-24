@@ -29,15 +29,12 @@ function togglePermission(name: string) {
 }
 
 function submit() {
+    // Server flashes flash.roles.{updated,created} via useFlashToast —
+    // no client-side push needed.
     if (props.role) {
-        form.put(`/admin/roles/${props.role.id}`, {
-            preserveScroll: true,
-            onSuccess: () => push('Rolle lagret', 'success'),
-        });
+        form.put(`/admin/roles/${props.role.id}`, { preserveScroll: true });
     } else {
-        form.post('/admin/roles', {
-            onSuccess: () => push('Rolle opprettet', 'success'),
-        });
+        form.post('/admin/roles');
     }
 }
 </script>

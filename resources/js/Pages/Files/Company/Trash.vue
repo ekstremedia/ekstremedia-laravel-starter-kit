@@ -35,9 +35,10 @@ const { push } = useCommandToasts();
 const confirmer = useConfirm();
 
 function restore(item: TrashItem) {
+    // Server flashes files.restored; useFlashToast surfaces it. Pushing
+    // again here would stack two toasts for the same action.
     router.post(customerUrl(`/files/company/trash/${item.id}/restore`), {}, {
         preserveScroll: true,
-        onSuccess: () => push(t('files.restored'), 'success'),
     });
 }
 
@@ -54,7 +55,7 @@ function forceDelete(item: TrashItem) {
         accept: () => {
             router.delete(customerUrl(`/files/company/trash/${item.id}`), {
                 preserveScroll: true,
-                onSuccess: () => push(t('files.force_deleted'), 'success'),
+                // Success toast comes from the server flash.
                 onError: (errors) => {
                     const first = Object.values(errors)[0];
                     push(typeof first === 'string' ? first : t('common.error'), 'danger');

@@ -143,7 +143,8 @@ function onFilesChosen(event: Event) {
     router.post(customerUrl('/files/company'), form, {
         preserveScroll: true,
         forceFormData: true,
-        onSuccess: () => push(t('files.upload_success', { count: input.files!.length }), 'success'),
+        // Success toast comes from the server flash via useFlashToast —
+        // pushing one here too would stack two identical toasts.
         onError: (errors) => {
             const first = Object.values(errors)[0];
             push(typeof first === 'string' ? first : t('common.error'), 'danger');
@@ -213,10 +214,9 @@ function confirmDelete() {
     router.delete(endpoint, {
         data: payload,
         preserveScroll: true,
-        onSuccess: () => {
-            push(item.linked ? t('files.company_unlinked') : t('files.deleted'), 'success');
-            closeDelete();
-        },
+        // Server flashes files.deleted / files.company_unlinked which
+        // useFlashToast surfaces — only close the dialog here.
+        onSuccess: () => closeDelete(),
         // Keep the dialog open on failure so the admin sees the reason
         // (403, validation, or a backend abort message) and can retry.
         onError: (errors) => {
