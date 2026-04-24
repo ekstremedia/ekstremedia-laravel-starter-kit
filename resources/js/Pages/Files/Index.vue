@@ -8,7 +8,8 @@ import UploadDialog from '@/Components/Files/UploadDialog.vue';
 import ImageLightbox from '@/Components/Files/ImageLightbox.vue';
 import VideoPlayer from '@/Components/Files/VideoPlayer.vue';
 import ItemActionsMenu from '@/Components/Files/ItemActionsMenu.vue';
-import ScopeSwitcher from '@/Components/Files/ScopeSwitcher.vue';
+import FilesToolbar from '@/Components/Files/FilesToolbar.vue';
+import FilesUsageBar from '@/Components/Files/FilesUsageBar.vue';
 import ConfirmDialog from 'primevue/confirmdialog';
 import { useConfirm } from 'primevue/useconfirm';
 import CommandDialog from '@/Components/Command/Dialog.vue';
@@ -549,185 +550,57 @@ const usageLabel = computed(() => {
                 </div>
             </div>
 
-            <!-- Header: meta + breadcrumbs + actions -->
-            <header :style="{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }">
-                <div :style="{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }">
-                    <ScopeSwitcher active="private" :permissions="switcherPermissions" />
-                </div>
-                <div :style="{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }">
-                    <div :style="{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', flexWrap: 'wrap' }">
-                        <Link
-                            :href="customerUrl('/files')"
-                            :style="{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }"
-                        >{{ t('files.root') }}</Link>
-                        <template v-for="(b, i) in (breadcrumbs ?? [])" :key="b.id">
-                            <Icon name="chevR" :size="11" :style="{ color: 'var(--fg-mute)' }" />
-                            <Link
-                                v-if="i < (breadcrumbs?.length ?? 0) - 1"
-                                :href="customerUrl(`/files/${b.id}`)"
-                                :style="{ color: 'var(--accent)', textDecoration: 'none' }"
-                            >{{ b.name }}</Link>
-                            <span v-else :style="{ color: 'var(--fg)', fontWeight: 500 }">{{ b.name }}</span>
-                        </template>
-                    </div>
-                    <div :style="{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }">
-                        <button
-                            v-if="canUpload"
-                            type="button"
-                            @click="uploadOpen = true"
-                            :style="{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                background: 'var(--accent)',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: '5px',
-                                padding: '6px 12px',
-                                fontSize: '12px',
-                                fontWeight: 500,
-                                cursor: 'pointer',
-                                fontFamily: 'inherit',
-                            }"
-                        >
-                            <Icon name="plus" :size="12" />
-                            <span>{{ t('files.upload') }}</span>
-                        </button>
-                        <button
-                            v-if="canCreateFolder"
-                            type="button"
-                            @click="createFolder"
-                            class="cmd-ghost-btn"
-                        >
-                            <i class="pi pi-folder-plus" :style="{ fontSize: '11px' }" />
-                            <span>{{ t('files.new_folder') }}</span>
-                        </button>
-                        <input
-                            v-model="searchQuery"
-                            type="search"
-                            :placeholder="t('files.search_placeholder')"
-                            @keyup.enter="onSearch"
-                            :style="{
-                                width: '192px',
-                                background: 'var(--panel2)',
-                                border: '1px solid var(--border)',
-                                borderRadius: '5px',
-                                padding: '6px 10px',
-                                fontSize: '12px',
-                                color: 'var(--fg)',
-                                fontFamily: 'inherit',
-                            }"
-                        />
-                        <div
-                            :style="{
-                                display: 'inline-flex',
-                                border: '1px solid var(--border)',
-                                borderRadius: '5px',
-                                padding: '2px',
-                                background: 'var(--panel2)',
-                            }"
-                        >
-                            <button
-                                type="button"
-                                @click="setViewMode('grid')"
-                                :title="t('files.view_grid')"
-                                :aria-label="t('files.view_grid')"
-                                :aria-pressed="viewMode === 'grid'"
-                                :style="{
-                                    padding: '4px 8px',
-                                    borderRadius: '3px',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    fontSize: '11px',
-                                    fontFamily: 'inherit',
-                                    background: viewMode === 'grid' ? 'var(--accent-soft)' : 'transparent',
-                                    color: viewMode === 'grid' ? 'var(--fg)' : 'var(--fg-mute)',
-                                }"
-                            ><i class="pi pi-th-large" /></button>
-                            <button
-                                type="button"
-                                @click="setViewMode('list')"
-                                :title="t('files.view_list')"
-                                :aria-label="t('files.view_list')"
-                                :aria-pressed="viewMode === 'list'"
-                                :style="{
-                                    padding: '4px 8px',
-                                    borderRadius: '3px',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    fontSize: '11px',
-                                    fontFamily: 'inherit',
-                                    background: viewMode === 'list' ? 'var(--accent-soft)' : 'transparent',
-                                    color: viewMode === 'list' ? 'var(--fg)' : 'var(--fg-mute)',
-                                }"
-                            ><i class="pi pi-list" /></button>
-                        </div>
-                        <Link
-                            :href="customerUrl('/files/trash')"
-                            class="cmd-ghost-btn"
-                            :style="{ position: 'relative' }"
-                        >
-                            <i class="pi pi-trash" :style="{ fontSize: '11px' }" />
-                            <span>{{ t('files.trash') }}</span>
-                            <span
-                                v-if="(props.trashed_count ?? 0) > 0"
-                                :style="{
-                                    marginLeft: '4px',
-                                    minWidth: '18px',
-                                    display: 'inline-flex',
-                                    justifyContent: 'center',
-                                    background: 'rgba(255, 138, 138, 0.15)',
-                                    color: 'var(--danger)',
-                                    borderRadius: '9px',
-                                    padding: '1px 6px',
-                                    fontSize: '10px',
-                                    fontWeight: 600,
-                                }"
-                            >{{ props.trashed_count }}</span>
-                        </Link>
-                    </div>
-                </div>
-            </header>
-
-            <!-- Usage bar -->
-            <div
-                :style="{
-                    marginBottom: '16px',
-                    background: 'var(--panel)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '6px',
-                    padding: '10px 14px',
+            <!-- Shared toolbar — same component used on Shared Files,
+                 so every header tweak shows up on both scopes. -->
+            <FilesToolbar
+                scope="private"
+                base-path="/files"
+                :breadcrumbs="breadcrumbs ?? []"
+                :root-label="t('files.root')"
+                v-model:search="searchQuery"
+                :view-mode="viewMode"
+                @update:viewMode="setViewMode"
+                @submit-search="onSearch"
+                @upload="uploadOpen = true"
+                @new-folder="createFolder"
+                :permissions="{
+                    upload: canUpload,
+                    createFolder: canCreateFolder,
+                    canViewShared: switcherPermissions.canViewShared,
                 }"
             >
-                <div :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }">
-                    <span :style="{ color: 'var(--fg-dim)' }">{{ usageLabel }}</span>
-                    <span
-                        v-if="props.usage?.quota_bytes && props.usage.quota_bytes > 0"
-                        class="cmd-mono"
-                        :style="{ color: 'var(--fg)', fontWeight: 500, fontSize: '11px' }"
-                    >{{ props.usage.percent }}%</span>
-                </div>
-                <div
-                    v-if="props.usage.quota_bytes && props.usage.quota_bytes > 0"
-                    :style="{
-                        marginTop: '8px',
-                        height: '4px',
-                        overflow: 'hidden',
-                        borderRadius: '9999px',
-                        background: 'var(--panel2)',
-                        border: '1px solid var(--border)',
-                    }"
-                >
-                    <div
-                        :style="{
-                            height: '100%',
-                            transition: 'width 180ms ease',
-                            background: props.usage.percent >= 95 ? 'var(--danger)' : props.usage.percent >= 80 ? 'var(--warning)' : 'var(--accent)',
-                            width: `${Math.min(100, props.usage.percent)}%`,
-                        }"
-                    />
-                </div>
-            </div>
+                <template #afterActions>
+                    <Link
+                        :href="customerUrl('/files/trash')"
+                        class="cmd-ghost-btn"
+                        :style="{ position: 'relative' }"
+                    >
+                        <i class="pi pi-trash" :style="{ fontSize: '11px' }" />
+                        <span>{{ t('files.trash') }}</span>
+                        <span
+                            v-if="(props.trashed_count ?? 0) > 0"
+                            :style="{
+                                marginLeft: '4px',
+                                minWidth: '18px',
+                                display: 'inline-flex',
+                                justifyContent: 'center',
+                                background: 'rgba(255, 138, 138, 0.15)',
+                                color: 'var(--danger)',
+                                borderRadius: '9px',
+                                padding: '1px 6px',
+                                fontSize: '10px',
+                                fontWeight: 600,
+                            }"
+                        >{{ props.trashed_count }}</span>
+                    </Link>
+                </template>
+            </FilesToolbar>
+
+            <!-- Shared usage meter — identical on both Files surfaces. -->
+            <FilesUsageBar
+                :used-bytes="props.usage.used_bytes"
+                :quota-bytes="props.usage.quota_bytes"
+            />
 
             <!-- Empty state -->
             <div

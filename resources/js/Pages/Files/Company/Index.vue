@@ -6,7 +6,8 @@ import CommandLayout from '@/Layouts/CommandLayout.vue';
 import Icon from '@/Components/Command/Icon.vue';
 import CommandDialog from '@/Components/Command/Dialog.vue';
 import CmdButton from '@/Components/Command/Button.vue';
-import ScopeSwitcher from '@/Components/Files/ScopeSwitcher.vue';
+import FilesToolbar from '@/Components/Files/FilesToolbar.vue';
+import FilesUsageBar from '@/Components/Files/FilesUsageBar.vue';
 import type { PageProps } from '@/types';
 import { useConfirm } from 'primevue/useconfirm';
 import { useCommandToasts } from '@/composables/useCommandToasts';
@@ -274,95 +275,34 @@ const quotaLabel = computed(() => {
     <div class="cmd-files-page">
         <Head :title="t('files.company_title')" />
 
-        <!-- Scope switcher — same pill appears on both pages so the two
-             surfaces feel like two tabs of one app, not two pages. -->
-        <div :style="{ marginBottom: '14px' }">
-            <ScopeSwitcher active="shared" :permissions="switcherPermissions" />
-        </div>
+        <!-- Shared toolbar — identical on both Files pages. Upload +
+             New folder + search + grid/list + breadcrumbs + scope
+             switcher all live in one component, so any design tweak
+             lands on both scopes automatically. -->
+        <FilesToolbar
+            scope="shared"
+            base-path="/files/company"
+            :breadcrumbs="breadcrumbs"
+            :root-label="t('files.breadcrumb_root')"
+            v-model:search="searchQuery"
+            :view-mode="viewMode"
+            @update:viewMode="setViewMode"
+            @submit-search="onSearch"
+            @upload="triggerUpload"
+            @new-folder="newFolderOpen = true"
+            :permissions="{
+                upload: permissions.upload,
+                createFolder: permissions.create_folder,
+                canViewShared: switcherPermissions.canViewShared,
+            }"
+        />
+        <input ref="fileInput" type="file" multiple hidden @change="onFilesChosen" />
 
-        <!-- Header -->
-        <div :style="{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '16px', gap: '16px' }">
-            <div :style="{ minWidth: 0 }">
-                <h1 :style="{ margin: 0, fontSize: '20px', fontWeight: 600, color: 'var(--fg)' }">
-                    {{ t('files.company_title') }}
-                </h1>
-                <div :style="{ fontSize: '11.5px', color: 'var(--fg-mute)', marginTop: '4px', display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }">
-                    <Link :href="customerUrl('/files/company')" :style="{ color: 'var(--fg-dim)', textDecoration: 'none' }">{{ t('files.breadcrumb_root') }}</Link>
-                    <template v-for="bc in breadcrumbs" :key="bc.id">
-                        <Icon name="chevR" :size="9" :style="{ color: 'var(--fg-mute)' }" />
-                        <Link :href="customerUrl(`/files/company/${bc.id}`)" :style="{ color: 'var(--fg-dim)', textDecoration: 'none' }">{{ bc.name }}</Link>
-                    </template>
-                </div>
-            </div>
-
-            <div :style="{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }">
-                <input
-                    v-model="searchQuery"
-                    type="search"
-                    :placeholder="t('files.search_placeholder')"
-                    @keyup.enter="onSearch"
-                    :style="{
-                        width: '192px',
-                        background: 'var(--panel2)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '5px',
-                        padding: '6px 10px',
-                        fontSize: '12px',
-                        color: 'var(--fg)',
-                        fontFamily: 'inherit',
-                    }"
-                />
-                <!-- Grid/list toggle — mirrors the personal page and
-                     shares the same localStorage preference. -->
-                <div :style="{ display: 'inline-flex', background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '5px', padding: '2px' }">
-                    <button
-                        type="button"
-                        @click="setViewMode('grid')"
-                        :title="t('files.view_grid')"
-                        :style="{ background: viewMode === 'grid' ? 'var(--panel)' : 'transparent', border: 'none', padding: '4px 8px', borderRadius: '3px', color: viewMode === 'grid' ? 'var(--fg)' : 'var(--fg-dim)', cursor: 'pointer' }"
-                    ><i class="pi pi-th-large" :style="{ fontSize: '11px' }" /></button>
-                    <button
-                        type="button"
-                        @click="setViewMode('list')"
-                        :title="t('files.view_list')"
-                        :style="{ background: viewMode === 'list' ? 'var(--panel)' : 'transparent', border: 'none', padding: '4px 8px', borderRadius: '3px', color: viewMode === 'list' ? 'var(--fg)' : 'var(--fg-dim)', cursor: 'pointer' }"
-                    ><i class="pi pi-list" :style="{ fontSize: '11px' }" /></button>
-                </div>
-                <button
-                    v-if="permissions.create_folder"
-                    @click="newFolderOpen = true"
-                    :style="{ background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '5px', padding: '7px 11px', fontSize: '12px', color: 'var(--fg)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }"
-                >
-                    <Icon name="disk" :size="12" /> {{ t('files.new_folder') }}
-                </button>
-                <button
-                    v-if="permissions.upload"
-                    @click="triggerUpload"
-                    :style="{ background: 'var(--accent)', color: 'var(--accent-fg, #fff)', border: 'none', borderRadius: '5px', padding: '7px 11px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }"
-                >
-                    <Icon name="arrow" :size="12" /> {{ t('files.upload') }}
-                </button>
-                <input ref="fileInput" type="file" multiple hidden @change="onFilesChosen" />
-            </div>
-        </div>
-
-        <!-- Usage bar -->
-        <div :style="{ marginBottom: '14px', background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px 14px' }">
-            <div :style="{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: 'var(--fg-dim)', marginBottom: '6px' }">
-                <span>{{ humanBytes(usage.used_bytes) }} / {{ quotaLabel }}</span>
-                <span v-if="!usage.quota_unlimited && usage.quota_bytes">{{ usage.percent.toFixed(1) }}%</span>
-            </div>
-            <div :style="{ height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }">
-                <div
-                    :style="{
-                        height: '100%',
-                        width: `${Math.min(100, usage.percent)}%`,
-                        background: usage.percent >= 95 ? 'var(--danger)' : usage.percent >= 80 ? 'var(--warning)' : 'var(--accent)',
-                        transition: 'width 0.2s',
-                    }"
-                />
-            </div>
-        </div>
+        <FilesUsageBar
+            :used-bytes="usage.used_bytes"
+            :quota-bytes="usage.quota_bytes"
+            :quota-unlimited="usage.quota_unlimited"
+        />
 
         <!-- Items -->
         <div v-if="items.length === 0" :style="{ padding: '40px 20px', textAlign: 'center', color: 'var(--fg-mute)', background: 'var(--panel)', border: '1px dashed var(--border)', borderRadius: '6px' }">
