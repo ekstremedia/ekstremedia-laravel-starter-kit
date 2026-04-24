@@ -21,6 +21,7 @@ class AppSettingsController extends Controller
                 'default_role', 'require_2fa_for_admins', 'send_welcome_notification',
                 'maintenance_message', 'announcement_banner', 'announcement_severity',
                 'files_feature_enabled', 'max_share_days',
+                'default_personal_storage_bytes',
             ]),
             // Only customer-scoped roles are valid as a Fortify default — the
             // registration flow hands the new user off to `CustomerMembership`,
@@ -44,6 +45,11 @@ class AppSettingsController extends Controller
             'announcement_severity' => ['required', 'in:info,warn,danger,success'],
             'files_feature_enabled' => ['required', 'boolean'],
             'max_share_days' => ['required', 'integer', 'min:1', 'max:30'],
+            // Global fallback for personal storage quota. Null = unlimited
+            // (no cap), -1 = explicit unlimited, 0 = blocked, N>0 = byte cap.
+            // Capped at JS safe-integer range so Inertia round-trips keep
+            // precision.
+            'default_personal_storage_bytes' => ['sometimes', 'nullable', 'integer', 'min:-1', 'max:'.((2 ** 53) - 1)],
         ]);
 
         $settings = AppSetting::current();

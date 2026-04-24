@@ -25,6 +25,8 @@ interface Settings {
     announcement_severity: Severity;
     files_feature_enabled: boolean;
     max_share_days: number;
+    // null/null = unlimited, -1 = explicit unlimited, 0 = blocked, N>0 = cap.
+    default_personal_storage_bytes: number | null;
 }
 
 interface Props {
@@ -48,6 +50,17 @@ const form = useForm({
     announcement_severity: props.settings.announcement_severity as Severity,
     files_feature_enabled: props.settings.files_feature_enabled,
     max_share_days: props.settings.max_share_days,
+    default_personal_storage_bytes: props.settings.default_personal_storage_bytes,
+});
+
+// `v-model.number` gives us '' when the user clears the field, but the
+// backend wants a proper null (not 0, which means "blocked"). Round-trip
+// through a computed that normalises empty/NaN back to null.
+const defaultPersonalStorageBytes = computed<number | null>({
+    get: () => form.default_personal_storage_bytes,
+    set: (v) => {
+        form.default_personal_storage_bytes = v === null || Number.isNaN(v as unknown as number) || (v as unknown as string) === '' ? null : Number(v);
+    },
 });
 
 const dirty = computed(() => form.isDirty);
@@ -434,6 +447,34 @@ const roleOpen = ref(false);
                                         outline: 'none',
                                     }"
                                 />
+                            </div>
+
+                            <div>
+                                <div
+                                    class="cmd-mono cmd-uc"
+                                    :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '6px', letterSpacing: '0.06em' }"
+                                >Standard personlig lagring (bytes)</div>
+                                <input
+                                    v-model.number="defaultPersonalStorageBytes"
+                                    type="number"
+                                    min="-1"
+                                    class="cmd-mono"
+                                    placeholder="tom = ubegrenset, -1 = ubegrenset, 0 = blokkert"
+                                    :style="{
+                                        width: '100%',
+                                        maxWidth: '360px',
+                                        background: 'var(--panel2)',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: '5px',
+                                        padding: '7px 10px',
+                                        color: 'var(--fg)',
+                                        fontSize: '12px',
+                                        outline: 'none',
+                                    }"
+                                />
+                                <p :style="{ fontSize: '11px', color: 'var(--fg-mute)', marginTop: '4px' }">
+                                    Standard byte-grense for alle brukeres personlige filer. Kan overstyres per kunde og per bruker.
+                                </p>
                             </div>
                         </div>
                     </section>

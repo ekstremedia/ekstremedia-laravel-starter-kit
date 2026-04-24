@@ -39,7 +39,9 @@ class PublicShareController extends Controller
         }
 
         /** @var FileItem $item */
-        $item = $share->fileItem()->with('media')->firstOrFail();
+        // FileItemResource reads `companyLink` + `user` off the model; eager
+        // load both here so the public share page doesn't N+1 on folders.
+        $item = $share->fileItem()->with(['media', 'companyLink', 'user'])->firstOrFail();
 
         $share->forceFill([
             'view_count' => $share->view_count + 1,
@@ -50,7 +52,7 @@ class PublicShareController extends Controller
             'item' => (new FileItemResource($item))->toArray($request),
             'children' => $item->isFolder()
                 ? FileItem::where('parent_id', $item->id)
-                    ->with('media')
+                    ->with(['media', 'companyLink', 'user'])
                     ->orderByRaw("case when type = 'folder' then 0 else 1 end")
                     ->orderBy('name')
                     ->get()

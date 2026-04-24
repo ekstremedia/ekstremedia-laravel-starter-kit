@@ -21,6 +21,8 @@ export function useSidebarItems() {
     const tenancyEnabled = computed(() => page.props.tenancy?.enabled ?? false);
     const chatEnabled = computed(() => page.props.chat?.enabled ?? false);
     const globalFilesEnabled = computed(() => page.props.app_settings?.files_feature_enabled ?? false);
+    const userPermissions = computed<string[]>(() => (user.value as { permissions?: string[] } | undefined)?.permissions ?? []);
+    const canViewCompanyFiles = computed(() => isSuperAdmin.value || userPermissions.value.includes('view company files'));
 
     const customer = computed(() => page.props.customer);
     const customers = computed(() => page.props.available_customers ?? []);
@@ -34,14 +36,35 @@ export function useSidebarItems() {
         return customers.value.find((c) => c.files_feature_enabled) ?? null;
     });
 
+    // Company files target: gated on its own toggle only. A customer can
+    // run Shared Files without Personal Files, or vice versa, or both —
+    // the two feature flags are independent per customer. The global
+    // `files_feature_enabled` (master kill switch) is enforced below via
+    // `globalFilesEnabled` in `hideWhen`, not here.
+    const companyFilesTarget = computed(() => {
+        if (customer.value?.company_files_enabled) {
+            return customer.value;
+        }
+
+        return customers.value.find((c) => c.company_files_enabled) ?? null;
+    });
+
     const items = computed<SidebarEntry[]>(() => {
         const dashboardHref = customerSlug.value ? `/c/${customerSlug.value}/dashboard` : '/app';
         const filesHref = filesTarget.value ? `/c/${filesTarget.value.slug}/files` : '/app';
+        const companyFilesHref = companyFilesTarget.value ? `/c/${companyFilesTarget.value.slug}/files/company` : '/app';
+
+        // Match the personal files nav on /files but NOT /files/company so
+        // the two entries highlight independently as the user moves between
+        // them.
+        const filesActive = (p: string) => p.startsWith('/c/') && p.includes('/files') && !p.includes('/files/company');
+        const companyFilesActive = (p: string) => p.startsWith('/c/') && p.includes('/files/company');
 
         const entries: SidebarEntry[] = [
             { id: 'home', href: '/home', label: t('rail.home'), icon: 'user', kb: 'H', match: (p) => p === '/home' || p === '/' },
             { id: 'my-dashboard', href: dashboardHref, label: t('rail.dashboard'), icon: 'home', match: (p) => p.startsWith('/c/') && p.includes('/dashboard') },
-            { id: 'files', href: filesHref, label: t('rail.files'), icon: 'disk', match: (p) => p.startsWith('/c/') && p.includes('/files'), hideWhen: () => !globalFilesEnabled.value || !filesTarget.value },
+            { id: 'files', href: filesHref, label: t('rail.files'), icon: 'disk', match: filesActive, hideWhen: () => !globalFilesEnabled.value || !filesTarget.value },
+            { id: 'company-files', href: companyFilesHref, label: t('rail.company_files'), icon: 'customer', match: companyFilesActive, hideWhen: () => !globalFilesEnabled.value || !companyFilesTarget.value || !canViewCompanyFiles.value },
             { id: 'chat', href: '/chat', label: t('rail.chat'), icon: 'mail', match: (p) => p.startsWith('/chat'), hideWhen: () => !chatEnabled.value },
         ];
 

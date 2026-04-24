@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\StorageUsageService;
 use App\Support\CustomerMembership;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -85,12 +86,21 @@ class CustomerController extends Controller
             ->with('success', __('flash.customers.created', ['name' => $customer->name]));
     }
 
-    public function edit(Tenant $customer): Response
+    public function edit(Tenant $customer, StorageUsageService $usage): Response
     {
         $customer->load(['users' => function ($q) {
             $q->select('users.id', 'users.first_name', 'users.last_name', 'users.email')
                 ->orderBy('users.email');
         }]);
+
+        // Live usage for the "Used: X GB of Y" caption on the admin edit
+        // page. Cheap per-page query; surface the fresh number rather than
+        // the denormalized column in case it drifted.
+        $companyUsed = $usage->usedBytesForTenantCompany($customer);
+
+        // Fetch app settings once — `current()` does firstOrCreate on each
+        // call, and we need two fields below.
+        $appSettings = AppSetting::current();
 
         return Inertia::render('Admin/Customers/Edit', [
             'customer' => [
@@ -99,13 +109,18 @@ class CustomerController extends Controller
                 'name' => $customer->name,
                 'status' => $customer->status,
                 'files_feature_enabled' => (bool) $customer->files_feature_enabled,
+                'company_files_enabled' => (bool) $customer->company_files_enabled,
+                'storage_quota_bytes' => $customer->storage_quota_bytes,
+                'storage_used_bytes' => $companyUsed,
+                'default_member_storage_bytes' => $customer->default_member_storage_bytes,
                 'users' => $customer->users->map(fn (User $user) => [
                     'id' => $user->id,
                     'email' => $user->email,
                     'full_name' => $user->fullName(),
                 ])->values(),
             ],
-            'global_files_feature_enabled' => (bool) AppSetting::current()->files_feature_enabled,
+            'global_files_feature_enabled' => (bool) $appSettings->files_feature_enabled,
+            'global_default_personal_storage_bytes' => $appSettings->default_personal_storage_bytes,
         ]);
     }
 
@@ -113,19 +128,36 @@ class CustomerController extends Controller
     {
         $globalFilesEnabled = (bool) AppSetting::current()->files_feature_enabled;
 
+        // Same "disabled globally" gate for both feature flags — extracted
+        // to a single closure so the error message stays in lockstep if it
+        // ever changes.
+        $requiresGlobalFiles = function (string $attribute, mixed $value, \Closure $fail) use ($globalFilesEnabled): void {
+            if ($value && ! $globalFilesEnabled) {
+                $fail('Files feature is disabled globally in App Settings — enable it there first.');
+            }
+        };
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'status' => ['required', Rule::in(['active', 'suspended'])],
-            'files_feature_enabled' => [
-                'sometimes',
-                'boolean',
-                function (string $attribute, mixed $value, \Closure $fail) use ($globalFilesEnabled): void {
-                    if ($value && ! $globalFilesEnabled) {
-                        $fail('Files feature is disabled globally in App Settings — enable it there first.');
-                    }
-                },
-            ],
+            'files_feature_enabled' => ['sometimes', 'boolean', $requiresGlobalFiles],
+            // Company files is the master kill switch for the shared
+            // workspace; personal and company are otherwise independent
+            // per-customer toggles, both gated only on the global flag.
+            'company_files_enabled' => ['sometimes', 'boolean', $requiresGlobalFiles],
+            // -1 = explicit unlimited, null = unlimited (no cap set),
+            // 0 = blocked, N>0 = byte cap. Capped at 2^53-1 so Inertia
+            // round-trips preserve precision (JS safe-integer range).
+            'storage_quota_bytes' => ['sometimes', 'nullable', 'integer', 'min:-1', 'max:'.((2 ** 53) - 1)],
+            'default_member_storage_bytes' => ['sometimes', 'nullable', 'integer', 'min:-1', 'max:'.((2 ** 53) - 1)],
         ]);
+
+        // Personal and company-shared files are independent toggles: a
+        // customer can run with one, the other, or both. The global
+        // `AppSetting::files_feature_enabled` is still the master kill
+        // switch (enforced below) — but at the per-customer level, an
+        // admin can e.g. disable personal Files while keeping the shared
+        // workspace available.
 
         $customer->update($data);
 

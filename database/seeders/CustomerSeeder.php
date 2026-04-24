@@ -29,6 +29,12 @@ class CustomerSeeder extends Seeder
             [
                 'name' => config('app.name', 'Default customer'),
                 'status' => 'active',
+                // Files (personal + company-shared) are on out of the box
+                // with a 5 GB per-customer cap. Admins can flip the flags
+                // or adjust the cap from /admin/customers/{id}/edit.
+                'files_feature_enabled' => true,
+                'company_files_enabled' => true,
+                'storage_quota_bytes' => 5 * 1024 * 1024 * 1024,
             ],
         );
     }

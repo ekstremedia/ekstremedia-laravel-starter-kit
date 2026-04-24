@@ -17,7 +17,7 @@ beforeEach(function () {
 
     $this->user = User::factory()->create();
     joinCustomer($this->user, $this->customer);
-    $this->user->settings()->merge(['files_enabled' => true, 'storage_quota_bytes' => null]);
+    $this->user->settings()->merge(['files_enabled' => true, 'storage_quota_override' => -1]);
 });
 
 it('soft-deletes a file and lists it in the trash page', function () {

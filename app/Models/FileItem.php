@@ -9,8 +9,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -23,6 +26,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property int $user_id
  * @property int|null $parent_id
  * @property string $type
+ * @property string $scope
  * @property string $name
  * @property string|null $mime_type
  * @property int $size
@@ -37,11 +41,16 @@ class FileItem extends Model implements HasMedia
     use HasFactory;
     use HasUuids;
     use InteractsWithMedia;
+    use LogsActivity;
     use SoftDeletes;
 
     public const TYPE_FOLDER = 'folder';
 
     public const TYPE_FILE = 'file';
+
+    public const SCOPE_PERSONAL = 'personal';
+
+    public const SCOPE_COMPANY = 'company';
 
     public const IMAGE_SIZES = [
         'thumb' => ['width' => 400, 'height' => 400, 'quality' => 80],
@@ -50,7 +59,23 @@ class FileItem extends Model implements HasMedia
         'xlarge' => ['width' => 4096, 'height' => 4096, 'quality' => 92],
     ];
 
-    protected $fillable = ['tenant_id', 'user_id', 'parent_id', 'type', 'name', 'mime_type', 'size'];
+    protected $fillable = ['tenant_id', 'user_id', 'parent_id', 'type', 'scope', 'name', 'mime_type', 'size'];
+
+    /**
+     * Audit create/update/delete/restore on FileItems so Customer Admins can
+     * see "who uploaded this folder" or "who renamed that file". We log a
+     * compact attribute set — the full media blob doesn't belong in an audit
+     * trail, and a bare timestamp change (Eloquent's updated_at touch after
+     * a related media insert) shouldn't produce a noisy row either.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'scope', 'type', 'parent_id', 'size', 'mime_type'])
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges()
+            ->useLogName('files');
+    }
 
     /**
      * Pin to the central connection so queries don't follow the tenant schema
@@ -108,6 +133,24 @@ class FileItem extends Model implements HasMedia
     public function isFolder(): bool
     {
         return $this->type === self::TYPE_FOLDER;
+    }
+
+    public function isCompanyScope(): bool
+    {
+        return $this->scope === self::SCOPE_COMPANY;
+    }
+
+    public function isPersonalScope(): bool
+    {
+        return $this->scope === self::SCOPE_PERSONAL;
+    }
+
+    /**
+     * @return HasOne<CompanyFileLink, $this>
+     */
+    public function companyLink(): HasOne
+    {
+        return $this->hasOne(CompanyFileLink::class);
     }
 
     public function isImage(): bool

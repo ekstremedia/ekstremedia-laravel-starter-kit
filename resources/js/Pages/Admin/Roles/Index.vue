@@ -43,9 +43,8 @@ function destroy(r: Role) {
         acceptLabel: t('common.delete'),
         rejectLabel: t('common.cancel'),
         accept: () => {
-            router.delete(`/admin/roles/${r.id}`, {
-                onSuccess: () => push(t('admin.roles.toast_deleted', { name: r.name }), 'danger'),
-            });
+            // Server flashes flash.roles.deleted via useFlashToast.
+            router.delete(`/admin/roles/${r.id}`);
         },
     });
 }

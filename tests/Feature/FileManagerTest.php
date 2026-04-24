@@ -21,7 +21,7 @@ beforeEach(function () {
     joinCustomer($this->user, $this->customer);
     $this->user->settings()->merge([
         'files_enabled' => true,
-        'storage_quota_bytes' => 10_000_000,
+        'storage_quota_override' => 10_000_000,
     ]);
 
     $this->filesUrl = customerUrl($this->customer, '/files');
@@ -88,7 +88,7 @@ it('uploads a file and links it via medialibrary', function () {
 });
 
 it('rejects uploads exceeding the user quota via middleware', function () {
-    $this->user->settings()->merge(['storage_quota_bytes' => 1000]);
+    $this->user->settings()->merge(['storage_quota_override' => 1000]);
 
     // Plain POST falls through to back-redirect + validation errors (web form).
     $this->actingAs($this->user)
@@ -102,7 +102,7 @@ it('rejects uploads exceeding the user quota via middleware', function () {
 });
 
 it('returns JSON validation errors for JSON/XHR quota rejections', function () {
-    $this->user->settings()->merge(['storage_quota_bytes' => 1000]);
+    $this->user->settings()->merge(['storage_quota_override' => 1000]);
 
     // JSON clients get the ValidationException rendered as 422 JSON. Inertia
     // XHRs follow the same shape (forwarded as a 303 redirect back by the

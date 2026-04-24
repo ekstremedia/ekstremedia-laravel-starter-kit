@@ -6,12 +6,17 @@ import Menu from 'primevue/menu';
 interface FileItemLite {
     id: number;
     type: 'folder' | 'file';
+    shared_to_company?: boolean;
 }
 
 const props = defineProps<{
     item: FileItemLite;
     downloadUrl?: string;
     variant?: 'overlay' | 'inline';
+    // Feature flag: whether the surrounding page supports share-to-company.
+    // Enabled only when the tenant has company_files_enabled and the user
+    // has the `share files to company` permission — the parent resolves both.
+    canShareToCompany?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -20,6 +25,8 @@ const emit = defineEmits<{
     share: [];
     download: [];
     delete: [];
+    shareToCompany: [];
+    unshareFromCompany: [];
 }>();
 
 const { t } = useI18n();
@@ -39,6 +46,28 @@ const items = computed(() => {
             url: props.downloadUrl,
             command: () => emit('download'),
         });
+    }
+
+    // Share-to-company works on both files (one link) and folders
+    // (recursive mirror into a matching company folder tree). Only
+    // surface "Unshare" when the item is already linked; otherwise
+    // "Share" is the only meaningful action. Folders don't carry the
+    // `shared_to_company` flag today, so they always get the share
+    // entry — sharing is idempotent and picks up any files added since.
+    if (props.canShareToCompany) {
+        if (props.item.shared_to_company) {
+            out.push({
+                label: t('files.unshare_from_company'),
+                icon: 'pi pi-link',
+                command: () => emit('unshareFromCompany'),
+            });
+        } else {
+            out.push({
+                label: t('files.share_to_company'),
+                icon: 'pi pi-users',
+                command: () => emit('shareToCompany'),
+            });
+        }
     }
 
     out.push({ separator: true });
@@ -69,9 +98,9 @@ const triggerStyle = computed(() => props.variant === 'inline'
         fontFamily: 'inherit',
     }
     : {
-        background: 'rgba(10,12,18,0.7)',
+        background: 'var(--overlay)',
         border: 'none',
-        color: '#fff',
+        color: 'var(--fg-inverse)',
         borderRadius: '9999px',
         padding: '5px 7px',
         cursor: 'pointer',

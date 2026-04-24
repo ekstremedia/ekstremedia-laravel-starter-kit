@@ -116,7 +116,11 @@ class UserController extends Controller
                 $resolved = $user->setting
                     ? array_merge(UserSetting::$defaults, $user->setting->settings ?? [])
                     : UserSetting::$defaults;
-                $user->setAttribute('storage_quota_bytes', $resolved['storage_quota_bytes'] ?? null);
+                // Expose the raw override so the admin list can distinguish
+                // explicit caps (N>0) from explicit unlimited (-1) and
+                // inheriting (null). Resolution to the effective cap for
+                // display happens on the Vue side.
+                $user->setAttribute('storage_quota_override', $resolved['storage_quota_override'] ?? null);
 
                 // Compact per-customer role mapping for the hover tooltip.
                 $customerRoles = [];
@@ -220,15 +224,23 @@ class UserController extends Controller
 
     public function setQuota(Request $request, User $user): RedirectResponse
     {
-        // `nullable` allows unlimited; `0` is valid (disables uploads).
+        // `storage_quota_override`:
+        //   null  = inherit (3-tier resolution falls back to customer/app default)
+        //   -1    = explicit unlimited for this user
+        //    0    = hard-disabled
+        //    N>0  = byte cap
+        // Capped at 2^53-1 so values round-trip through JS consumers
+        // without losing precision (Number.MAX_SAFE_INTEGER). Real quotas
+        // don't come close — this is a belt-and-braces guard against
+        // pasting an accidentally huge number.
         $data = $request->validate([
-            'storage_quota_bytes' => 'nullable|integer|min:0',
+            'storage_quota_override' => ['nullable', 'integer', 'min:-1', 'max:'.((2 ** 53) - 1)],
             'files_enabled' => 'sometimes|boolean',
         ]);
 
         $patch = [];
-        if (array_key_exists('storage_quota_bytes', $data)) {
-            $patch['storage_quota_bytes'] = $data['storage_quota_bytes'];
+        if (array_key_exists('storage_quota_override', $data)) {
+            $patch['storage_quota_override'] = $data['storage_quota_override'];
             // Reset alert tracking when quota moves, otherwise users who
             // already crossed 95/100 % under the old cap would silently stop
             // receiving alerts (the stored threshold would shadow the new one).
@@ -243,6 +255,13 @@ class UserController extends Controller
         }
 
         $user->settings()->merge($patch);
+
+        // The admin user list caches its payload for 5 minutes keyed on this
+        // version counter. setRole/setCustomerRole already bump it after
+        // mutation — do the same here so the storage bar and override badge
+        // reflect the new value on the next list render instead of lagging
+        // up to the full TTL.
+        User::bumpUsersListVersion();
 
         return back()->with('success', __('admin.users.quota_updated'));
     }

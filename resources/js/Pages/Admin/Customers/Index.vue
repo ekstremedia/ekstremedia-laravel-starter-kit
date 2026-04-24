@@ -7,12 +7,10 @@ import CommandLayout from '@/Layouts/CommandLayout.vue';
 import CmdDataTable, { type Column } from '@/Components/Command/DataTable.vue';
 import Icon from '@/Components/Command/Icon.vue';
 import Dot from '@/Components/Command/Dot.vue';
-import { useCommandToasts } from '@/composables/useCommandToasts';
 
 defineOptions({ layout: CommandLayout });
 
 const { t } = useI18n();
-const { push } = useCommandToasts();
 const confirmer = useConfirm();
 
 interface CustomerRow {
@@ -56,9 +54,8 @@ function destroy(c: CustomerRow) {
         acceptLabel: t('common.delete'),
         rejectLabel: t('common.cancel'),
         accept: () => {
-            router.delete(`/admin/customers/${c.id}`, {
-                onSuccess: () => push(t('admin.customers.toast_deleted', { name: c.name }), 'danger'),
-            });
+            // Server flashes flash.customers.deleted via useFlashToast.
+            router.delete(`/admin/customers/${c.id}`);
         },
     });
 }

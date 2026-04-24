@@ -9,6 +9,7 @@ import Toggle from '@/Components/Command/Toggle.vue';
 import Icon from '@/Components/Command/Icon.vue';
 import Dot from '@/Components/Command/Dot.vue';
 import { useCommandToasts } from '@/composables/useCommandToasts';
+import { humanBytes as sharedHumanBytes } from '@/utils/bytes';
 
 defineOptions({ layout: CommandLayout });
 
@@ -23,37 +24,131 @@ interface CustomerData {
     name: string;
     status: 'active' | 'suspended';
     files_feature_enabled: boolean;
+    company_files_enabled: boolean;
+    // Raw DB value: null = unlimited (no cap), -1 = explicit unlimited,
+    // 0 = blocked, N>0 = byte cap.
+    storage_quota_bytes: number | null;
+    storage_used_bytes: number;
+    default_member_storage_bytes: number | null;
     users: Member[];
 }
 
-const props = defineProps<{ customer: CustomerData; global_files_feature_enabled: boolean }>();
+const props = defineProps<{
+    customer: CustomerData;
+    global_files_feature_enabled: boolean;
+    global_default_personal_storage_bytes: number | null;
+}>();
+
+// --- Helpers for "GB input + radio mode" ---
+// The backend stores raw bytes; the UI talks in GB (with one decimal place) to
+// keep the text inputs short. These helpers round-trip null/-1/0/N without
+// losing the sentinel distinction.
+const BYTES_PER_GB = 1024 * 1024 * 1024;
+
+function bytesToGb(bytes: number | null | undefined): number | '' {
+    if (bytes == null || bytes <= 0) return '';
+    return Math.round((bytes / BYTES_PER_GB) * 10) / 10;
+}
+
+function gbToBytes(gb: number | string | null): number | null {
+    if (gb === '' || gb === null || gb === undefined) return null;
+    const n = typeof gb === 'string' ? Number(gb) : gb;
+    if (!isFinite(n) || n <= 0) return null;
+    return Math.round(n * BYTES_PER_GB);
+}
+
+// Custom mode requires a positive GB number. gbToBytes returns null for
+// empty/invalid/non-positive — treating that as "unlimited" silently
+// would let admins block storage by accident, so guard before submit.
+function isValidCustomGb(gb: number | string | null): boolean {
+    if (gb === '' || gb === null || gb === undefined) return false;
+    const n = typeof gb === 'string' ? Number(gb) : gb;
+    return isFinite(n) && n > 0;
+}
+
+type QuotaMode = 'unlimited' | 'custom' | 'blocked';
+type MemberMode = 'inherit' | 'unlimited' | 'custom' | 'blocked';
+
+// Derive initial modes from the raw bytes values.
+function initialCompanyMode(bytes: number | null): QuotaMode {
+    if (bytes === 0) return 'blocked';
+    if (bytes === null || bytes < 0) return 'unlimited';
+    return 'custom';
+}
+
+function initialMemberMode(bytes: number | null): MemberMode {
+    if (bytes === null) return 'inherit';
+    if (bytes < 0) return 'unlimited';
+    if (bytes === 0) return 'blocked';
+    return 'custom';
+}
+
+const companyMode = ref<QuotaMode>(initialCompanyMode(props.customer.storage_quota_bytes));
+const companyCustomGb = ref<number | ''>(bytesToGb(props.customer.storage_quota_bytes));
+
+const memberMode = ref<MemberMode>(initialMemberMode(props.customer.default_member_storage_bytes));
+const memberCustomGb = ref<number | ''>(bytesToGb(props.customer.default_member_storage_bytes));
 
 const form = useForm({
     name: props.customer.name,
     status: props.customer.status,
-    // Coerce the per-customer flag to false whenever the global feature is
-    // off so a stale `true` can't be submitted while the toggle is disabled.
+    // Coerce each per-customer flag to false whenever the global feature
+    // is off so a stale `true` can't be submitted while the toggle is
+    // disabled. Personal and company are otherwise independent.
     files_feature_enabled: props.global_files_feature_enabled && props.customer.files_feature_enabled,
+    company_files_enabled: props.global_files_feature_enabled && props.customer.company_files_enabled,
+    storage_quota_bytes: props.customer.storage_quota_bytes,
+    default_member_storage_bytes: props.customer.default_member_storage_bytes,
 });
 
 const statusOpen = ref(false);
 
+function materializeCompanyQuota(): number | null {
+    if (companyMode.value === 'unlimited') return -1;
+    if (companyMode.value === 'blocked') return 0;
+    return gbToBytes(companyCustomGb.value);
+}
+
+function materializeMemberQuota(): number | null {
+    if (memberMode.value === 'inherit') return null;
+    if (memberMode.value === 'unlimited') return -1;
+    if (memberMode.value === 'blocked') return 0;
+    return gbToBytes(memberCustomGb.value);
+}
+
+// Shared byte formatter + admin-specific "Unlimited" label when no cap
+// is set. The admin edit page surfaces an explicit "Unlimited" word
+// (not an em dash), so wrap the shared helper with the extra branch.
+function humanBytes(n: number | null | undefined): string {
+    if (n == null || n < 0) return t('admin.customers.unlimited');
+    return sharedHumanBytes(n);
+}
+
 function save() {
-    form.put(`/admin/customers/${props.customer.id}`, {
-        preserveScroll: true,
-        onSuccess: () => push(t('admin.customers.toast_updated'), 'success'),
-    });
+    if (companyMode.value === 'custom' && !isValidCustomGb(companyCustomGb.value)) {
+        push(t('admin.customers.custom_quota_required'), 'danger');
+        return;
+    }
+    if (memberMode.value === 'custom' && !isValidCustomGb(memberCustomGb.value)) {
+        push(t('admin.customers.custom_quota_required'), 'danger');
+        return;
+    }
+
+    form.storage_quota_bytes = materializeCompanyQuota();
+    form.default_member_storage_bytes = materializeMemberQuota();
+
+    // Server flashes flash.customers.updated via useFlashToast.
+    form.put(`/admin/customers/${props.customer.id}`, { preserveScroll: true });
 }
 
 const memberForm = useForm({ email: '' });
 
 function attach() {
+    // Server flashes flash.customers.member_added — reset the input
+    // here but let the flash surface the confirmation toast.
     memberForm.post(`/admin/customers/${props.customer.id}/members`, {
         preserveScroll: true,
-        onSuccess: () => {
-            memberForm.reset('email');
-            push(t('admin.customers.toast_member_added'), 'success');
-        },
+        onSuccess: () => memberForm.reset('email'),
     });
 }
 
@@ -67,10 +162,8 @@ function detach(member: Member) {
         acceptLabel: t('admin.customers.detach'),
         rejectLabel: t('common.cancel'),
         accept: () => {
-            router.delete(`/admin/customers/${props.customer.id}/members/${member.id}`, {
-                preserveScroll: true,
-                onSuccess: () => push(t('admin.customers.toast_member_removed', { email: member.email }), 'danger'),
-            });
+            // Server flashes flash.customers.member_removed.
+            router.delete(`/admin/customers/${props.customer.id}/members/${member.id}`, { preserveScroll: true });
         },
     });
 }
@@ -211,6 +304,100 @@ function detach(member: Member) {
                     {{ form.errors.files_feature_enabled }}
                 </p>
 
+                <!-- Company files is an independent toggle — one, the
+                     other, or both can run per customer. Only gated on
+                     the global Files feature (enforced server-side). -->
+                <div :style="{ borderTop: '1px solid var(--border)', paddingTop: '14px', marginTop: '2px' }">
+                    <div :style="{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }">
+                        <div :style="{ flex: 1, minWidth: 0 }">
+                            <div :style="{ fontSize: '12.5px', fontWeight: 500, color: 'var(--fg)', display: 'inline-flex', alignItems: 'center', gap: '6px' }">
+                                <Icon name="disk" :size="12" :style="{ color: 'var(--accent)' }" />
+                                {{ t('admin.customers.company_files') }}
+                            </div>
+                            <div :style="{ fontSize: '11px', color: 'var(--fg-dim)', marginTop: '2px' }">{{ t('admin.customers.company_files_hint') }}</div>
+                        </div>
+                        <Toggle
+                            v-model="form.company_files_enabled"
+                            :disabled="!global_files_feature_enabled"
+                            :label="t('admin.customers.company_files')"
+                        />
+                    </div>
+
+                    <div v-if="form.company_files_enabled" :style="{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '14px' }">
+                        <!-- Company storage quota -->
+                        <div>
+                            <div class="cmd-mono cmd-uc" :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '6px', fontWeight: 500, letterSpacing: '0.06em' }">
+                                {{ t('admin.customers.company_storage_quota') }}
+                            </div>
+                            <div :style="{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '6px' }">
+                                <label :style="{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--fg)', cursor: 'pointer' }">
+                                    <input type="radio" value="unlimited" v-model="companyMode" />
+                                    {{ t('admin.customers.unlimited') }}
+                                </label>
+                                <label :style="{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--fg)', cursor: 'pointer' }">
+                                    <input type="radio" value="custom" v-model="companyMode" />
+                                    {{ t('admin.customers.custom') }}
+                                </label>
+                                <label :style="{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--fg-dim)', cursor: 'pointer' }">
+                                    <input type="radio" value="blocked" v-model="companyMode" />
+                                    {{ t('admin.customers.blocked') }}
+                                </label>
+                            </div>
+                            <div v-if="companyMode === 'custom'" :style="{ display: 'flex', alignItems: 'center', gap: '6px' }">
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.1"
+                                    v-model.number="companyCustomGb"
+                                    :style="{ width: '120px', background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '5px', padding: '7px 10px', color: 'var(--fg)', fontSize: '12.5px', outline: 'none', fontFamily: 'inherit' }"
+                                />
+                                <span :style="{ fontSize: '11.5px', color: 'var(--fg-mute)' }">GB</span>
+                            </div>
+                            <p :style="{ fontSize: '11px', color: 'var(--fg-mute)', marginTop: '6px' }">
+                                {{ t('admin.customers.company_storage_used', { used: humanBytes(customer.storage_used_bytes) }) }}
+                            </p>
+                        </div>
+
+                        <!-- Default member storage -->
+                        <div>
+                            <div class="cmd-mono cmd-uc" :style="{ fontSize: '10px', color: 'var(--fg-mute)', marginBottom: '6px', fontWeight: 500, letterSpacing: '0.06em' }">
+                                {{ t('admin.customers.default_member_storage') }}
+                            </div>
+                            <div :style="{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '6px' }">
+                                <label :style="{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--fg)', cursor: 'pointer' }">
+                                    <input type="radio" value="inherit" v-model="memberMode" />
+                                    {{ t('admin.customers.inherit_global') }}
+                                </label>
+                                <label :style="{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--fg)', cursor: 'pointer' }">
+                                    <input type="radio" value="unlimited" v-model="memberMode" />
+                                    {{ t('admin.customers.unlimited') }}
+                                </label>
+                                <label :style="{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--fg)', cursor: 'pointer' }">
+                                    <input type="radio" value="custom" v-model="memberMode" />
+                                    {{ t('admin.customers.custom') }}
+                                </label>
+                                <label :style="{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--fg-dim)', cursor: 'pointer' }">
+                                    <input type="radio" value="blocked" v-model="memberMode" />
+                                    {{ t('admin.customers.blocked') }}
+                                </label>
+                            </div>
+                            <div v-if="memberMode === 'custom'" :style="{ display: 'flex', alignItems: 'center', gap: '6px' }">
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.1"
+                                    v-model.number="memberCustomGb"
+                                    :style="{ width: '120px', background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '5px', padding: '7px 10px', color: 'var(--fg)', fontSize: '12.5px', outline: 'none', fontFamily: 'inherit' }"
+                                />
+                                <span :style="{ fontSize: '11.5px', color: 'var(--fg-mute)' }">GB / user</span>
+                            </div>
+                            <p :style="{ fontSize: '11px', color: 'var(--fg-mute)', marginTop: '6px' }">
+                                {{ t('admin.customers.global_default_member_storage', { value: humanBytes(global_default_personal_storage_bytes) }) }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 <div>
                     <button
                         type="submit"
@@ -313,7 +500,7 @@ function detach(member: Member) {
                     </div>
                     <button
                         type="button"
-                        :title="'Fjern'"
+                        :title="t('common.remove')"
                         @click="detach(member)"
                         :style="{ background: 'transparent', border: 'none', color: 'var(--fg-mute)', cursor: 'pointer', padding: '6px', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }"
                         class="cmd-member-remove"

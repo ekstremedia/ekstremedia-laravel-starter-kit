@@ -61,16 +61,12 @@ function humanSize(bytes: number | null | undefined): string {
 }
 
 function runBackup() {
-    router.post('/admin/backups/run', {}, {
-        preserveScroll: true,
-        onSuccess: () => push(t('admin.backups.toast_started'), 'success'),
-    });
+    // Server flashes flash.backups.queued; useFlashToast shows it.
+    router.post('/admin/backups/run', {}, { preserveScroll: true });
 }
 function runClean() {
-    router.post('/admin/backups/clean', {}, {
-        preserveScroll: true,
-        onSuccess: () => push(t('admin.backups.toast_clean_started'), 'info'),
-    });
+    // Server flashes flash.backups.cleanup_queued.
+    router.post('/admin/backups/clean', {}, { preserveScroll: true });
 }
 
 function downloadUrl(b: Backup): string {

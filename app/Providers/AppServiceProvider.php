@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\Activity;
 use App\Models\PersonalAccessToken;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +13,6 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
-use Spatie\Activitylog\Models\Activity;
 
 class AppServiceProvider extends ServiceProvider
 {

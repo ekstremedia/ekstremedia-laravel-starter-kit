@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *     notification_system_alerts: bool,
  *     notification_storage_alerts: bool,
  *     files_enabled: bool,
- *     storage_quota_bytes: int|null,
+ *     storage_quota_override: int|null,
  *     storage_last_alerted_threshold: array<string, int>|null,
  *     last_customer_slug: string|null,
  * }
@@ -60,8 +60,12 @@ class UserSetting extends Model
         // sees /files automatically. Power users can flip this off via the
         // settings API; most never will.
         'files_enabled' => true,
-        // null = unlimited, 0 = hard-disabled, otherwise byte cap.
-        'storage_quota_bytes' => null,
+        // Per-user storage override. null/missing = inherit from the 3-tier
+        // resolution (tenant default → app default → unlimited). -1 = explicit
+        // unlimited for this user. 0 = hard-disabled. N > 0 = byte cap.
+        // Resolve through StorageUsageService::effectivePersonalQuota — don't
+        // read this key directly.
+        'storage_quota_override' => null,
         // Highest threshold (80/95/100) we've already notified about, so we
         // don't spam the same warning every upload. Reset to null on delete.
         'storage_last_alerted_threshold' => null,

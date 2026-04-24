@@ -42,7 +42,7 @@ beforeEach(function () {
     joinCustomer($this->user, $this->customer);
     $this->user->settings()->merge([
         'files_enabled' => true,
-        'storage_quota_bytes' => 10_000_000,
+        'storage_quota_override' => 10_000_000,
     ]);
 
     $this->filesUrl = customerUrl($this->customer, '/files');

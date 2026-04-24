@@ -22,7 +22,10 @@ interface UserRow {
     is_super_admin?: boolean;
     customer_roles: CustomerRoleCell[];
     storage_used_bytes: number;
-    storage_quota_bytes: number | null;
+    // Raw user override. null = inherit, -1 = explicit unlimited,
+    // 0 = blocked, N>0 = cap. Resolution happens server-side for the
+    // main file UI; the admin list only uses it to shade the bar.
+    storage_quota_override: number | null;
     banned_at?: string | null;
 }
 
@@ -103,10 +106,12 @@ function formatBytes(n: number | null | undefined): string {
 }
 
 function storageRatio(u: UserRow): number {
-    if (u.storage_quota_bytes && u.storage_quota_bytes > 0) {
-        return Math.min(1, (u.storage_used_bytes ?? 0) / u.storage_quota_bytes);
+    if (u.storage_quota_override && u.storage_quota_override > 0) {
+        return Math.min(1, (u.storage_used_bytes ?? 0) / u.storage_quota_override);
     }
-    // Unlimited quota — fill by using an arbitrary ceiling so the bar shows something.
+    // Unlimited or inherited quota — fill by using an arbitrary ceiling so
+    // the bar shows something. The real effective cap (3-tier) isn't
+    // exposed to this list; edit the user to see it.
     const ceiling = 1024 * 1024 * 1024; // 1 GB visual ceiling
     return Math.min(1, (u.storage_used_bytes ?? 0) / ceiling);
 }
@@ -170,27 +175,21 @@ function deleteOne(u: UserRow) {
         acceptLabel: t('common.delete'),
         rejectLabel: t('common.cancel'),
         accept: () => {
-            router.delete(`/admin/users/${u.id}`, {
-                preserveScroll: true,
-                onSuccess: () => push(t('admin.users.toast_deleted', { name: `${u.first_name} ${u.last_name}` }), 'danger'),
-            });
+            // Server flashes flash.users.deleted; useFlashToast shows it.
+            router.delete(`/admin/users/${u.id}`, { preserveScroll: true });
         },
     });
 }
 
 function sendTest(u: UserRow) {
-    router.post(`/admin/users/${u.id}/notify-test`, {}, {
-        preserveScroll: true,
-        onSuccess: () => push(t('admin.users.toast_test_notification_sent'), 'success'),
-    });
+    // Server flashes flash.users.test_notification_sent.
+    router.post(`/admin/users/${u.id}/notify-test`, {}, { preserveScroll: true });
 }
 
 function unban(u: UserRow) {
     if (!u.banned_at) { push(t('admin.users.toast_not_banned'), 'info'); return; }
-    router.post(`/admin/users/${u.id}/unban`, {}, {
-        preserveScroll: true,
-        onSuccess: () => push(t('admin.users.toast_restored', { name: u.first_name }), 'success'),
-    });
+    // Server flashes flash.users.unbanned.
+    router.post(`/admin/users/${u.id}/unban`, {}, { preserveScroll: true });
 }
 
 function pageStart(): number {

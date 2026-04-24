@@ -31,6 +31,12 @@
     --warning: #fbbf24;
     --danger: #ff8a8a;
 
+    /* Image / media overlays — kept theme-agnostic because they sit on top
+     * of arbitrary image content where the underlying surface color is
+     * unknown. Dark scrim + white foreground reads against any image. */
+    --overlay: rgba(10, 12, 18, 0.7);
+    --fg-inverse: #fff;
+
     /* Density: comfortable (default) */
     --pad-page: 16px;
     --pad-row: 8px;

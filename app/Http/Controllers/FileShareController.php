@@ -28,7 +28,7 @@ class FileShareController extends Controller
     {
         $tenant = $this->currentTenant($request);
         $user = $request->user();
-        $this->assertOwns($file, $user->id, $tenant->id);
+        $this->assertCanShare($file, $user, $tenant);
         $this->assertFeatureAvailable($tenant, $user);
         abort_unless($user->can('share files'), 403, __('files.permission_denied'));
 
@@ -59,7 +59,7 @@ class FileShareController extends Controller
     {
         $tenant = $this->currentTenant($request);
         $user = $request->user();
-        $this->assertOwns($file, $user->id, $tenant->id);
+        $this->assertCanShare($file, $user, $tenant);
         $this->assertFeatureAvailable($tenant, $user);
         abort_unless($user->can('share files'), 403, __('files.permission_denied'));
 
@@ -74,11 +74,17 @@ class FileShareController extends Controller
     public function destroy(Request $request, FileShare $share): RedirectResponse
     {
         // The file_shares → file_items FK cascades on delete, so a share
-        // without its FileItem shouldn't exist in the DB; ownership check
-        // is still required.
+        // without its FileItem shouldn't exist in the DB. FileItem does
+        // use SoftDeletes though — the default belongsTo relation respects
+        // the soft-delete scope and resolves to null once the owner
+        // trashes the file, which would TypeError on assertCanShare. Load
+        // the relation with `withTrashed()` so the authorization + revoke
+        // path keeps working until the item is hard-purged.
         $tenant = $this->currentTenant($request);
         $user = $request->user();
-        $this->assertOwns($share->fileItem, $user->id, $tenant->id);
+        $file = FileItem::withTrashed()->find($share->file_item_id);
+        abort_if($file === null, 404);
+        $this->assertCanShare($file, $user, $tenant);
         $this->assertFeatureAvailable($tenant, $user);
         abort_unless($user->can('share files'), 403, __('files.permission_denied'));
 
@@ -95,7 +101,7 @@ class FileShareController extends Controller
     {
         $tenant = $this->currentTenant($request);
         $user = $request->user();
-        $this->assertOwns($file, $user->id, $tenant->id);
+        $this->assertCanShare($file, $user, $tenant);
         $this->assertFeatureAvailable($tenant, $user);
         abort_unless($user->can('share files'), 403, __('files.permission_denied'));
 
@@ -148,9 +154,39 @@ class FileShareController extends Controller
         return $fallback;
     }
 
-    private function assertOwns(FileItem $item, int $userId, int $tenantId): void
+    /**
+     * Authorise a public-share action. Rules:
+     *
+     *   - Personal file: only the owner may create/revoke a link. This is
+     *     what the original `assertOwns` enforced and the default branch
+     *     below preserves it.
+     *   - Native company file: the file's uploader (`user_id`) OR a
+     *     customer admin can create/revoke. Sharing externally is an
+     *     admin-level action — we don't want any ordinary member
+     *     exposing another member's upload publicly.
+     *   - Linked personal file (a personal file surfaced via
+     *     company_file_links): only the owner can share it. Admins who
+     *     want public exposure should ask the owner to share, or copy
+     *     the file as a native company upload first.
+     */
+    private function assertCanShare(FileItem $item, User $user, Tenant $tenant): void
     {
-        if ($item->user_id !== $userId || $item->tenant_id !== $tenantId) {
+        if ($item->tenant_id !== $tenant->id) {
+            throw new AccessDeniedHttpException;
+        }
+
+        $isOwner = $item->user_id === $user->id;
+
+        if ($item->scope === FileItem::SCOPE_COMPANY) {
+            $canManage = $user->isSuperAdmin() || (bool) $user->can('manage company files');
+            if (! $isOwner && ! $canManage) {
+                throw new AccessDeniedHttpException;
+            }
+
+            return;
+        }
+
+        if (! $isOwner) {
             throw new AccessDeniedHttpException;
         }
     }

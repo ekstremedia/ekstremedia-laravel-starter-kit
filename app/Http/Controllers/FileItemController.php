@@ -8,10 +8,13 @@ use App\Events\FileItemUpdated;
 use App\Http\Resources\FileItemResource;
 use App\Jobs\GenerateDocumentPreview;
 use App\Jobs\GenerateVideoPreview;
+use App\Jobs\ShareFolderToCompany;
 use App\Models\AppSetting;
+use App\Models\CompanyFileLink;
 use App\Models\FileItem;
 use App\Models\Tenant;
 use App\Services\StorageUsageService;
+use App\Support\CompanyFilesCache;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -41,8 +44,9 @@ class FileItemController extends Controller
         $query = FileItem::query()
             ->where('tenant_id', $tenant->id)
             ->where('user_id', $user->id)
+            ->where('scope', FileItem::SCOPE_PERSONAL)
             ->where('parent_id', $parentId)
-            ->with('media');
+            ->with(['media', 'companyLink']);
 
         if ($search = $request->string('q')->toString()) {
             // Case-insensitive prefix search, escaping LIKE wildcards.
@@ -69,7 +73,7 @@ class FileItemController extends Controller
             'current_folder' => $folder?->only(['id', 'name', 'uuid']),
             'usage' => [
                 'used_bytes' => $usedBytes,
-                'quota_bytes' => $user->settings()->resolved()['storage_quota_bytes'] ?? null,
+                'quota_bytes' => $this->usage->effectivePersonalQuota($user, $tenant),
                 'percent' => $this->usage->percentUsedInTenant($user, $tenant),
             ],
             'trashed_count' => $trashedCount,
@@ -244,6 +248,134 @@ class FileItemController extends Controller
         return back()->with('success', __('files.deleted'));
     }
 
+    /**
+     * Share an owned personal file to the active customer's company tree.
+     * Creates a CompanyFileLink (one row per (tenant, file)); no media
+     * duplication — the same FileItem now surfaces in Company Files with an
+     * owner chip. Folders can't be linked; users organise by linking files
+     * into native company folders (created via CompanyFileController).
+     */
+    public function share(Request $request, FileItem $file): RedirectResponse
+    {
+        $tenant = $this->currentTenant($request);
+        $user = $request->user();
+        $this->assertFeatureAvailable($request, $tenant);
+        $this->authorizeOwn($file, $user->id, $tenant->id);
+
+        abort_unless(
+            $tenant->company_files_enabled,
+            404,
+            __('files.company_not_enabled'),
+        );
+        abort_unless($user->can('share files to company'), 403, __('files.permission_denied'));
+
+        if ($file->scope !== FileItem::SCOPE_PERSONAL) {
+            abort(422, __('files.cannot_share_non_personal'));
+        }
+
+        $data = $request->validate([
+            'company_parent_id' => ['nullable', 'integer', $this->existsFileItemRule()],
+        ]);
+
+        $parentId = $data['company_parent_id'] ?? null;
+        if ($parentId !== null) {
+            $parent = FileItem::findOrFail($parentId);
+            if (
+                $parent->tenant_id !== $tenant->id
+                || $parent->scope !== FileItem::SCOPE_COMPANY
+                || ! $parent->isFolder()
+            ) {
+                abort(422, __('files.invalid_company_folder'));
+            }
+        }
+
+        if ($file->isFolder()) {
+            // Heavy. Queue it so the request returns immediately — the UI
+            // gets an instant "sharing…" bump and settles when the job
+            // finishes (second bump from inside the job).
+            CompanyFilesCache::bump($tenant->id, 'folder_share_started', $parentId);
+            ShareFolderToCompany::dispatch(
+                personalFolderId: $file->id,
+                tenantId: $tenant->id,
+                actingUserId: $user->id,
+                companyParentId: $parentId,
+            );
+
+            return back()->with('success', __('files.shared_to_company_queued'));
+        }
+
+        // Single-file share: fast enough to do inline. One link row per
+        // (tenant, file) — re-sharing moves it between company folders
+        // instead of creating a duplicate. Wrap in the central-connection
+        // transaction so a mid-flight failure doesn't leave a half-
+        // written link that the usage recompute would then see.
+        DB::connection((string) config('tenancy.database.central_connection'))
+            ->transaction(function () use ($file, $tenant, $user, $parentId): void {
+                CompanyFileLink::updateOrCreate(
+                    ['tenant_id' => $tenant->id, 'file_item_id' => $file->id],
+                    ['company_parent_id' => $parentId, 'shared_by_user_id' => $user->id],
+                );
+            });
+
+        $this->usage->recomputeForTenant($tenant);
+        CompanyFilesCache::bump($tenant->id, 'file_shared', $parentId);
+
+        return back()->with('success', __('files.shared_to_company'));
+    }
+
+    /**
+     * Remove a personal file from the company tree. Only the owner can
+     * call this — company admins unshare via CompanyFileController::unlink
+     * (which surfaces the notify-owner flow).
+     */
+    public function unshare(Request $request, FileItem $file): RedirectResponse
+    {
+        $tenant = $this->currentTenant($request);
+        $user = $request->user();
+        $this->assertFeatureAvailable($request, $tenant);
+        $this->authorizeOwn($file, $user->id, $tenant->id);
+
+        if ($file->scope !== FileItem::SCOPE_PERSONAL) {
+            abort(422, __('files.cannot_unshare_non_personal'));
+        }
+
+        DB::connection((string) config('tenancy.database.central_connection'))
+            ->transaction(function () use ($file, $tenant): void {
+                if ($file->isFolder()) {
+                    // Walk the personal folder tree and drop any links that
+                    // were created for its descendant files. Leave the
+                    // mirrored company folders in place — they may now
+                    // contain links from other members or native uploads.
+                    $this->unshareFolderFromCompany($file, $tenant);
+                } else {
+                    CompanyFileLink::query()
+                        ->where('tenant_id', $tenant->id)
+                        ->where('file_item_id', $file->id)
+                        ->delete();
+                }
+            });
+
+        $this->usage->recomputeForTenant($tenant);
+        CompanyFilesCache::bump($tenant->id, 'unshared');
+
+        return back()->with('success', __('files.unshared_from_company'));
+    }
+
+    private function unshareFolderFromCompany(FileItem $personalFolder, Tenant $tenant): void
+    {
+        foreach ($personalFolder->children()->get() as $child) {
+            /** @var FileItem $child */
+            if ($child->isFolder()) {
+                $this->unshareFolderFromCompany($child, $tenant);
+            } else {
+                CompanyFileLink::query()
+                    ->where('tenant_id', $tenant->id)
+                    ->where('file_item_id', $child->id)
+                    ->delete();
+            }
+        }
+    }
+
     public function download(Request $request, FileItem $file): BinaryFileResponse
     {
         $tenant = $this->currentTenant($request);
@@ -334,7 +466,7 @@ class FileItemController extends Controller
             abort(403, __('files.not_enabled'));
         }
 
-        if (($settings['storage_quota_bytes'] ?? null) === 0) {
+        if ($this->usage->effectivePersonalQuota($user, $tenant) === 0) {
             abort(403, __('files.quota_disabled'));
         }
     }
