@@ -167,10 +167,13 @@ class CompanyFileTrashController extends Controller
 
     private function assertFeatureAvailable(Request $request, Tenant $tenant, User $user): void
     {
+        // Company trash follows the same rules as the main company area:
+        // master kill switch at the app level, independent per-customer
+        // toggle via `company_files_enabled`.
         if (! AppSetting::current()->files_feature_enabled) {
             abort(404);
         }
-        if (! $tenant->files_feature_enabled || ! $tenant->company_files_enabled) {
+        if (! $tenant->company_files_enabled) {
             abort(404);
         }
         abort_unless($user->can('view company files'), 403, __('files.permission_denied'));

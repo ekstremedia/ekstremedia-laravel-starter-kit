@@ -36,15 +36,17 @@ export function useSidebarItems() {
         return customers.value.find((c) => c.files_feature_enabled) ?? null;
     });
 
-    // Company files target: same fallback chain but gated on the dedicated
-    // company_files_enabled flag — a customer can have personal files on
-    // while leaving the shared area off.
+    // Company files target: gated on its own toggle only. A customer can
+    // run Shared Files without Personal Files, or vice versa, or both —
+    // the two feature flags are independent per customer. The global
+    // `files_feature_enabled` (master kill switch) is enforced below via
+    // `globalFilesEnabled` in `hideWhen`, not here.
     const companyFilesTarget = computed(() => {
-        if (customer.value?.files_feature_enabled && customer.value?.company_files_enabled) {
+        if (customer.value?.company_files_enabled) {
             return customer.value;
         }
 
-        return customers.value.find((c) => c.files_feature_enabled && c.company_files_enabled) ?? null;
+        return customers.value.find((c) => c.company_files_enabled) ?? null;
     });
 
     const items = computed<SidebarEntry[]>(() => {

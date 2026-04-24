@@ -445,11 +445,16 @@ class CompanyFileController extends Controller
 
     private function assertFeatureAvailable(Request $request, Tenant $tenant, User $user): void
     {
+        // The app-level flag is the master kill switch for everything
+        // file-related. Per-customer, the shared workspace lives behind
+        // its own `company_files_enabled` toggle — independent of the
+        // personal `files_feature_enabled`, so a customer can run with
+        // one or the other or both.
         if (! AppSetting::current()->files_feature_enabled) {
             abort(404);
         }
 
-        if (! $tenant->files_feature_enabled || ! $tenant->company_files_enabled) {
+        if (! $tenant->company_files_enabled) {
             abort(404);
         }
 

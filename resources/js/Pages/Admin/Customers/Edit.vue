@@ -82,10 +82,11 @@ const memberCustomGb = ref<number | ''>(bytesToGb(props.customer.default_member_
 const form = useForm({
     name: props.customer.name,
     status: props.customer.status,
-    // Coerce the per-customer flag to false whenever the global feature is
-    // off so a stale `true` can't be submitted while the toggle is disabled.
+    // Coerce each per-customer flag to false whenever the global feature
+    // is off so a stale `true` can't be submitted while the toggle is
+    // disabled. Personal and company are otherwise independent.
     files_feature_enabled: props.global_files_feature_enabled && props.customer.files_feature_enabled,
-    company_files_enabled: props.customer.company_files_enabled,
+    company_files_enabled: props.global_files_feature_enabled && props.customer.company_files_enabled,
     storage_quota_bytes: props.customer.storage_quota_bytes,
     default_member_storage_bytes: props.customer.default_member_storage_bytes,
 });
@@ -290,7 +291,9 @@ function detach(member: Member) {
                     {{ form.errors.files_feature_enabled }}
                 </p>
 
-                <!-- Company files sub-section. Only meaningful once files are on. -->
+                <!-- Company files is an independent toggle — one, the
+                     other, or both can run per customer. Only gated on
+                     the global Files feature (enforced server-side). -->
                 <div :style="{ borderTop: '1px solid var(--border)', paddingTop: '14px', marginTop: '2px' }">
                     <div :style="{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }">
                         <div :style="{ flex: 1, minWidth: 0 }">
@@ -302,7 +305,7 @@ function detach(member: Member) {
                         </div>
                         <Toggle
                             v-model="form.company_files_enabled"
-                            :disabled="!form.files_feature_enabled"
+                            :disabled="!global_files_feature_enabled"
                             :label="t('admin.customers.company_files')"
                         />
                     </div>

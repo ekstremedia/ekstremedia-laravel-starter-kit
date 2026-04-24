@@ -136,21 +136,31 @@ class CustomerController extends Controller
                     }
                 },
             ],
-            'company_files_enabled' => ['sometimes', 'boolean'],
+            'company_files_enabled' => [
+                'sometimes',
+                'boolean',
+                function (string $attribute, mixed $value, \Closure $fail) use ($globalFilesEnabled): void {
+                    // The global Files feature is the master kill switch
+                    // for anything file-related, including the shared
+                    // workspace. Personal and company are otherwise
+                    // independent per-customer toggles.
+                    if ($value && ! $globalFilesEnabled) {
+                        $fail('Files feature is disabled globally in App Settings — enable it there first.');
+                    }
+                },
+            ],
             // -1 = explicit unlimited, null = unlimited (no cap set),
             // 0 = blocked, N>0 = byte cap.
             'storage_quota_bytes' => ['sometimes', 'nullable', 'integer', 'min:-1'],
             'default_member_storage_bytes' => ['sometimes', 'nullable', 'integer', 'min:-1'],
         ]);
 
-        // Company files requires the personal files feature to be on too —
-        // disabling files_feature_enabled implicitly disables company files.
-        $filesEnabled = array_key_exists('files_feature_enabled', $data)
-            ? (bool) $data['files_feature_enabled']
-            : (bool) $customer->files_feature_enabled;
-        if (array_key_exists('company_files_enabled', $data) && $data['company_files_enabled'] && ! $filesEnabled) {
-            $data['company_files_enabled'] = false;
-        }
+        // Personal and company-shared files are independent toggles: a
+        // customer can run with one, the other, or both. The global
+        // `AppSetting::files_feature_enabled` is still the master kill
+        // switch (enforced below) — but at the per-customer level, an
+        // admin can e.g. disable personal Files while keeping the shared
+        // workspace available.
 
         $customer->update($data);
 
