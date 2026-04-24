@@ -47,7 +47,9 @@ class AppSettingsController extends Controller
             'max_share_days' => ['required', 'integer', 'min:1', 'max:30'],
             // Global fallback for personal storage quota. Null = unlimited
             // (no cap), -1 = explicit unlimited, 0 = blocked, N>0 = byte cap.
-            'default_personal_storage_bytes' => ['sometimes', 'nullable', 'integer', 'min:-1'],
+            // Capped at JS safe-integer range so Inertia round-trips keep
+            // precision.
+            'default_personal_storage_bytes' => ['sometimes', 'nullable', 'integer', 'min:-1', 'max:'.((2 ** 53) - 1)],
         ]);
 
         $settings = AppSetting::current();

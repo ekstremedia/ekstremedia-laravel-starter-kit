@@ -10,6 +10,7 @@ import VideoPlayer from '@/Components/Files/VideoPlayer.vue';
 import ItemActionsMenu from '@/Components/Files/ItemActionsMenu.vue';
 import FilesToolbar from '@/Components/Files/FilesToolbar.vue';
 import FilesUsageBar from '@/Components/Files/FilesUsageBar.vue';
+import { humanBytes as formatBytes } from '@/utils/bytes';
 import ConfirmDialog from 'primevue/confirmdialog';
 import { useConfirm } from 'primevue/useconfirm';
 import CommandDialog from '@/Components/Command/Dialog.vue';
@@ -432,17 +433,9 @@ function setViewMode(mode: 'grid' | 'list') {
     localStorage.setItem('files.viewMode', mode);
 }
 
-function formatBytes(n: number): string {
-    if (!n) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let i = 0;
-    let v = n;
-    while (v >= 1024 && i < units.length - 1) {
-        v /= 1024;
-        i++;
-    }
-    return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
-}
+// `formatBytes` is now `humanBytes` from @/utils/bytes (imported at
+// the top of the file as `formatBytes` for backwards-compat with the
+// many existing call sites).
 
 function iconFor(item: FileItem): string {
     if (item.type === 'folder') return 'pi-folder';

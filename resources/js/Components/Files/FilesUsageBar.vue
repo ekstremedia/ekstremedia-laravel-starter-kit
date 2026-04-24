@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { humanBytes } from '@/utils/bytes';
 
 /**
  * Usage meter that renders identically on Private and Shared Files.
@@ -19,15 +20,6 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
-
-function humanBytes(n: number | null | undefined): string {
-    if (n == null || n < 0) return '—';
-    if (n === 0) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let i = 0; let v = n;
-    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
-    return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
-}
 
 const percent = computed(() => {
     if (props.quotaBytes == null || props.quotaBytes <= 0) return 0;

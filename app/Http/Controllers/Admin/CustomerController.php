@@ -98,6 +98,10 @@ class CustomerController extends Controller
         // the denormalized column in case it drifted.
         $companyUsed = $usage->usedBytesForTenantCompany($customer);
 
+        // Fetch app settings once — `current()` does firstOrCreate on each
+        // call, and we need two fields below.
+        $appSettings = AppSetting::current();
+
         return Inertia::render('Admin/Customers/Edit', [
             'customer' => [
                 'id' => $customer->id,
@@ -115,8 +119,8 @@ class CustomerController extends Controller
                     'full_name' => $user->fullName(),
                 ])->values(),
             ],
-            'global_files_feature_enabled' => (bool) AppSetting::current()->files_feature_enabled,
-            'global_default_personal_storage_bytes' => AppSetting::current()->default_personal_storage_bytes,
+            'global_files_feature_enabled' => (bool) $appSettings->files_feature_enabled,
+            'global_default_personal_storage_bytes' => $appSettings->default_personal_storage_bytes,
         ]);
     }
 
@@ -124,35 +128,28 @@ class CustomerController extends Controller
     {
         $globalFilesEnabled = (bool) AppSetting::current()->files_feature_enabled;
 
+        // Same "disabled globally" gate for both feature flags — extracted
+        // to a single closure so the error message stays in lockstep if it
+        // ever changes.
+        $requiresGlobalFiles = function (string $attribute, mixed $value, \Closure $fail) use ($globalFilesEnabled): void {
+            if ($value && ! $globalFilesEnabled) {
+                $fail('Files feature is disabled globally in App Settings — enable it there first.');
+            }
+        };
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'status' => ['required', Rule::in(['active', 'suspended'])],
-            'files_feature_enabled' => [
-                'sometimes',
-                'boolean',
-                function (string $attribute, mixed $value, \Closure $fail) use ($globalFilesEnabled): void {
-                    if ($value && ! $globalFilesEnabled) {
-                        $fail('Files feature is disabled globally in App Settings — enable it there first.');
-                    }
-                },
-            ],
-            'company_files_enabled' => [
-                'sometimes',
-                'boolean',
-                function (string $attribute, mixed $value, \Closure $fail) use ($globalFilesEnabled): void {
-                    // The global Files feature is the master kill switch
-                    // for anything file-related, including the shared
-                    // workspace. Personal and company are otherwise
-                    // independent per-customer toggles.
-                    if ($value && ! $globalFilesEnabled) {
-                        $fail('Files feature is disabled globally in App Settings — enable it there first.');
-                    }
-                },
-            ],
+            'files_feature_enabled' => ['sometimes', 'boolean', $requiresGlobalFiles],
+            // Company files is the master kill switch for the shared
+            // workspace; personal and company are otherwise independent
+            // per-customer toggles, both gated only on the global flag.
+            'company_files_enabled' => ['sometimes', 'boolean', $requiresGlobalFiles],
             // -1 = explicit unlimited, null = unlimited (no cap set),
-            // 0 = blocked, N>0 = byte cap.
-            'storage_quota_bytes' => ['sometimes', 'nullable', 'integer', 'min:-1'],
-            'default_member_storage_bytes' => ['sometimes', 'nullable', 'integer', 'min:-1'],
+            // 0 = blocked, N>0 = byte cap. Capped at 2^53-1 so Inertia
+            // round-trips preserve precision (JS safe-integer range).
+            'storage_quota_bytes' => ['sometimes', 'nullable', 'integer', 'min:-1', 'max:'.((2 ** 53) - 1)],
+            'default_member_storage_bytes' => ['sometimes', 'nullable', 'integer', 'min:-1', 'max:'.((2 ** 53) - 1)],
         ]);
 
         // Personal and company-shared files are independent toggles: a

@@ -229,8 +229,12 @@ class UserController extends Controller
         //   -1    = explicit unlimited for this user
         //    0    = hard-disabled
         //    N>0  = byte cap
+        // Capped at 2^53-1 so values round-trip through JS consumers
+        // without losing precision (Number.MAX_SAFE_INTEGER). Real quotas
+        // don't come close — this is a belt-and-braces guard against
+        // pasting an accidentally huge number.
         $data = $request->validate([
-            'storage_quota_override' => 'nullable|integer|min:-1',
+            'storage_quota_override' => ['nullable', 'integer', 'min:-1', 'max:'.((2 ** 53) - 1)],
             'files_enabled' => 'sometimes|boolean',
         ]);
 

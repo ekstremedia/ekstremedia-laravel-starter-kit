@@ -7,6 +7,7 @@ import ConfirmDialog from 'primevue/confirmdialog';
 import { useConfirm } from 'primevue/useconfirm';
 import { useCommandToasts } from '@/composables/useCommandToasts';
 import { useCustomer } from '@/composables/useCustomer';
+import { humanBytes } from '@/utils/bytes';
 
 defineOptions({ layout: CommandLayout });
 
@@ -65,14 +66,7 @@ function forceDelete(item: TrashItem) {
     });
 }
 
-function humanBytes(n: number | null | undefined): string {
-    if (n == null || n < 0) return '—';
-    if (n === 0) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let i = 0; let v = n;
-    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
-    return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
-}
+// humanBytes lives in @/utils/bytes — imported at the top.
 
 // Match Files/Company/Index.vue's mapping — Command icon set has no
 // folder/file glyphs, so we lean on `disk`/`log` and let thumbnails

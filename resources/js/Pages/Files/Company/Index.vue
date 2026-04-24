@@ -8,6 +8,7 @@ import CommandDialog from '@/Components/Command/Dialog.vue';
 import CmdButton from '@/Components/Command/Button.vue';
 import FilesToolbar from '@/Components/Files/FilesToolbar.vue';
 import FilesUsageBar from '@/Components/Files/FilesUsageBar.vue';
+import { humanBytes } from '@/utils/bytes';
 import type { PageProps } from '@/types';
 import { useConfirm } from 'primevue/useconfirm';
 import { useCommandToasts } from '@/composables/useCommandToasts';
@@ -247,14 +248,7 @@ function download(item: CompanyItem) {
 }
 
 // --- Helpers ---
-function humanBytes(n: number | null | undefined): string {
-    if (n == null || n < 0) return '—';
-    if (n === 0) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let i = 0; let v = n;
-    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
-    return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
-}
+// humanBytes lives in @/utils/bytes now — imported below.
 
 // Map item kinds onto the Command icon set — no dedicated folder/file
 // glyphs, so we reuse `disk` for folders and `log` for anything file-ish

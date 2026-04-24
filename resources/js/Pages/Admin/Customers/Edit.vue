@@ -9,6 +9,7 @@ import Toggle from '@/Components/Command/Toggle.vue';
 import Icon from '@/Components/Command/Icon.vue';
 import Dot from '@/Components/Command/Dot.vue';
 import { useCommandToasts } from '@/composables/useCommandToasts';
+import { humanBytes as sharedHumanBytes } from '@/utils/bytes';
 
 defineOptions({ layout: CommandLayout });
 
@@ -106,13 +107,12 @@ function materializeMemberQuota(): number | null {
     return gbToBytes(memberCustomGb.value);
 }
 
+// Shared byte formatter + admin-specific "Unlimited" label when no cap
+// is set. The admin edit page surfaces an explicit "Unlimited" word
+// (not an em dash), so wrap the shared helper with the extra branch.
 function humanBytes(n: number | null | undefined): string {
     if (n == null || n < 0) return t('admin.customers.unlimited');
-    if (n === 0) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let i = 0; let v = n;
-    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
-    return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+    return sharedHumanBytes(n);
 }
 
 function save() {

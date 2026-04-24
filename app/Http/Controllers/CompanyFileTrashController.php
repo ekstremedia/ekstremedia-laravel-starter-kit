@@ -51,7 +51,14 @@ class CompanyFileTrashController extends Controller
             $query->where('user_id', $user->id);
         }
 
-        $items = $query->get()
+        // Cap the render-time payload so a tenant with thousands of
+        // trashed items doesn't push a huge JSON blob through Inertia or
+        // N+1 the eager-loads. Paginating would change the Vue contract
+        // (array → paginator shape); a hard limit is the safer in-place
+        // safety net. The company-trash UI is a recovery surface — the
+        // 100 most recent are overwhelmingly what anyone needs, and the
+        // retention job purges the rest inside 30 days anyway.
+        $items = $query->limit(100)->get()
             ->map(fn (FileItem $item) => new CompanyFileItemResource($item, null, $canManage))
             ->all();
 

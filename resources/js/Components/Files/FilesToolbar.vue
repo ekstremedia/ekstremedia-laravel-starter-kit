@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
+import CmdButton from '@/Components/Command/Button.vue';
 import Icon from '@/Components/Command/Icon.vue';
 import ScopeSwitcher from '@/Components/Files/ScopeSwitcher.vue';
 import { useCustomer } from '@/composables/useCustomer';
@@ -127,51 +128,29 @@ const newFolderText = computed(() => props.newFolderLabel ?? t('files.new_folder
                     ><i class="pi pi-list" :style="{ fontSize: '11px' }" /></button>
                 </div>
 
-                <button
+                <CmdButton
                     v-if="permissions.upload"
-                    type="button"
+                    variant="primary"
+                    size="sm"
                     @click="emit('upload')"
-                    :style="{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: 'var(--accent)',
-                        color: 'var(--accent-fg, #fff)',
-                        border: 'none',
-                        borderRadius: '5px',
-                        padding: '6px 12px',
-                        fontSize: '12px',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                    }"
                 >
-                    <Icon name="plus" :size="12" />
-                    <span>{{ uploadText }}</span>
-                </button>
+                    <template #icon>
+                        <Icon name="plus" :size="12" />
+                    </template>
+                    {{ uploadText }}
+                </CmdButton>
 
-                <button
+                <CmdButton
                     v-if="permissions.createFolder"
-                    type="button"
+                    variant="ghost"
+                    size="sm"
                     @click="emit('newFolder')"
-                    :style="{
-                        background: 'var(--panel2)',
-                        color: 'var(--fg)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '5px',
-                        padding: '6px 12px',
-                        fontSize: '12px',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                    }"
                 >
-                    <i class="pi pi-folder-plus" :style="{ fontSize: '11px' }" />
-                    <span>{{ newFolderText }}</span>
-                </button>
+                    <template #icon>
+                        <i class="pi pi-folder-plus" :style="{ fontSize: '11px' }" />
+                    </template>
+                    {{ newFolderText }}
+                </CmdButton>
 
                 <!-- Page-specific extras (e.g. personal Files tacks on
                      a Trash link with a badge, Shared Files doesn't). -->
