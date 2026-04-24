@@ -252,6 +252,13 @@ class UserController extends Controller
 
         $user->settings()->merge($patch);
 
+        // The admin user list caches its payload for 5 minutes keyed on this
+        // version counter. setRole/setCustomerRole already bump it after
+        // mutation — do the same here so the storage bar and override badge
+        // reflect the new value on the next list render instead of lagging
+        // up to the full TTL.
+        User::bumpUsersListVersion();
+
         return back()->with('success', __('admin.users.quota_updated'));
     }
 

@@ -74,12 +74,17 @@ class FileShareController extends Controller
     public function destroy(Request $request, FileShare $share): RedirectResponse
     {
         // The file_shares → file_items FK cascades on delete, so a share
-        // without its FileItem shouldn't exist in the DB; access check is
-        // still required because company-file shares can be revoked by any
-        // admin even if they weren't the one who created the link.
+        // without its FileItem shouldn't exist in the DB. FileItem does
+        // use SoftDeletes though — the default belongsTo relation respects
+        // the soft-delete scope and resolves to null once the owner
+        // trashes the file, which would TypeError on assertCanShare. Load
+        // the relation with `withTrashed()` so the authorization + revoke
+        // path keeps working until the item is hard-purged.
         $tenant = $this->currentTenant($request);
         $user = $request->user();
-        $this->assertCanShare($share->fileItem, $user, $tenant);
+        $file = FileItem::withTrashed()->find($share->file_item_id);
+        abort_if($file === null, 404);
+        $this->assertCanShare($file, $user, $tenant);
         $this->assertFeatureAvailable($tenant, $user);
         abort_unless($user->can('share files'), 403, __('files.permission_denied'));
 

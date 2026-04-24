@@ -552,10 +552,6 @@ const usageLabel = computed(() => {
             <!-- Header: meta + breadcrumbs + actions -->
             <header :style="{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }">
                 <div :style="{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }">
-                    <div
-                        class="cmd-mono cmd-uc"
-                        :style="{ fontSize: '10.5px', color: 'var(--fg-mute)', letterSpacing: '0.06em' }"
-                    >{{ t('files.title') }}</div>
                     <ScopeSwitcher active="private" :permissions="switcherPermissions" />
                 </div>
                 <div :style="{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }">
@@ -1067,6 +1063,9 @@ const usageLabel = computed(() => {
                                     @rename="startRename(item)"
                                     @share="openShareDialog(item)"
                                     @delete="confirmDelete(item)"
+                                    :canShareToCompany="canShareToCompany"
+                                    @shareToCompany="shareToCompany(item)"
+                                    @unshareFromCompany="unshareFromCompany(item)"
                                 />
                             </td>
                         </tr>

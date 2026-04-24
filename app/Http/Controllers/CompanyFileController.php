@@ -275,12 +275,12 @@ class CompanyFileController extends Controller
         if (array_key_exists('parent_id', $data)) {
             if ($data['parent_id'] !== null) {
                 if ((int) $data['parent_id'] === (int) $file->id) {
-                    abort(422, 'Cannot set an item as its own parent.');
+                    abort(422, __('files.cannot_self_parent'));
                 }
                 $parent = FileItem::findOrFail($data['parent_id']);
                 $this->assertCompanyFolder($parent, $tenant);
                 if ($file->isFolder() && $this->isDescendantOf($parent, $file)) {
-                    abort(422, 'Cannot move a folder into its own descendant.');
+                    abort(422, __('files.cannot_move_into_descendant'));
                 }
             }
             $file->parent_id = $data['parent_id'];

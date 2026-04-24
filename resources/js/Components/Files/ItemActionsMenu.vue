@@ -48,12 +48,14 @@ const items = computed(() => {
         });
     }
 
-    // Share-to-company works on both files (one link) and folders (recursive
-    // mirror into a matching company folder tree). Files surface a "shared"
-    // badge when already linked; folders always show the share action —
-    // sharing again is idempotent and picks up any files added since.
+    // Share-to-company works on both files (one link) and folders
+    // (recursive mirror into a matching company folder tree). Only
+    // surface "Unshare" when the item is already linked; otherwise
+    // "Share" is the only meaningful action. Folders don't carry the
+    // `shared_to_company` flag today, so they always get the share
+    // entry — sharing is idempotent and picks up any files added since.
     if (props.canShareToCompany) {
-        if (props.item.type === 'file' && props.item.shared_to_company) {
+        if (props.item.shared_to_company) {
             out.push({
                 label: t('files.unshare_from_company'),
                 icon: 'pi pi-link',
@@ -64,13 +66,6 @@ const items = computed(() => {
                 label: t('files.share_to_company'),
                 icon: 'pi pi-users',
                 command: () => emit('shareToCompany'),
-            });
-        }
-        if (props.item.type === 'folder') {
-            out.push({
-                label: t('files.unshare_from_company'),
-                icon: 'pi pi-link',
-                command: () => emit('unshareFromCompany'),
             });
         }
     }

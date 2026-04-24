@@ -30,7 +30,12 @@ class FileTrashController extends Controller
         $items = FileItem::onlyTrashed()
             ->where('tenant_id', $tenant->id)
             ->where('user_id', $user->id)
-            ->with('media')
+            // companyLink + user are optional in FileItemResource but
+            // must be eager-loaded to avoid N+1 when present. Trashed
+            // items rarely carry a live companyLink (the FK cascades),
+            // but eager-loading costs nothing and avoids the lazy-load
+            // ban in non-production environments.
+            ->with(['media', 'companyLink', 'user'])
             ->orderByDesc('deleted_at')
             ->get();
 

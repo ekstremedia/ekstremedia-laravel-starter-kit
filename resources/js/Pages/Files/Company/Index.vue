@@ -66,6 +66,22 @@ const page = usePage<PageProps>();
 
 const parentId = computed(() => props.current_folder?.id ?? null);
 
+// View mode (grid vs list) is persisted the same way the personal page
+// does it, so the user's preference survives toggling between Private
+// and Shared via the scope switcher.
+const viewMode = ref<'grid' | 'list'>((localStorage.getItem('files.viewMode') as 'grid' | 'list') || 'grid');
+function setViewMode(m: 'grid' | 'list') {
+    viewMode.value = m;
+    localStorage.setItem('files.viewMode', m);
+}
+
+const searchQuery = ref(props.search ?? '');
+function onSearch() {
+    router.get(customerUrl(parentId.value ? `/files/company/${parentId.value}` : '/files/company'), {
+        q: searchQuery.value || undefined,
+    }, { preserveState: true, preserveScroll: true, replace: true, only: ['items', 'realtime_version'] });
+}
+
 // The scope switcher needs to know whether the viewer can still see the
 // Shared tab — reuse the same permission gate as the server.
 const switcherPermissions = computed(() => {
@@ -255,7 +271,7 @@ const quotaLabel = computed(() => {
 </script>
 
 <template>
-    <div>
+    <div class="cmd-files-page">
         <Head :title="t('files.company_title')" />
 
         <!-- Scope switcher — same pill appears on both pages so the two
@@ -279,7 +295,39 @@ const quotaLabel = computed(() => {
                 </div>
             </div>
 
-            <div :style="{ display: 'flex', gap: '8px', alignItems: 'center' }">
+            <div :style="{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }">
+                <input
+                    v-model="searchQuery"
+                    type="search"
+                    :placeholder="t('files.search_placeholder')"
+                    @keyup.enter="onSearch"
+                    :style="{
+                        width: '192px',
+                        background: 'var(--panel2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '5px',
+                        padding: '6px 10px',
+                        fontSize: '12px',
+                        color: 'var(--fg)',
+                        fontFamily: 'inherit',
+                    }"
+                />
+                <!-- Grid/list toggle — mirrors the personal page and
+                     shares the same localStorage preference. -->
+                <div :style="{ display: 'inline-flex', background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '5px', padding: '2px' }">
+                    <button
+                        type="button"
+                        @click="setViewMode('grid')"
+                        :title="t('files.view_grid')"
+                        :style="{ background: viewMode === 'grid' ? 'var(--panel)' : 'transparent', border: 'none', padding: '4px 8px', borderRadius: '3px', color: viewMode === 'grid' ? 'var(--fg)' : 'var(--fg-dim)', cursor: 'pointer' }"
+                    ><i class="pi pi-th-large" :style="{ fontSize: '11px' }" /></button>
+                    <button
+                        type="button"
+                        @click="setViewMode('list')"
+                        :title="t('files.view_list')"
+                        :style="{ background: viewMode === 'list' ? 'var(--panel)' : 'transparent', border: 'none', padding: '4px 8px', borderRadius: '3px', color: viewMode === 'list' ? 'var(--fg)' : 'var(--fg-dim)', cursor: 'pointer' }"
+                    ><i class="pi pi-list" :style="{ fontSize: '11px' }" /></button>
+                </div>
                 <button
                     v-if="permissions.create_folder"
                     @click="newFolderOpen = true"
@@ -321,6 +369,64 @@ const quotaLabel = computed(() => {
             {{ t('files.empty_folder') }}
         </div>
 
+        <!-- Grid view — tile layout matching the personal Files grid -->
+        <ul v-else-if="viewMode === 'grid'" :style="{
+            listStyle: 'none',
+            padding: 0,
+            margin: 0,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gap: '10px',
+        }">
+            <li
+                v-for="item in items"
+                :key="`g-${item.linked ? 'l' : 'f'}-${item.id}-${item.link_id ?? ''}`"
+                :style="{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    background: 'var(--panel)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    cursor: item.type === 'folder' ? 'pointer' : 'default',
+                }"
+                @click="openFolder(item)"
+            >
+                <div :style="{ position: 'relative', aspectRatio: '4 / 3', background: 'var(--panel2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }">
+                    <img v-if="item.thumbnail_url" :src="item.thumbnail_url" :alt="item.name" :style="{ width: '100%', height: '100%', objectFit: 'cover' }" />
+                    <Icon v-else :name="iconFor(item)" :size="32" :style="{ color: 'var(--fg-mute)' }" />
+                    <span v-if="item.linked" :style="{ position: 'absolute', top: '6px', left: '6px', padding: '1px 6px', fontSize: '10px', background: 'var(--accent-soft)', color: 'var(--accent)', borderRadius: '3px', fontWeight: 500 }">
+                        {{ t('files.linked_badge') }}
+                    </span>
+                    <div v-if="item.can_manage || item.type === 'file'" :style="{ position: 'absolute', top: '6px', right: '6px', display: 'flex', gap: '4px' }" @click.stop>
+                        <button
+                            v-if="item.type === 'file'"
+                            @click="download(item)"
+                            :title="t('files.download')"
+                            :style="{ background: 'rgba(10,12,18,0.7)', border: 'none', color: '#fff', cursor: 'pointer', padding: '5px 7px', borderRadius: '9999px' }"
+                        ><i class="pi pi-download" :style="{ fontSize: '10px' }" /></button>
+                        <button
+                            v-if="item.can_manage"
+                            @click="openDelete(item)"
+                            :title="item.linked ? t('files.unshare_from_company') : t('files.delete')"
+                            :style="{ background: 'rgba(10,12,18,0.7)', border: 'none', color: '#fff', cursor: 'pointer', padding: '5px 7px', borderRadius: '9999px' }"
+                        ><i class="pi pi-trash" :style="{ fontSize: '10px' }" /></button>
+                    </div>
+                </div>
+                <div :style="{ padding: '10px 12px' }">
+                    <div :style="{ fontSize: '12.5px', fontWeight: 500, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">{{ item.name }}</div>
+                    <div :style="{ fontSize: '11px', color: 'var(--fg-dim)', marginTop: '3px', display: 'flex', gap: '6px', alignItems: 'center' }">
+                        <span v-if="item.type !== 'folder'">{{ humanBytes(item.size) }}</span>
+                        <span v-if="item.owner" :style="{ display: 'inline-flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">
+                            <img v-if="item.owner.avatar_thumb_url" :src="item.owner.avatar_thumb_url" :alt="item.owner.name" :style="{ width: '12px', height: '12px', borderRadius: '50%' }" />
+                            <span :style="{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">{{ item.owner.name }}</span>
+                        </span>
+                    </div>
+                </div>
+            </li>
+        </ul>
+
+        <!-- List view (default for dense layouts) -->
         <ul v-else :style="{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '6px' }">
             <li
                 v-for="item in items"
@@ -431,3 +537,16 @@ const quotaLabel = computed(() => {
         </CommandDialog>
     </div>
 </template>
+
+<style scoped>
+/* Mirror the personal Files wrapper so toggling between Private and
+ * Shared doesn't snap the content between 1200 px centered and full
+ * width. The class name matches the personal page deliberately — if
+ * either value changes, update both so the two tabs stay visually
+ * aligned. */
+.cmd-files-page {
+    position: relative;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+</style>
