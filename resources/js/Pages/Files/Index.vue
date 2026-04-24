@@ -863,7 +863,7 @@ const usageLabel = computed(() => {
                     </div>
                     <div
                         class="cmd-file-actions"
-                        :style="{ position: 'absolute', right: '4px', top: '4px', opacity: 0, transition: 'opacity 0.12s' }"
+                        :style="{ position: 'absolute', right: '4px', top: '4px' }"
                     >
                         <ItemActionsMenu
                             :item="item"
@@ -1298,7 +1298,14 @@ const usageLabel = computed(() => {
 .cmd-file-card:hover {
     border-color: var(--accent-border) !important;
 }
-.cmd-file-card:hover .cmd-file-actions {
+/* Inline styles override stylesheet rules, so keep the opacity toggle in CSS
+   where the :hover selector can actually win. */
+.cmd-file-actions {
+    opacity: 0;
+    transition: opacity 0.12s;
+}
+.cmd-file-card:hover .cmd-file-actions,
+.cmd-file-card:focus-within .cmd-file-actions {
     opacity: 1;
 }
 .cmd-file-row:hover {
