@@ -7,12 +7,10 @@ import CommandLayout from '@/Layouts/CommandLayout.vue';
 import CmdDataTable, { type Column } from '@/Components/Command/DataTable.vue';
 import Icon from '@/Components/Command/Icon.vue';
 import Dot from '@/Components/Command/Dot.vue';
-import { useCommandToasts } from '@/composables/useCommandToasts';
 
 defineOptions({ layout: CommandLayout });
 
 const { t } = useI18n();
-const { push } = useCommandToasts();
 const confirmer = useConfirm();
 
 interface CustomerRow {

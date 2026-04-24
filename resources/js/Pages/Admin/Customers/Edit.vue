@@ -482,7 +482,7 @@ function detach(member: Member) {
                     </div>
                     <button
                         type="button"
-                        :title="'Fjern'"
+                        :title="t('common.remove')"
                         @click="detach(member)"
                         :style="{ background: 'transparent', border: 'none', color: 'var(--fg-mute)', cursor: 'pointer', padding: '6px', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }"
                         class="cmd-member-remove"

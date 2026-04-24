@@ -123,12 +123,11 @@ const switcherPermissions = computed(() => {
 });
 
 function shareToCompany(item: FileItem) {
-    if (item.type !== 'file') return;
+    // Folders are valid here — the backend dispatches ShareFolderToCompany
+    // on the queue and flashes files.shared_to_company_queued. Success
+    // toast comes from the server flash via useFlashToast.
     router.post(customerUrl(`/files/${item.id}/share-to-company`), {}, {
         preserveScroll: true,
-        onSuccess: () => toast.add({
-            severity: 'success', summary: t('files.share_to_company'), detail: t('files.shared_to_company'), life: 3000,
-        }),
         onError: () => toast.add({
             severity: 'error', summary: t('files.share_to_company'), detail: t('files.share_failed'), life: 4000,
         }),
@@ -138,8 +137,10 @@ function shareToCompany(item: FileItem) {
 function unshareFromCompany(item: FileItem) {
     router.delete(customerUrl(`/files/${item.id}/share-to-company`), {
         preserveScroll: true,
-        onSuccess: () => toast.add({
-            severity: 'success', summary: t('files.unshare_from_company'), detail: t('files.company_unlinked'), life: 3000,
+        // Server flashes files.unshared_from_company; only handle errors
+        // client-side so a 403/5xx doesn't silently "succeed".
+        onError: () => toast.add({
+            severity: 'error', summary: t('files.unshare_from_company'), detail: t('files.share_failed'), life: 4000,
         }),
     });
 }
@@ -501,17 +502,9 @@ watch(
 
 const uploadUrl = computed(() => customerUrl('/files'));
 const extraUploadData = computed(() => ({ parent_id: currentFolderId.value }));
-
-const usageLabel = computed(() => {
-    const usage = props.usage;
-    if (!usage) return '';
-    if (usage.quota_bytes === null) return t('files.unlimited');
-    if (usage.quota_bytes === 0) return t('files.disabled');
-    return t('files.used_of', {
-        used: formatBytes(usage.used_bytes),
-        quota: formatBytes(usage.quota_bytes),
-    });
-});
+// FilesUsageBar formats its own "used / quota" label (including the
+// "Disabled" branch for quota === 0), so the page no longer needs a
+// computed wrapper.
 </script>
 
 <template>

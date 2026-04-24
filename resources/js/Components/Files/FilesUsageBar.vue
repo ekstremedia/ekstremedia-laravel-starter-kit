@@ -36,17 +36,23 @@ const percent = computed(() => {
 
 const quotaDisplay = computed(() => {
     if (props.quotaUnlimited || props.quotaBytes === null) return t('files.unlimited');
+    // 0 is the "blocked" sentinel — show Disabled instead of "0 B" so
+    // admins configuring a hard block get the right UX instead of a
+    // misleading "used of 0 B" label.
+    if (props.quotaBytes === 0) return t('files.disabled');
     return humanBytes(props.quotaBytes);
 });
+
+const isBlocked = computed(() => props.quotaBytes === 0);
 </script>
 
 <template>
     <div :style="{ marginBottom: '14px', background: 'var(--panel2)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px 14px' }">
         <div :style="{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: 'var(--fg-dim)', marginBottom: '6px' }">
-            <span>{{ label ?? t('files.used_of', { used: humanBytes(usedBytes), quota: quotaDisplay }) }}</span>
-            <span v-if="quotaBytes !== null && !quotaUnlimited">{{ percent.toFixed(1) }}%</span>
+            <span>{{ isBlocked ? quotaDisplay : (label ?? t('files.used_of', { used: humanBytes(usedBytes), quota: quotaDisplay })) }}</span>
+            <span v-if="quotaBytes !== null && !quotaUnlimited && !isBlocked">{{ percent.toFixed(1) }}%</span>
         </div>
-        <div :style="{ height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }">
+        <div v-if="!isBlocked" :style="{ height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }">
             <div
                 :style="{
                     height: '100%',

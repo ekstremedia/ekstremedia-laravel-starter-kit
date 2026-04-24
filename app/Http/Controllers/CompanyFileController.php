@@ -38,7 +38,7 @@ class CompanyFileController extends Controller
     {
         $tenant = $this->currentTenant($request);
         $user = $request->user();
-        $this->assertFeatureAvailable($request, $tenant, $user);
+        $this->assertFeatureAvailable($tenant, $user);
 
         if ($folder !== null && $folder->exists) {
             $this->assertCompanyFolder($folder, $tenant);
@@ -159,7 +159,7 @@ class CompanyFileController extends Controller
     {
         $tenant = $this->currentTenant($request);
         $user = $request->user();
-        $this->assertFeatureAvailable($request, $tenant, $user);
+        $this->assertFeatureAvailable($tenant, $user);
         abort_unless($user->can('create company folders'), 403, __('files.permission_denied'));
 
         $data = $request->validate([
@@ -190,7 +190,7 @@ class CompanyFileController extends Controller
     {
         $tenant = $this->currentTenant($request);
         $user = $request->user();
-        $this->assertFeatureAvailable($request, $tenant, $user);
+        $this->assertFeatureAvailable($tenant, $user);
         abort_unless($user->can('upload to company files'), 403, __('files.permission_denied'));
 
         $request->validate([
@@ -258,7 +258,7 @@ class CompanyFileController extends Controller
     {
         $tenant = $this->currentTenant($request);
         $user = $request->user();
-        $this->assertFeatureAvailable($request, $tenant, $user);
+        $this->assertFeatureAvailable($tenant, $user);
         $this->assertCompanyItem($file, $tenant);
 
         // Renaming/moving a native company item: owner or admin.
@@ -301,7 +301,7 @@ class CompanyFileController extends Controller
     {
         $tenant = $this->currentTenant($request);
         $user = $request->user();
-        $this->assertFeatureAvailable($request, $tenant, $user);
+        $this->assertFeatureAvailable($tenant, $user);
         $this->assertCompanyItem($file, $tenant);
 
         $isOwner = $file->user_id === $user->id;
@@ -345,29 +345,40 @@ class CompanyFileController extends Controller
     {
         $tenant = $this->currentTenant($request);
         $user = $request->user();
-        $this->assertFeatureAvailable($request, $tenant, $user);
+        $this->assertFeatureAvailable($tenant, $user);
 
         if ($link->tenant_id !== $tenant->id) {
             abort(404);
         }
 
-        // The fileItem FK is cascadeOnDelete, so the link can't outlive its
-        // underlying personal file; likewise user_id on file_items is NOT
-        // NULL. Both relations are always present at this point.
-        $owner = $link->fileItem->user;
+        // The fileItem FK cascades on hard-delete, BUT FileItem uses
+        // SoftDeletes — the default belongsTo relation respects the
+        // soft-delete scope and resolves to null once the owner trashes
+        // their personal file. Load with `withTrashed()` so the admin
+        // can still unlink a stale reference during the 30-day retention
+        // window.
+        $fileItem = FileItem::withTrashed()->find($link->file_item_id);
+        abort_if($fileItem === null, 404);
+
+        // file_items.user_id is NOT NULL (see migration), so the relation
+        // is always resolved. phpstan enforces this from the phpdoc.
+        $owner = $fileItem->user;
         $isOwner = $owner->id === $user->id;
         $canManage = $this->canManageCompanyFiles($user, $tenant);
 
         abort_unless($isOwner || $canManage, 403, __('files.permission_denied'));
 
         [$notifyInApp, $notifyEmail] = $this->notifyFlags($request);
-        $fileName = $link->fileItem->name;
+        $fileName = $fileItem->name;
 
         $link->delete();
         $this->usage->recomputeForTenant($tenant);
         CompanyFilesCache::bump($tenant->id, 'link_removed');
 
-        if (! $isOwner && ($notifyInApp || $notifyEmail)) {
+        // Skip the owner notification when the file has been trashed —
+        // the owner is already aware they deleted it, and a separate
+        // admin-unlink notification would only add noise.
+        if (! $isOwner && ! $fileItem->trashed() && ($notifyInApp || $notifyEmail)) {
             $owner->notify(new CompanyFileUnlinkedByAdminNotification(
                 fileName: $fileName,
                 tenantId: $tenant->id,
@@ -385,7 +396,7 @@ class CompanyFileController extends Controller
     {
         $tenant = $this->currentTenant($request);
         $user = $request->user();
-        $this->assertFeatureAvailable($request, $tenant, $user);
+        $this->assertFeatureAvailable($tenant, $user);
 
         // Allow download from either a native company file in this tenant,
         // or a personal file linked into this tenant's company tree.
@@ -443,7 +454,7 @@ class CompanyFileController extends Controller
         return $fallback;
     }
 
-    private function assertFeatureAvailable(Request $request, Tenant $tenant, User $user): void
+    private function assertFeatureAvailable(Tenant $tenant, User $user): void
     {
         // The app-level flag is the master kill switch for everything
         // file-related. Per-customer, the shared workspace lives behind

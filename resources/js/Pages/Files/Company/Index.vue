@@ -205,11 +205,15 @@ function confirmDelete() {
         ? customerUrl(`/files/company/links/${item.link_id}`)
         : customerUrl(`/files/company/${item.id}`);
 
-    const isOwnerAction = !(props.can_manage && item.owner && !selfIsOwner(item));
-    const payload: Record<string, boolean> = isOwnerAction ? {} : {
+    // Single source of truth: "admin is acting on someone else's item".
+    // The template gates the notify-owner checkboxes on the same
+    // expression (see the dialog body below) so the payload and UI can't
+    // drift out of sync.
+    const showNotify = props.can_manage && !!item.owner && !selfIsOwner(item);
+    const payload: Record<string, boolean> = showNotify ? {
         notify_in_app: notifyInApp.value,
         notify_email: notifyByEmail.value,
-    };
+    } : {};
 
     router.delete(endpoint, {
         data: payload,
@@ -227,13 +231,13 @@ function confirmDelete() {
 }
 
 function selfIsOwner(item: CompanyItem): boolean {
-    // We don't have the auth user id in props directly; the backend already
-    // computed `can_manage` with owner-OR-admin, so we rely on `shared_by`
-    // (for linked items) being absent as a weak signal. Keep the notify UI
-    // available whenever the acting user might be an admin over someone
-    // else — worst case the admin accidentally notifies themselves, which
-    // the backend guards against anyway.
-    return false;
+    // Compare against the authenticated user id exposed via Inertia's
+    // shared `auth.user` payload. When an admin deletes an item they
+    // uploaded themselves, we suppress the "Notify owner" checkboxes —
+    // the backend also guards against self-notify, but hiding the UI
+    // avoids a confusing option that does nothing.
+    const authId = (page.props.auth?.user as { id?: number } | undefined)?.id;
+    return authId !== undefined && !!item.owner && item.owner.id === authId;
 }
 
 // --- Download ---
@@ -453,7 +457,7 @@ const quotaLabel = computed(() => {
                 <!-- Admin notify options. Owner-deleting-own never needs these,
                      but the UI shows them whenever the acting user can_manage
                      AND the owner is not themself. -->
-                <div v-if="permissions.manage && deleteDialogItem.owner" :style="{ display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--panel2)', padding: '10px', borderRadius: '5px', border: '1px solid var(--border)' }">
+                <div v-if="can_manage && deleteDialogItem.owner && !selfIsOwner(deleteDialogItem)" :style="{ display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--panel2)', padding: '10px', borderRadius: '5px', border: '1px solid var(--border)' }">
                     <div :style="{ fontSize: '11px', color: 'var(--fg-mute)', fontWeight: 500 }">
                         {{ t('files.notify_owner', { name: deleteDialogItem.owner.name }) }}
                     </div>

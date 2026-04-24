@@ -94,6 +94,7 @@ const newFolderText = computed(() => props.newFolderLabel ?? t('files.new_folder
                     v-model="searchModel"
                     type="search"
                     :placeholder="t('files.search_placeholder')"
+                    :aria-label="t('files.search_placeholder')"
                     @keyup.enter="emit('submitSearch')"
                     :style="{
                         width: '192px',
@@ -112,12 +113,16 @@ const newFolderText = computed(() => props.newFolderLabel ?? t('files.new_folder
                         type="button"
                         @click="viewModeModel = 'grid'"
                         :title="t('files.view_grid')"
+                        :aria-label="t('files.view_grid')"
+                        :aria-pressed="viewMode === 'grid'"
                         :style="{ background: viewMode === 'grid' ? 'var(--panel)' : 'transparent', border: 'none', padding: '4px 8px', borderRadius: '3px', color: viewMode === 'grid' ? 'var(--fg)' : 'var(--fg-dim)', cursor: 'pointer' }"
                     ><i class="pi pi-th-large" :style="{ fontSize: '11px' }" /></button>
                     <button
                         type="button"
                         @click="viewModeModel = 'list'"
                         :title="t('files.view_list')"
+                        :aria-label="t('files.view_list')"
+                        :aria-pressed="viewMode === 'list'"
                         :style="{ background: viewMode === 'list' ? 'var(--panel)' : 'transparent', border: 'none', padding: '4px 8px', borderRadius: '3px', color: viewMode === 'list' ? 'var(--fg)' : 'var(--fg-dim)', cursor: 'pointer' }"
                     ><i class="pi pi-list" :style="{ fontSize: '11px' }" /></button>
                 </div>

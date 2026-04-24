@@ -35,7 +35,7 @@ class CompanyFileTrashController extends Controller
     {
         $tenant = $this->currentTenant($request);
         $user = $request->user();
-        $this->assertFeatureAvailable($request, $tenant, $user);
+        $this->assertFeatureAvailable($tenant, $user);
 
         $canManage = $this->canManageCompanyFiles($user);
 
@@ -66,7 +66,7 @@ class CompanyFileTrashController extends Controller
     {
         $tenant = $this->currentTenant($request);
         $user = $request->user();
-        $this->assertFeatureAvailable($request, $tenant, $user);
+        $this->assertFeatureAvailable($tenant, $user);
 
         $item = FileItem::onlyTrashed()->findOrFail($id);
         $this->authorizeCompanyTrash($item, $user, $tenant, forManageOnly: false);
@@ -97,7 +97,7 @@ class CompanyFileTrashController extends Controller
     {
         $tenant = $this->currentTenant($request);
         $user = $request->user();
-        $this->assertFeatureAvailable($request, $tenant, $user);
+        $this->assertFeatureAvailable($tenant, $user);
 
         $item = FileItem::onlyTrashed()->findOrFail($id);
         // Permanent delete is admin-only — an owner who changes their mind
@@ -165,7 +165,7 @@ class CompanyFileTrashController extends Controller
         return $fallback;
     }
 
-    private function assertFeatureAvailable(Request $request, Tenant $tenant, User $user): void
+    private function assertFeatureAvailable(Tenant $tenant, User $user): void
     {
         // Company trash follows the same rules as the main company area:
         // master kill switch at the app level, independent per-customer
