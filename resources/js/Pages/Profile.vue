@@ -75,7 +75,7 @@ function saveProfile() {
     });
 }
 
-const profilePublicHref = computed(() => user.value.public_id ? `/u/${user.value.public_id}` : null);
+const profilePublicHref = computed(() => `/u/${user.value.public_id}`);
 
 // --- Password ---
 const passwordForm = useForm({
@@ -397,8 +397,9 @@ function getToken(): string {
                     <h3 :style="{ margin: 0, fontSize: '12px', fontWeight: 600, color: 'var(--fg)' }">{{ t('profile.public_title') }}</h3>
                     <p :style="{ fontSize: '11px', color: 'var(--fg-mute)', margin: '3px 0 0' }">{{ t('profile.public_desc') }}</p>
                     <a
-                        v-if="profilePublicHref"
                         :href="profilePublicHref"
+                        target="_blank"
+                        rel="noopener"
                         :style="{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent)', marginTop: '6px' }"
                     >
                         <Icon name="user" :size="11" />

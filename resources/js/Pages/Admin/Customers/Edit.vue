@@ -19,10 +19,9 @@ const confirmer = useConfirm();
 
 interface Member {
     id: number;
-    public_id: string | null;
+    public_id: string;
     email: string;
     full_name: string;
-    headline: string | null;
     avatar_thumb_url: string | null;
     roles: string[];
 }
@@ -503,7 +502,7 @@ function detach(member: Member) {
                     }"
                 >
                     <Link
-                        :href="member.public_id ? `/u/${member.public_id}` : '#'"
+                        :href="`/u/${member.public_id}`"
                         :style="{
                             display: 'flex',
                             alignItems: 'center',
@@ -512,7 +511,6 @@ function detach(member: Member) {
                             minWidth: 0,
                             textDecoration: 'none',
                             color: 'inherit',
-                            cursor: member.public_id ? 'pointer' : 'default',
                         }"
                     >
                         <div

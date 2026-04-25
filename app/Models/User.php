@@ -201,7 +201,7 @@ class User extends Authenticatable implements HasLocalePreference, HasMedia, Mus
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['first_name', 'last_name', 'email', 'email_verified_at'])
+            ->logOnly(['first_name', 'last_name', 'email', 'email_verified_at', 'headline', 'bio', 'location', 'website'])
             ->logOnlyDirty()
             ->useLogName('user');
     }

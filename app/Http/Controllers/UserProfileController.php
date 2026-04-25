@@ -31,7 +31,10 @@ class UserProfileController extends Controller
         // wouldn't otherwise see.
         $query = $user->customers()->where('status', 'active');
         if (! $viewer->isSuperAdmin()) {
-            $query->whereIn('tenants.id', $viewer->customers()->pluck('tenants.id'));
+            // Subquery instead of pluck() — the inner SELECT runs as part of
+            // the same SQL statement, avoiding a second round-trip and a
+            // potentially large WHERE IN payload.
+            $query->whereIn('tenants.id', $viewer->customers()->select('tenants.id'));
         }
         /** @var array<int, Tenant> $shared */
         $shared = $query->orderBy('name')->get(['tenants.id', 'tenants.slug', 'tenants.name'])->all();

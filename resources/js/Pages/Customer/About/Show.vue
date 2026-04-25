@@ -50,8 +50,11 @@ const websiteHostname = computed(() => {
 });
 
 function memberInitials(fullName: string): string {
-    const parts = fullName.trim().split(/\s+/);
-    return ((parts[0]?.[0] ?? '') + (parts[parts.length - 1]?.[0] ?? '')).toUpperCase();
+    const parts = fullName.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    const first = parts[0]?.[0] ?? '';
+    const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
+    return (first + last).toUpperCase() || '?';
 }
 </script>
 
@@ -97,20 +100,20 @@ function memberInitials(fullName: string): string {
                             whiteSpace: 'nowrap',
                         }"
                     >
-                        <Icon name="edit" :size="11" /> {{ t('customer_about.edit') }}
+                        <Icon name="edit" :size="11" /> {{ t('common.edit') }}
                     </Link>
                 </div>
             </div>
 
             <div v-if="profile.about" class="cmd-card" :style="{ padding: '20px' }">
-                <h2 :style="{ margin: '0 0 10px', fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">{{ t('customer_about.title') }}</h2>
+                <h2 :style="{ margin: '0 0 10px', fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">{{ t('customer.about.title') }}</h2>
                 <p :style="{ margin: 0, fontSize: '13px', lineHeight: 1.55, color: 'var(--fg-dim)', whiteSpace: 'pre-wrap' }">{{ profile.about }}</p>
             </div>
 
             <div class="cmd-card" :style="{ padding: '20px' }">
                 <div :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }">
-                    <h2 :style="{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">{{ t('customer_about.members') }}</h2>
-                    <span :style="{ fontSize: '11px', color: 'var(--fg-mute)' }">{{ t('customer_about.member_count', { count: member_count }) }}</span>
+                    <h2 :style="{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--fg)' }">{{ t('customer.about.members') }}</h2>
+                    <span :style="{ fontSize: '11px', color: 'var(--fg-mute)' }">{{ t('customer.about.member_count', { count: member_count }) }}</span>
                 </div>
                 <ul
                     v-if="members.length"
@@ -144,12 +147,12 @@ function memberInitials(fullName: string): string {
                             </div>
                             <div :style="{ minWidth: 0, flex: 1 }">
                                 <div :style="{ fontSize: '12.5px', color: 'var(--fg)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">{{ m.full_name }}</div>
-                                <div :style="{ fontSize: '11px', color: 'var(--fg-mute)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">{{ m.headline || (m.roles[0] ?? t('customer_about.role_member')) }}</div>
+                                <div :style="{ fontSize: '11px', color: 'var(--fg-mute)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">{{ m.headline || (m.roles[0] ?? t('customer.about.role_member')) }}</div>
                             </div>
                         </Link>
                     </li>
                 </ul>
-                <p v-else :style="{ fontSize: '12px', color: 'var(--fg-mute)', margin: 0 }">{{ t('customer_about.no_members') }}</p>
+                <p v-else :style="{ fontSize: '12px', color: 'var(--fg-mute)', margin: 0 }">{{ t('customer.about.no_members') }}</p>
             </div>
         </div>
     </AppLayout>

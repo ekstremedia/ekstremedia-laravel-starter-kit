@@ -34,7 +34,7 @@ it('configures activity log to only include whitelisted fields', function () {
     $options = (new User)->getActivitylogOptions();
 
     expect($options->logAttributes)->toEqualCanonicalizing(
-        ['first_name', 'last_name', 'email', 'email_verified_at']
+        ['first_name', 'last_name', 'email', 'email_verified_at', 'headline', 'bio', 'location', 'website']
     )
         ->and($options->logName)->toBe('user')
         ->and($options->logOnlyDirty)->toBeTrue();

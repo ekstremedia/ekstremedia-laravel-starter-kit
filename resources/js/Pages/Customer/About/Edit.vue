@@ -6,7 +6,6 @@
  */
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
-import { useToast } from 'primevue/usetoast';
 import AppLayout from '@/Layouts/CommandLayout.vue';
 import Field from '@/Components/Command/Field.vue';
 import { useCustomer } from '@/composables/useCustomer';
@@ -27,7 +26,6 @@ interface Props {
 
 const props = defineProps<Props>();
 const { t } = useI18n();
-const toast = useToast();
 const { customerUrl } = useCustomer();
 
 const form = useForm({
@@ -39,24 +37,25 @@ const form = useForm({
 });
 
 function save() {
-    form.put(customerUrl('/about'), {
-        preserveScroll: true,
-        onSuccess: () => toast.add({ severity: 'success', detail: t('profile.saved'), life: 3000 }),
-    });
+    // No client toast on success: the controller redirects with
+    // flash('success', __('flash.profile.updated')) and the global
+    // useFlashToast() in CommandLayout surfaces it. Adding one here would
+    // double-toast and use a different label than the backend message.
+    form.put(customerUrl('/about'), { preserveScroll: true });
 }
 </script>
 
 <template>
     <AppLayout>
-        <Head :title="t('customer_about.edit_title')" />
+        <Head :title="t('customer.about.edit_title')" />
 
         <div :style="{ maxWidth: '720px', margin: '0 auto', padding: '24px 20px' }">
             <div :style="{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }">
-                <h1 :style="{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--fg)' }">{{ t('customer_about.edit_title') }}</h1>
+                <h1 :style="{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--fg)' }">{{ t('customer.about.edit_title') }}</h1>
                 <Link
                     :href="customerUrl('/about')"
                     :style="{ fontSize: '12px', color: 'var(--fg-mute)', textDecoration: 'none' }"
-                >{{ t('customer_about.cancel') }}</Link>
+                >{{ t('common.cancel') }}</Link>
             </div>
 
             <form
@@ -66,25 +65,25 @@ function save() {
             >
                 <Field
                     v-model="form.name"
-                    :label="t('customer_about.name_label')"
+                    :label="t('customer.about.name_label')"
                     :error="form.errors.name"
                 />
                 <Field
                     v-model="form.headline"
-                    :label="t('customer_about.headline_label')"
-                    :placeholder="t('customer_about.headline_placeholder')"
+                    :label="t('customer.about.headline_label')"
+                    :placeholder="t('customer.about.headline_placeholder')"
                     :error="form.errors.headline"
                 />
 
                 <div>
                     <label :style="{ display: 'block', fontSize: '11px', color: 'var(--fg-dim)', marginBottom: '4px', fontWeight: 500 }">
-                        {{ t('customer_about.about_label') }}
+                        {{ t('customer.about.about_label') }}
                     </label>
                     <textarea
                         v-model="form.about"
                         rows="6"
                         :maxlength="2000"
-                        :placeholder="t('customer_about.about_placeholder')"
+                        :placeholder="t('customer.about.about_placeholder')"
                         :style="{
                             width: '100%',
                             background: 'var(--panel2)',
@@ -104,13 +103,13 @@ function save() {
                 <div :style="{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }">
                     <Field
                         v-model="form.location"
-                        :label="t('customer_about.location_label')"
+                        :label="t('customer.about.location_label')"
                         :error="form.errors.location"
                     />
                     <Field
                         v-model="form.website"
                         type="url"
-                        :label="t('customer_about.website_label')"
+                        :label="t('customer.about.website_label')"
                         placeholder="https://example.com"
                         :error="form.errors.website"
                     />

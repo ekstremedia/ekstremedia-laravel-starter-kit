@@ -4,7 +4,7 @@ export type UserSettingValue = string | number | boolean | null;
 
 export interface User {
     id: number;
-    public_id?: string;
+    public_id: string;
     first_name: string;
     last_name: string;
     email: string;

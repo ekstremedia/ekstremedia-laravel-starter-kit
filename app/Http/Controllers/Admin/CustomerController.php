@@ -111,7 +111,7 @@ class CustomerController extends Controller
                     'media',
                 ])
                 ->orderBy('users.email')
-                ->get(['users.id', 'users.public_id', 'users.first_name', 'users.last_name', 'users.email', 'users.headline']);
+                ->get(['users.id', 'users.public_id', 'users.first_name', 'users.last_name', 'users.email']);
         } finally {
             $registrar->setPermissionsTeamId($previousTeamId);
         }
@@ -145,7 +145,6 @@ class CustomerController extends Controller
                     'public_id' => $user->public_id,
                     'email' => $user->email,
                     'full_name' => $user->fullName(),
-                    'headline' => $user->headline,
                     'avatar_thumb_url' => $user->avatarUrl('thumb'),
                     'roles' => $user->roles->pluck('name')->all(),
                 ])->values(),

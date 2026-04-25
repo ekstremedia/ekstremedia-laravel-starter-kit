@@ -22,6 +22,10 @@ class TenantFactory extends Factory
         return [
             'slug' => $slug,
             'name' => ucfirst($slug),
+            'headline' => fake()->sentence(6),
+            'about' => fake()->paragraph(3),
+            'location' => fake()->city().', '.fake()->countryCode(),
+            'website' => 'https://'.fake()->domainName(),
             'status' => 'active',
             'files_feature_enabled' => false,
         ];

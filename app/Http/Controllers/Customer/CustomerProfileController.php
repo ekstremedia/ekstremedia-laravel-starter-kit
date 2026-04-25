@@ -29,7 +29,7 @@ class CustomerProfileController extends Controller
      */
     public function show(Request $request): Response
     {
-        $customer = $this->customer($request);
+        $customer = $this->customer();
         $viewer = $request->user();
         abort_unless($viewer && (new TenantProfilePolicy)->view($viewer, $customer), 403);
 
@@ -70,7 +70,7 @@ class CustomerProfileController extends Controller
 
     public function edit(Request $request): Response
     {
-        $customer = $this->customer($request);
+        $customer = $this->customer();
         $viewer = $request->user();
         abort_unless($viewer && (new TenantProfilePolicy)->update($viewer, $customer), 403);
 
@@ -89,7 +89,7 @@ class CustomerProfileController extends Controller
 
     public function update(Request $request): RedirectResponse
     {
-        $customer = $this->customer($request);
+        $customer = $this->customer();
         $viewer = $request->user();
         abort_unless($viewer && (new TenantProfilePolicy)->update($viewer, $customer), 403);
 
@@ -115,7 +115,7 @@ class CustomerProfileController extends Controller
             ->with('success', __('flash.profile.updated'));
     }
 
-    private function customer(Request $request): Tenant
+    private function customer(): Tenant
     {
         /** @var Tenant $tenant */
         $tenant = tenancy()->tenant ?? abort(404);

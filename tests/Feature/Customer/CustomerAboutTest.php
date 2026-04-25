@@ -69,6 +69,7 @@ it('lets a customer Admin update the customer profile', function () {
     $fresh = $this->customer->fresh();
     expect($fresh->name)->toBe('New Name LLC');
     expect($fresh->headline)->toBe('We make widgets');
+    expect($fresh->about)->toBe("Founded in 2020.\n\nMaking widgets since.");
     expect($fresh->location)->toBe('Oslo');
     expect($fresh->website)->toBe('https://example.com');
 });

@@ -45,7 +45,9 @@ it('saves customer profile fields from the admin edit page', function () {
         ->patch(route('admin.customers.update', $customer), [
             'name' => 'Updated Co',
             'status' => 'suspended',
-            'headline' => 'tagline',
+            // Whitespace-padded — exercises the trim normalization in
+            // CustomerController::update().
+            'headline' => '  tagline  ',
             'about' => 'about text',
             'location' => 'Oslo',
             'website' => 'https://example.com',
