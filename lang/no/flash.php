@@ -59,6 +59,10 @@ return [
         'saved' => 'Varslingsinnstillinger lagret.',
     ],
 
+    'profile' => [
+        'updated' => 'Profilen er oppdatert.',
+    ],
+
     'permissions' => [
         'created' => 'Tillatelsen er opprettet.',
         'deleted' => 'Tillatelsen er slettet.',

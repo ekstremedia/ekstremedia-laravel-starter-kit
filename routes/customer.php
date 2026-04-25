@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\AvatarController;
 use App\Http\Controllers\CompanyFileController;
 use App\Http\Controllers\CompanyFileTrashController;
+use App\Http\Controllers\Customer\CustomerProfileController;
 use App\Http\Controllers\CustomerMembersController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FileItemController;
@@ -36,6 +37,13 @@ Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard
 Route::get('/profile', fn () => Inertia::render('Profile'))->name('profile');
 Route::post('/profile/avatar', [AvatarController::class, 'store'])->name('profile.avatar.store');
 Route::delete('/profile/avatar', [AvatarController::class, 'destroy'])->name('profile.avatar.destroy');
+
+// Customer "About" — the company's own profile card. View is open to any
+// member; edit is gated to customer Admins (and SuperAdmins) by the
+// TenantProfilePolicy inside the controller.
+Route::get('/about', [CustomerProfileController::class, 'show'])->name('about.show');
+Route::get('/about/edit', [CustomerProfileController::class, 'edit'])->name('about.edit');
+Route::put('/about', [CustomerProfileController::class, 'update'])->name('about.update');
 
 Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
 Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');

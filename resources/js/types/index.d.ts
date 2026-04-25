@@ -4,6 +4,7 @@ export type UserSettingValue = string | number | boolean | null;
 
 export interface User {
     id: number;
+    public_id?: string;
     first_name: string;
     last_name: string;
     email: string;
@@ -13,6 +14,10 @@ export interface User {
     full_name: string;
     avatar_url?: string | null;
     avatar_thumb_url?: string | null;
+    headline?: string | null;
+    bio?: string | null;
+    location?: string | null;
+    website?: string | null;
     roles?: string[];
     permissions?: string[];
     is_super_admin?: boolean;
@@ -48,6 +53,10 @@ export interface Customer {
     id: number;
     slug: string;
     name: string;
+    headline?: string | null;
+    about?: string | null;
+    location?: string | null;
+    website?: string | null;
     files_feature_enabled?: boolean;
     company_files_enabled?: boolean;
 }

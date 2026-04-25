@@ -17,11 +17,23 @@ const { t } = useI18n();
 const { push } = useCommandToasts();
 const confirmer = useConfirm();
 
-interface Member { id: number; email: string; full_name: string }
+interface Member {
+    id: number;
+    public_id: string | null;
+    email: string;
+    full_name: string;
+    headline: string | null;
+    avatar_thumb_url: string | null;
+    roles: string[];
+}
 interface CustomerData {
     id: number;
     slug: string;
     name: string;
+    headline: string | null;
+    about: string | null;
+    location: string | null;
+    website: string | null;
     status: 'active' | 'suspended';
     files_feature_enabled: boolean;
     company_files_enabled: boolean;
@@ -485,18 +497,70 @@ function detach(member: Member) {
                     :style="{
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
+                        gap: '10px',
                         padding: '10px 0',
                         borderBottom: '1px solid var(--border)',
                     }"
                 >
-                    <div :style="{ minWidth: 0 }">
-                        <div :style="{ fontSize: '12.5px', fontWeight: 500, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">
-                            {{ member.full_name }}
+                    <Link
+                        :href="member.public_id ? `/u/${member.public_id}` : '#'"
+                        :style="{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            flex: 1,
+                            minWidth: 0,
+                            textDecoration: 'none',
+                            color: 'inherit',
+                            cursor: member.public_id ? 'pointer' : 'default',
+                        }"
+                    >
+                        <div
+                            :style="{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                background: 'var(--panel2)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                overflow: 'hidden',
+                                flexShrink: 0,
+                                border: '1px solid var(--border)',
+                            }"
+                        >
+                            <img
+                                v-if="member.avatar_thumb_url"
+                                :src="member.avatar_thumb_url"
+                                :alt="member.full_name"
+                                :style="{ width: '100%', height: '100%', objectFit: 'cover' }"
+                            />
+                            <Icon v-else name="user" :size="14" />
                         </div>
-                        <div class="cmd-mono" :style="{ fontSize: '11px', color: 'var(--fg-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">
-                            {{ member.email }}
+                        <div :style="{ minWidth: 0, flex: 1 }">
+                            <div :style="{ fontSize: '12.5px', fontWeight: 500, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">
+                                {{ member.full_name }}
+                            </div>
+                            <div class="cmd-mono" :style="{ fontSize: '11px', color: 'var(--fg-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }">
+                                {{ member.email }}
+                            </div>
                         </div>
+                    </Link>
+                    <div :style="{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'flex-end' }">
+                        <span
+                            v-for="role in (member.roles.length ? member.roles : [t('admin.customers.no_role')])"
+                            :key="role"
+                            :style="{
+                                fontSize: '10px',
+                                padding: '2px 7px',
+                                borderRadius: '999px',
+                                background: member.roles.length ? 'var(--panel2)' : 'transparent',
+                                color: member.roles.length ? 'var(--fg-dim)' : 'var(--fg-mute)',
+                                border: '1px solid var(--border)',
+                                whiteSpace: 'nowrap',
+                                fontWeight: 500,
+                            }"
+                        >{{ role }}</span>
                     </div>
                     <button
                         type="button"

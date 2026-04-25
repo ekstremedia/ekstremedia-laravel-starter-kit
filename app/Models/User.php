@@ -17,6 +17,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Lab404\Impersonate\Models\Impersonate;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
@@ -33,13 +34,18 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $email_verified_at
  * @property Carbon|null $banned_at
  * @property Carbon|null $last_login_at
+ * @property string $public_id
+ * @property string|null $headline
+ * @property string|null $bio
+ * @property string|null $location
+ * @property string|null $website
  */
 // `is_super_admin` is intentionally *not* fillable — it must only be set via
 // explicit `forceFill(['is_super_admin' => ...])` or the dedicated setRole
 // flow in UserController. Allowing mass-assignment here would let a crafted
 // payload on `/admin/users` or `/register` elevate the account without
 // going through the SuperAdmin-gated code path.
-#[Fillable(['first_name', 'last_name', 'email', 'password'])]
+#[Fillable(['public_id', 'first_name', 'last_name', 'email', 'password', 'headline', 'bio', 'location', 'website'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements HasLocalePreference, HasMedia, MustVerifyEmail
 {
@@ -54,6 +60,15 @@ class User extends Authenticatable implements HasLocalePreference, HasMedia, Mus
 
     protected static function booted(): void
     {
+        // public_id is the only identifier exposed in the URL (see /u/{user:public_id}).
+        // We allocate it before the row is inserted so newly-created users have a
+        // routable handle from the very first save.
+        static::creating(function (User $user): void {
+            if (empty($user->public_id)) {
+                $user->public_id = (string) Str::uuid();
+            }
+        });
+
         // Any CRUD event on a user row bumps the version counter baked into
         // the Admin Users index cache key, invalidating stale entries on the
         // next read without relying on tagged cache drivers.

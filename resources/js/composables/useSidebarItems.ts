@@ -25,35 +25,9 @@ export function useSidebarItems() {
     const canViewCompanyFiles = computed(() => isSuperAdmin.value || userPermissions.value.includes('view company files'));
 
     const customer = computed(() => page.props.customer);
-    const customers = computed(() => page.props.available_customers ?? []);
     const customerSlug = computed(() => customer.value?.slug ?? null);
 
-    // Files link target: current customer if set, else the first available
-    // customer that has files enabled. Keeps "Filer" discoverable on non-
-    // customer routes (e.g. /home, /chat).
-    const filesTarget = computed(() => {
-        if (customer.value?.files_feature_enabled) return customer.value;
-        return customers.value.find((c) => c.files_feature_enabled) ?? null;
-    });
-
-    // Company files target: gated on its own toggle only. A customer can
-    // run Shared Files without Personal Files, or vice versa, or both —
-    // the two feature flags are independent per customer. The global
-    // `files_feature_enabled` (master kill switch) is enforced below via
-    // `globalFilesEnabled` in `hideWhen`, not here.
-    const companyFilesTarget = computed(() => {
-        if (customer.value?.company_files_enabled) {
-            return customer.value;
-        }
-
-        return customers.value.find((c) => c.company_files_enabled) ?? null;
-    });
-
     const items = computed<SidebarEntry[]>(() => {
-        const dashboardHref = customerSlug.value ? `/c/${customerSlug.value}/dashboard` : '/app';
-        const filesHref = filesTarget.value ? `/c/${filesTarget.value.slug}/files` : '/app';
-        const companyFilesHref = companyFilesTarget.value ? `/c/${companyFilesTarget.value.slug}/files/company` : '/app';
-
         // Match the personal files nav on /files but NOT /files/company so
         // the two entries highlight independently as the user moves between
         // them.
@@ -62,19 +36,29 @@ export function useSidebarItems() {
 
         const entries: SidebarEntry[] = [
             { id: 'home', href: '/home', label: t('rail.home'), icon: 'user', kb: 'H', match: (p) => p === '/home' || p === '/' },
-            { id: 'my-dashboard', href: dashboardHref, label: t('rail.dashboard'), icon: 'home', match: (p) => p.startsWith('/c/') && p.includes('/dashboard') },
-            { id: 'files', href: filesHref, label: t('rail.files'), icon: 'disk', match: filesActive, hideWhen: () => !globalFilesEnabled.value || !filesTarget.value },
-            { id: 'company-files', href: companyFilesHref, label: t('rail.company_files'), icon: 'customer', match: companyFilesActive, hideWhen: () => !globalFilesEnabled.value || !companyFilesTarget.value || !canViewCompanyFiles.value },
             { id: 'chat', href: '/chat', label: t('rail.chat'), icon: 'mail', match: (p) => p.startsWith('/chat'), hideWhen: () => !chatEnabled.value },
         ];
 
-        // Customer-admin: only meaningful inside a customer context. Shows the
-        // Members link for the active customer.
-        if (isCustomerAdmin.value && customerSlug.value) {
+        // Customer-scope section: only meaningful inside a customer context.
+        // Groups the customer's own dashboard, files, shared files, and (for
+        // admins) members under a single separator so the rail visibly
+        // belongs to that customer rather than scattering tenant-only links
+        // among global ones.
+        if (customerSlug.value) {
+            const slug = customerSlug.value;
             entries.push(
-                { separator: true, key: 'c1' },
-                { id: 'members', href: `/c/${customerSlug.value}/members`, label: t('rail.members'), icon: 'users', match: (p) => p.startsWith(`/c/${customerSlug.value}/members`) },
+                { separator: true, key: 'cust' },
+                { id: 'my-dashboard', href: `/c/${slug}/dashboard`, label: t('rail.dashboard'), icon: 'home', match: (p) => p.startsWith('/c/') && p.includes('/dashboard') },
+                { id: 'about', href: `/c/${slug}/about`, label: t('rail.about'), icon: 'customer', match: (p) => p.startsWith(`/c/${slug}/about`) },
+                { id: 'files', href: `/c/${slug}/files`, label: t('rail.files'), icon: 'disk', match: filesActive, hideWhen: () => !globalFilesEnabled.value || !customer.value?.files_feature_enabled },
+                { id: 'company-files', href: `/c/${slug}/files/company`, label: t('rail.company_files'), icon: 'customer', match: companyFilesActive, hideWhen: () => !globalFilesEnabled.value || !customer.value?.company_files_enabled || !canViewCompanyFiles.value },
             );
+
+            if (isCustomerAdmin.value) {
+                entries.push(
+                    { id: 'members', href: `/c/${slug}/members`, label: t('rail.members'), icon: 'users', match: (p) => p.startsWith(`/c/${slug}/members`) },
+                );
+            }
         }
 
         if (isSuperAdmin.value) {

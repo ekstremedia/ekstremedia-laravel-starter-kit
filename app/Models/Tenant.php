@@ -16,6 +16,10 @@ use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
  * @property int $id
  * @property string $slug
  * @property string $name
+ * @property string|null $headline
+ * @property string|null $about
+ * @property string|null $location
+ * @property string|null $website
  * @property string $status
  * @property bool $files_feature_enabled
  * @property bool $company_files_enabled
@@ -43,6 +47,10 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             'id',
             'slug',
             'name',
+            'headline',
+            'about',
+            'location',
+            'website',
             'status',
             'files_feature_enabled',
             'company_files_enabled',

@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Landlord CRUD for customers.
@@ -88,10 +89,32 @@ class CustomerController extends Controller
 
     public function edit(Tenant $customer, StorageUsageService $usage): Response
     {
-        $customer->load(['users' => function ($q) {
-            $q->select('users.id', 'users.first_name', 'users.last_name', 'users.email')
-                ->orderBy('users.email');
-        }]);
+        // Same eager-load pattern as CustomerMembersController@index — pull
+        // the customer-scoped roles in a single JOIN keyed on
+        // `model_has_roles.team_id` so we can show each member's role(s)
+        // without an N+1 storm of CustomerMembership::rolesOn calls.
+        // Unlike that controller, this is a central /admin route, so
+        // tenancy middleware hasn't already set the registrar team id —
+        // do it explicitly around the eager load and restore afterwards.
+        $teamKey = config('permission.column_names.team_foreign_key');
+        $mhrTable = config('permission.table_names.model_has_roles');
+
+        $registrar = app(PermissionRegistrar::class);
+        $previousTeamId = $registrar->getPermissionsTeamId();
+
+        try {
+            $registrar->setPermissionsTeamId($customer->id);
+
+            $members = $customer->users()
+                ->with([
+                    'roles' => fn ($q) => $q->where("{$mhrTable}.{$teamKey}", $customer->id),
+                    'media',
+                ])
+                ->orderBy('users.email')
+                ->get(['users.id', 'users.public_id', 'users.first_name', 'users.last_name', 'users.email', 'users.headline']);
+        } finally {
+            $registrar->setPermissionsTeamId($previousTeamId);
+        }
 
         // Live usage for the "Used: X GB of Y" caption on the admin edit
         // page. Cheap per-page query; surface the fresh number rather than
@@ -107,16 +130,24 @@ class CustomerController extends Controller
                 'id' => $customer->id,
                 'slug' => $customer->slug,
                 'name' => $customer->name,
+                'headline' => $customer->headline,
+                'about' => $customer->about,
+                'location' => $customer->location,
+                'website' => $customer->website,
                 'status' => $customer->status,
                 'files_feature_enabled' => (bool) $customer->files_feature_enabled,
                 'company_files_enabled' => (bool) $customer->company_files_enabled,
                 'storage_quota_bytes' => $customer->storage_quota_bytes,
                 'storage_used_bytes' => $companyUsed,
                 'default_member_storage_bytes' => $customer->default_member_storage_bytes,
-                'users' => $customer->users->map(fn (User $user) => [
+                'users' => $members->map(fn (User $user) => [
                     'id' => $user->id,
+                    'public_id' => $user->public_id,
                     'email' => $user->email,
                     'full_name' => $user->fullName(),
+                    'headline' => $user->headline,
+                    'avatar_thumb_url' => $user->avatarUrl('thumb'),
+                    'roles' => $user->roles->pluck('name')->all(),
                 ])->values(),
             ],
             'global_files_feature_enabled' => (bool) $appSettings->files_feature_enabled,
@@ -139,6 +170,10 @@ class CustomerController extends Controller
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'headline' => ['sometimes', 'nullable', 'string', 'max:160'],
+            'about' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'location' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'website' => ['sometimes', 'nullable', 'string', 'url:http,https', 'max:255'],
             'status' => ['required', Rule::in(['active', 'suspended'])],
             'files_feature_enabled' => ['sometimes', 'boolean', $requiresGlobalFiles],
             // Company files is the master kill switch for the shared
@@ -151,6 +186,13 @@ class CustomerController extends Controller
             'storage_quota_bytes' => ['sometimes', 'nullable', 'integer', 'min:-1', 'max:'.((2 ** 53) - 1)],
             'default_member_storage_bytes' => ['sometimes', 'nullable', 'integer', 'min:-1', 'max:'.((2 ** 53) - 1)],
         ]);
+
+        foreach (['headline', 'about', 'location', 'website'] as $key) {
+            if (array_key_exists($key, $data) && is_string($data[$key])) {
+                $trimmed = trim($data[$key]);
+                $data[$key] = $trimmed === '' ? null : $trimmed;
+            }
+        }
 
         // Personal and company-shared files are independent toggles: a
         // customer can run with one, the other, or both. The global

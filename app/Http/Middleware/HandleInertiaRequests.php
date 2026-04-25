@@ -51,9 +51,14 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => fn () => $request->user() ? [
                     'id' => $request->user()->id,
+                    'public_id' => $request->user()->public_id,
                     'first_name' => $request->user()->first_name,
                     'last_name' => $request->user()->last_name,
                     'email' => $request->user()->email,
+                    'headline' => $request->user()->headline,
+                    'bio' => $request->user()->bio,
+                    'location' => $request->user()->location,
+                    'website' => $request->user()->website,
                     'email_verified_at' => $request->user()->email_verified_at,
                     'created_at' => $request->user()->created_at,
                     'two_factor_enabled' => ! is_null($request->user()->two_factor_confirmed_at),
@@ -129,6 +134,10 @@ class HandleInertiaRequests extends Middleware
             'id' => $customer->id,
             'slug' => $customer->slug,
             'name' => $customer->name,
+            'headline' => $customer->headline,
+            'about' => $customer->about,
+            'location' => $customer->location,
+            'website' => $customer->website,
             'files_feature_enabled' => (bool) $customer->files_feature_enabled,
             'company_files_enabled' => (bool) $customer->company_files_enabled,
         ];

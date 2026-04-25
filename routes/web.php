@@ -25,6 +25,7 @@ use App\Http\Controllers\NotificationPreferenceController;
 use App\Http\Controllers\PersonalAccessTokenController;
 use App\Http\Controllers\PublicShareController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\UserProfileController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -70,6 +71,11 @@ Route::middleware('auth')->group(function () {
     // picker page or admin panel). The customer-scoped copies in customer.php
     // take precedence when a customer is active.
     Route::middleware('verified')->group(function () {
+        // Public-ish profile for any user, keyed by UUID so URLs aren't
+        // enumerable. Visibility is gated by UserProfilePolicy@view inside
+        // the controller.
+        Route::get('/u/{user:public_id}', [UserProfileController::class, 'show'])->name('users.profile.show');
+
         Route::get('/profile', fn () => Inertia::render('Profile'))->name('profile.central');
         // Avatar endpoints are also registered centrally — admins visiting
         // /profile without an active customer (e.g. from the picker page or

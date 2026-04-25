@@ -62,6 +62,10 @@ const profileForm = useForm({
     first_name: user.value.first_name,
     last_name: user.value.last_name,
     email: user.value.email,
+    headline: user.value.headline ?? '',
+    bio: user.value.bio ?? '',
+    location: user.value.location ?? '',
+    website: user.value.website ?? '',
 });
 
 function saveProfile() {
@@ -70,6 +74,8 @@ function saveProfile() {
         onSuccess: () => toast.add({ severity: 'success', detail: t('profile.saved'), life: 3000 }),
     });
 }
+
+const profilePublicHref = computed(() => user.value.public_id ? `/u/${user.value.public_id}` : null);
 
 // --- Password ---
 const passwordForm = useForm({
@@ -384,6 +390,70 @@ function getToken(): string {
                     :error="profileForm.errors.email"
                     autocomplete="email"
                 />
+
+                <div :style="{ height: '1px', background: 'var(--border)', margin: '2px 0' }" />
+
+                <div>
+                    <h3 :style="{ margin: 0, fontSize: '12px', fontWeight: 600, color: 'var(--fg)' }">{{ t('profile.public_title') }}</h3>
+                    <p :style="{ fontSize: '11px', color: 'var(--fg-mute)', margin: '3px 0 0' }">{{ t('profile.public_desc') }}</p>
+                    <a
+                        v-if="profilePublicHref"
+                        :href="profilePublicHref"
+                        :style="{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent)', marginTop: '6px' }"
+                    >
+                        <Icon name="user" :size="11" />
+                        <span>{{ t('profile.public_view') }}</span>
+                    </a>
+                </div>
+
+                <Field
+                    v-model="profileForm.headline"
+                    :label="t('profile.headline_label')"
+                    :placeholder="t('profile.headline_placeholder')"
+                    :error="profileForm.errors.headline"
+                />
+
+                <div>
+                    <label :style="{ display: 'block', fontSize: '11px', color: 'var(--fg-dim)', marginBottom: '4px', fontWeight: 500 }">
+                        {{ t('profile.bio_label') }}
+                    </label>
+                    <textarea
+                        v-model="profileForm.bio"
+                        rows="4"
+                        :maxlength="2000"
+                        :placeholder="t('profile.bio_placeholder')"
+                        :style="{
+                            width: '100%',
+                            background: 'var(--panel2)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '5px',
+                            padding: '8px 10px',
+                            fontSize: '12.5px',
+                            fontFamily: 'inherit',
+                            color: 'var(--fg)',
+                            resize: 'vertical',
+                            minHeight: '80px',
+                        }"
+                    />
+                    <div v-if="profileForm.errors.bio" :style="{ color: 'var(--danger)', fontSize: '11px', marginTop: '3px' }">{{ profileForm.errors.bio }}</div>
+                </div>
+
+                <div :style="{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }">
+                    <Field
+                        v-model="profileForm.location"
+                        :label="t('profile.location_label')"
+                        :placeholder="t('profile.location_placeholder')"
+                        :error="profileForm.errors.location"
+                    />
+                    <Field
+                        v-model="profileForm.website"
+                        type="url"
+                        :label="t('profile.website_label')"
+                        placeholder="https://example.com"
+                        :error="profileForm.errors.website"
+                    />
+                </div>
+
                 <div :style="{ display: 'flex', justifyContent: 'flex-end' }">
                     <button
                         type="submit"

@@ -20,6 +20,10 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
+            // Set explicitly here, on top of the User::creating hook, so
+            // tests that call `Event::fake()` (which suppresses model
+            // events) still get a non-null public_id.
+            'public_id' => (string) Str::uuid(),
             'first_name' => fake()->firstName(),
             'last_name' => fake()->lastName(),
             'email' => fake()->unique()->safeEmail(),

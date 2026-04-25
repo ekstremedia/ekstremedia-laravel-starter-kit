@@ -59,6 +59,10 @@ return [
         'saved' => 'Notification preferences saved.',
     ],
 
+    'profile' => [
+        'updated' => 'Profile updated.',
+    ],
+
     'permissions' => [
         'created' => 'Permission created.',
         'deleted' => 'Permission deleted.',
