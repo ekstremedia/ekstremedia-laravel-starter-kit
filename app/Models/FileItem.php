@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
@@ -24,6 +25,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property string $uuid
  * @property int $tenant_id
  * @property int $user_id
+ * @property string $owner_type
+ * @property int $owner_id
  * @property int|null $parent_id
  * @property string $type
  * @property string $scope
@@ -33,7 +36,9 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Tenant $tenant
+ * @property-read User $creator
  * @property-read User $user
+ * @property-read \Illuminate\Database\Eloquent\Model|null $owner
  * @property-read FileItem|null $parent
  */
 class FileItem extends Model implements HasMedia
@@ -59,7 +64,18 @@ class FileItem extends Model implements HasMedia
         'xlarge' => ['width' => 4096, 'height' => 4096, 'quality' => 92],
     ];
 
-    protected $fillable = ['tenant_id', 'user_id', 'parent_id', 'type', 'scope', 'name', 'mime_type', 'size'];
+    protected $fillable = [
+        'tenant_id',
+        'user_id',
+        'owner_type',
+        'owner_id',
+        'parent_id',
+        'type',
+        'scope',
+        'name',
+        'mime_type',
+        'size',
+    ];
 
     /**
      * Audit create/update/delete/restore on FileItems so Customer Admins can
@@ -71,7 +87,7 @@ class FileItem extends Model implements HasMedia
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'scope', 'type', 'parent_id', 'size', 'mime_type'])
+            ->logOnly(['name', 'scope', 'owner_type', 'owner_id', 'type', 'parent_id', 'size', 'mime_type'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges()
             ->useLogName('files');
@@ -88,8 +104,6 @@ class FileItem extends Model implements HasMedia
     }
 
     /**
-     * The UUID lives in its own column — id is still the primary key.
-     *
      * @return array<int, string>
      */
     public function uniqueIds(): array
@@ -112,9 +126,38 @@ class FileItem extends Model implements HasMedia
         return $this->belongsTo(Tenant::class);
     }
 
+    /**
+     * Polymorphic owner: the model that owns this file (User for personal,
+     * Tenant for company, future Building/Customer/etc.). Can be null when
+     * the related row was hard-deleted out from under the morph.
+     *
+     * @return MorphTo<\Illuminate\Database\Eloquent\Model, $this>
+     */
+    public function owner(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    /**
+     * Who uploaded/created this file. Always a User (column is NOT NULL).
+     * Distinct from owner() — a Tenant-owned file is still created by a user.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /**
+     * Backwards-compatible alias for creator(). Existing call-sites that read
+     * $item->user keep working until they're migrated to ->creator or ->owner.
+     *
+     * @return BelongsTo<User, $this>
+     */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->creator();
     }
 
     public function parent(): BelongsTo
@@ -173,8 +216,6 @@ class FileItem extends Model implements HasMedia
 
     public function registerMediaConversions(?Media $media = null): void
     {
-        // Folders have no media; skip. Only rasterize real image types — SVG
-        // and non-image uploads have no meaningful raster preview.
         if ($media === null || ! str_starts_with((string) $media->mime_type, 'image/')) {
             return;
         }
@@ -192,12 +233,26 @@ class FileItem extends Model implements HasMedia
         }
     }
 
+    /**
+     * Scope by polymorphic owner — replaces hand-rolled
+     * `where('user_id', $u->id)->where('scope', 'personal')` blocks.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<FileItem>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<FileItem>
+     */
+    public function scopeForOwner($query, Model $owner)
+    {
+        return $query->where('owner_type', $owner::class)
+            ->where('owner_id', $owner->getKey());
+    }
+
     protected function casts(): array
     {
         return [
             'size' => 'integer',
             'tenant_id' => 'integer',
             'user_id' => 'integer',
+            'owner_id' => 'integer',
             'parent_id' => 'integer',
         ];
     }

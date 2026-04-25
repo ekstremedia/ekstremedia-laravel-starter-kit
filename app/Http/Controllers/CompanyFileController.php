@@ -175,6 +175,8 @@ class CompanyFileController extends Controller
         $folder = FileItem::create([
             'tenant_id' => $tenant->id,
             'user_id' => $user->id,
+            'owner_type' => Tenant::class,
+            'owner_id' => $tenant->id,
             'parent_id' => $data['parent_id'] ?? null,
             'type' => FileItem::TYPE_FOLDER,
             'scope' => FileItem::SCOPE_COMPANY,
@@ -215,6 +217,8 @@ class CompanyFileController extends Controller
                 $item = FileItem::create([
                     'tenant_id' => $tenant->id,
                     'user_id' => $user->id,
+                    'owner_type' => Tenant::class,
+                    'owner_id' => $tenant->id,
                     'parent_id' => $parentId,
                     'type' => FileItem::TYPE_FILE,
                     'scope' => FileItem::SCOPE_COMPANY,

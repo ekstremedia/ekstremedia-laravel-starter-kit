@@ -8,6 +8,7 @@ use App\Models\FileItem;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 /**
@@ -16,22 +17,50 @@ use Illuminate\Support\Str;
 class FileItemFactory extends Factory
 {
     /**
-     * @return array{tenant_id: mixed, user_id: mixed, parent_id: int|null, type: string, name: string, mime_type: string, size: int}
+     * Default: a User-owned (personal-scope) file. The creator and the owner
+     * are the same User by convention; tests that need divergent
+     * "uploaded by X, owned by Y" data should set them explicitly via
+     * ->ownedBy($model).
+     *
+     * @return array{tenant_id: mixed, user_id: mixed, parent_id: int|null, type: string, scope: string, name: string, mime_type: string, size: int}
      */
     public function definition(): array
     {
-        // Human-readable base + short random suffix keeps names readable in
-        // test output while avoiding Faker's ->unique() pool overflowing when
-        // suites create many items.
         return [
             'tenant_id' => Tenant::factory(),
             'user_id' => User::factory(),
             'parent_id' => null,
             'type' => FileItem::TYPE_FILE,
+            'scope' => FileItem::SCOPE_PERSONAL,
             'name' => fake()->word().'-'.Str::random(6).'.jpg',
             'mime_type' => 'image/jpeg',
             'size' => fake()->numberBetween(1_000, 5_000_000),
         ];
+    }
+
+    /**
+     * Default the polymorphic owner to the creating user when the test
+     * didn't set it explicitly. Letting the test's `user_id => $this->user`
+     * override flow naturally into ownership keeps existing tests working
+     * without per-call ->ownedBy() boilerplate.
+     */
+    public function configure(): static
+    {
+        return $this->afterMaking(function (FileItem $item): void {
+            $attrs = $item->getAttributes();
+            if (! isset($attrs['owner_type']) && isset($attrs['user_id'])) {
+                $item->owner_type = User::class;
+                $item->owner_id = (int) $attrs['user_id'];
+            }
+        })->afterCreating(function (FileItem $item): void {
+            $attrs = $item->getAttributes();
+            if (! isset($attrs['owner_type']) && isset($attrs['user_id'])) {
+                $item->forceFill([
+                    'owner_type' => User::class,
+                    'owner_id' => (int) $attrs['user_id'],
+                ])->saveQuietly();
+            }
+        });
     }
 
     public function folder(): static
@@ -41,6 +70,29 @@ class FileItemFactory extends Factory
             'mime_type' => null,
             'size' => 0,
             'name' => fake()->word().'-'.Str::random(6),
+        ]);
+    }
+
+    /**
+     * Make this FileItem owned by the given model (User personal, Tenant
+     * company, or any other FileOwner).
+     */
+    public function ownedBy(Model $owner): static
+    {
+        return $this->state(fn () => [
+            'owner_type' => $owner::class,
+            'owner_id' => $owner->getKey(),
+            'scope' => $owner instanceof Tenant ? FileItem::SCOPE_COMPANY : FileItem::SCOPE_PERSONAL,
+        ]);
+    }
+
+    public function company(Tenant $tenant): static
+    {
+        return $this->state(fn () => [
+            'tenant_id' => $tenant->getKey(),
+            'owner_type' => Tenant::class,
+            'owner_id' => $tenant->getKey(),
+            'scope' => FileItem::SCOPE_COMPANY,
         ]);
     }
 }

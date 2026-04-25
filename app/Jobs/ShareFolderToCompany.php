@@ -78,7 +78,12 @@ class ShareFolderToCompany implements ShouldQueue
                 'parent_id' => $companyParentId,
                 'name' => $personalFolder->name,
             ],
-            ['user_id' => $actor->id, 'size' => 0],
+            [
+                'user_id' => $actor->id,
+                'owner_type' => Tenant::class,
+                'owner_id' => $tenant->id,
+                'size' => 0,
+            ],
         );
 
         // Chunk the descendants so a folder with tens of thousands of items

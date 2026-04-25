@@ -8,14 +8,16 @@ use App\Http\Resources\FileItemResource;
 use App\Models\AppSetting;
 use App\Models\FileItem;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\StorageUsageService;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class FileTrashController extends Controller
 {
@@ -27,9 +29,12 @@ class FileTrashController extends Controller
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
 
+        $owner = $this->resolveOwner($request, $user);
+        $this->authorizeOwnerAccess($user, $owner, $tenant, view: true);
+
         $items = FileItem::onlyTrashed()
             ->where('tenant_id', $tenant->id)
-            ->where('user_id', $user->id)
+            ->forOwner($owner)
             // companyLink + user are optional in FileItemResource but
             // must be eager-loaded to avoid N+1 when present. Trashed
             // items rarely carry a live companyLink (the FK cascades),
@@ -50,10 +55,9 @@ class FileTrashController extends Controller
         $tenant = $this->currentTenant($request);
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
-        abort_unless($user->can('delete files'), 403, __('files.permission_denied'));
 
         $item = FileItem::onlyTrashed()->findOrFail($id);
-        $this->authorizeOwn($item, $user->id, $tenant->id);
+        Gate::forUser($user)->authorize('delete', [$item, $tenant]);
 
         // If the parent is also trashed (or gone), restore to root — don't
         // resurrect a row whose parent_id points at nothing.
@@ -73,7 +77,7 @@ class FileTrashController extends Controller
             $this->cascadeRestore($item, $deletedAt);
         }
 
-        $this->usage->recomputeForUser($user);
+        $this->usage->recomputeForOwner($item->owner ?? $user);
 
         return back()->with('success', __('files.restored'));
     }
@@ -98,21 +102,22 @@ class FileTrashController extends Controller
         $tenant = $this->currentTenant($request);
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
-        abort_unless($user->can('delete files'), 403, __('files.permission_denied'));
 
         $item = FileItem::onlyTrashed()->findOrFail($id);
-        $this->authorizeOwn($item, $user->id, $tenant->id);
+        Gate::forUser($user)->authorize('delete', [$item, $tenant]);
+
+        $owner = $item->owner;
 
         // Atomic — either the whole cascade + usage refresh commits, or
         // nothing does. Otherwise a partial delete leaves orphaned children
         // plus a stale denormalized storage_used_bytes.
         DB::connection((string) config('tenancy.database.central_connection'))
-            ->transaction(function () use ($item, $user): void {
+            ->transaction(function () use ($item, $owner, $user): void {
                 if ($item->isFolder()) {
                     $this->cascadeForceDelete($item);
                 }
                 $item->forceDelete();
-                $this->usage->recomputeForUser($user);
+                $this->usage->recomputeForOwner($owner ?? $user);
             });
 
         return back()->with('success', __('files.force_deleted'));
@@ -125,12 +130,15 @@ class FileTrashController extends Controller
         $this->assertFeatureAvailable($request, $tenant);
         abort_unless($user->can('delete files'), 403, __('files.permission_denied'));
 
+        $owner = $this->resolveOwner($request, $user);
+        $this->authorizeOwnerAccess($user, $owner, $tenant, view: false);
+
         DB::connection((string) config('tenancy.database.central_connection'))
-            ->transaction(function () use ($tenant, $user): void {
+            ->transaction(function () use ($tenant, $owner): void {
                 // Chunk so huge trashes don't load everything into memory.
                 FileItem::onlyTrashed()
                     ->where('tenant_id', $tenant->id)
-                    ->where('user_id', $user->id)
+                    ->forOwner($owner)
                     ->chunkById(100, function ($items): void {
                         foreach ($items as $item) {
                             // A previous iteration may have cascade-removed this
@@ -145,7 +153,7 @@ class FileTrashController extends Controller
                         }
                     });
 
-                $this->usage->recomputeForUser($user);
+                $this->usage->recomputeForOwner($owner);
             });
 
         return back()->with('success', __('files.trash_emptied'));
@@ -203,10 +211,51 @@ class FileTrashController extends Controller
         }
     }
 
-    private function authorizeOwn(FileItem $item, int $userId, int $tenantId): void
+    /**
+     * Refuse trash access when the caller can't read/manage the owner's
+     * files — otherwise crafting `?owner_type=...&owner_id=...` would let
+     * any authed user list or empty another owner's trash.
+     */
+    private function authorizeOwnerAccess(User $user, Model $owner, Tenant $tenant, bool $view): void
     {
-        if ($item->user_id !== $userId || $item->tenant_id !== $tenantId) {
-            throw new AccessDeniedHttpException;
+        if (! $owner instanceof \App\Contracts\FileOwner) {
+            // Unknown owner type can't be authorized — refuse rather than
+            // silently allow.
+            abort(403, __('files.permission_denied'));
         }
+
+        $allowed = $view
+            ? $owner->canViewFiles($user, $tenant)
+            : $owner->canManageFiles($user, $tenant);
+
+        abort_unless($allowed, 403, __('files.permission_denied'));
+    }
+
+    /**
+     * Same logic as FileItemController::resolveOwner — defaults to the
+     * current user (personal trash) but accepts owner_type/owner_id query
+     * params to scope to a different owner (a tenant's company trash, a
+     * building's trash in future domains, etc.).
+     */
+    private function resolveOwner(Request $request, User $user): Model
+    {
+        $type = $request->input('owner_type');
+        $id = $request->input('owner_id');
+
+        if (! is_string($type) || ! is_numeric($id)) {
+            return $user;
+        }
+
+        $allowed = config('files.allowed_owner_types', [User::class, Tenant::class]);
+        if (! in_array($type, $allowed, true) || ! class_exists($type)) {
+            abort(422, 'Unknown owner type.');
+        }
+
+        $resolved = $type::query()->find((int) $id);
+        if ($resolved === null) {
+            abort(404);
+        }
+
+        return $resolved;
     }
 }

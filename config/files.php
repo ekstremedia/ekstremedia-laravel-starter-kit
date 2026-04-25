@@ -8,10 +8,20 @@
  *     preview_mime_types: array<int, string>,
  *     trash_retention_days: int,
  *     max_upload_kilobytes: int,
+ *     allowed_owner_types: array<int, class-string>,
  * }
  */
 return [
     'gotenberg_url' => env('GOTENBERG_URL', 'http://gotenberg:3000'),
+
+    // Polymorphic owner types this app accepts for FileItem ownership.
+    // Add new types (Building, Customer, Property…) here as the domain grows
+    // — the controller refuses to morph to anything not on this list to
+    // prevent crafted owner_type payloads from probing arbitrary classes.
+    'allowed_owner_types' => [
+        \App\Models\User::class,
+        \App\Models\Tenant::class,
+    ],
 
     // Per-file upload size limit applied to files.* validation. Expressed
     // in kilobytes to match Laravel's `max:` validation units.

@@ -49,6 +49,11 @@ class RoleAndPermissionSeeder extends Seeder
             'create company folders',
             'share files to company',
             'manage company files',
+            // Cross-cutting override: holders can manage any FileItem regardless
+            // of owner. Granted to customer Admins so they can curate building
+            // / customer / etc. file trees that aren't strictly "company" or
+            // "personal". SuperAdmin always passes the policy without this.
+            'manage all files',
         ];
 
         foreach ($customerPermissions as $permission) {

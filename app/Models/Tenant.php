@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Contracts\FileOwner;
+use App\Models\Concerns\HasFiles;
 use Database\Factories\TenantFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -27,10 +29,10 @@ use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
  * @property int $storage_used_bytes
  * @property int|null $default_member_storage_bytes
  */
-class Tenant extends BaseTenant implements TenantWithDatabase
+class Tenant extends BaseTenant implements FileOwner, TenantWithDatabase
 {
     /** @use HasFactory<TenantFactory> */
-    use HasDatabase, HasFactory;
+    use HasDatabase, HasFactory, HasFiles;
 
     public $incrementing = true;
 
@@ -100,5 +102,58 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     public function companyFileLinks(): HasMany
     {
         return $this->hasMany(CompanyFileLink::class);
+    }
+
+    /**
+     * Tenant-owned files: a member with the right permission can manage them.
+     * Spatie's team scope is set to this tenant before checking so the
+     * permission resolves against the user's role *in this customer*.
+     */
+    public function canManageFiles(User $user, ?Tenant $tenant = null): bool
+    {
+        if ($user->isSuperAdmin() || $user->can('manage all files')) {
+            return true;
+        }
+
+        if (! $user->belongsToCustomer($this)) {
+            return false;
+        }
+
+        return $this->checkScopedPermission($user, 'manage company files');
+    }
+
+    public function canViewFiles(User $user, ?Tenant $tenant = null): bool
+    {
+        if ($user->isSuperAdmin() || $user->can('manage all files')) {
+            return true;
+        }
+
+        if (! $user->belongsToCustomer($this)) {
+            return false;
+        }
+
+        return $this->checkScopedPermission($user, 'view company files')
+            || $this->canManageFiles($user, $this);
+    }
+
+    /**
+     * Run a Spatie permission check with this tenant active as the team scope,
+     * then restore the previous scope. Avoids leaking the current request's
+     * team id into authorization questions about *this* tenant.
+     */
+    private function checkScopedPermission(User $user, string $permission): bool
+    {
+        $registrar = app(\Spatie\Permission\PermissionRegistrar::class);
+        $previous = $registrar->getPermissionsTeamId();
+
+        try {
+            $registrar->setPermissionsTeamId($this->getKey());
+            $user->unsetRelation('roles')->unsetRelation('permissions');
+
+            return $user->can($permission);
+        } finally {
+            $registrar->setPermissionsTeamId($previous);
+            $user->unsetRelation('roles')->unsetRelation('permissions');
+        }
     }
 }

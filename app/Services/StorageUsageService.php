@@ -10,6 +10,7 @@ use App\Models\Message;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\ApproachingStorageLimitNotification;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -18,15 +19,16 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 /**
  * Two-tier storage accounting:
  *
- *   - **Billable** — the user's own uploads (FileItem `file` collection).
- *     This is what the user sees on /files and what quota enforcement uses.
- *     Scoped per-(user, tenant) so each customer the user belongs to has
- *     its own bucket.
+ *   - **Billable** — uploads where the FileItem is in the `file` collection
+ *     and is owned by the model in question. Owners are polymorphic (User,
+ *     Tenant, Building, etc.). This is what quota enforcement and the /files
+ *     usage bar use. Scoped per-(owner, tenant) so each customer gets its
+ *     own bucket.
  *
  *   - **System total** — every row in the `media` table, regardless of owner
- *     or collection. This is what the admin dashboard sums for capacity
- *     planning. Previews (doc_preview, video_preview, video_web), chat
- *     attachments, and user avatars live here only — never in billable.
+ *     or collection. Used by the admin dashboard for capacity planning.
+ *     Previews (doc_preview, video_preview, video_web), chat attachments, and
+ *     user avatars live here only — never in billable.
  *
  * Image conversions (thumb/medium/large/xlarge) are stored as files on disk
  * under `{media.id}/conversions/` without their own DB row, so they're
@@ -34,26 +36,105 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  */
 class StorageUsageService
 {
-    /** User-uploaded originals only — the collection that counts toward the user's quota. */
+    /** User-uploaded originals only — the collection that counts toward quotas. */
     private const BILLABLE_COLLECTION = 'file';
 
+    // -----------------------------------------------------------------------
+    // Polymorphic-owner API (preferred for new code)
+    // -----------------------------------------------------------------------
+
     /**
-     * Billable bytes across every tenant the user belongs to. Used by the
-     * denormalized `users.storage_used_bytes` column so the admin user list
-     * sorting reflects "what the user is paying for, overall".
+     * Billable bytes across every tenant for this owner.
      */
-    public function usedBytesForUser(User $user): int
+    public function usedBytesForOwner(Model $owner): int
     {
-        return (int) $this->billableQuery($user, null)->sum('media.size');
+        return (int) $this->billableQuery($owner, null)->sum('media.size');
     }
 
     /**
-     * Billable bytes for (user, tenant). Powers the /files usage bar,
-     * remaining-bytes check, and per-tenant threshold alerting.
+     * Billable bytes for (owner, tenant).
      */
+    public function usedBytesForOwnerInTenant(Model $owner, Tenant $tenant): int
+    {
+        return (int) $this->billableQuery($owner, $tenant)->sum('media.size');
+    }
+
+    /**
+     * Effective storage quota for this owner in this tenant. Returns `null`
+     * for unlimited, `0` for hard-disabled, positive bytes otherwise.
+     *
+     * Resolution order depends on owner type:
+     *   - User    → user override → tenant default → app default → unlimited
+     *   - Tenant  → tenant.storage_quota_bytes (no fallback chain)
+     *   - other   → null (caller must override via service binding if needed)
+     */
+    public function effectiveQuota(Model $owner, ?Tenant $tenant = null): ?int
+    {
+        if ($owner instanceof User && $tenant !== null) {
+            return $this->effectivePersonalQuota($owner, $tenant);
+        }
+
+        if ($owner instanceof Tenant) {
+            $quota = $owner->storage_quota_bytes;
+            if ($quota === null) {
+                return null;
+            }
+
+            return (int) $quota < 0 ? null : (int) $quota;
+        }
+
+        return null;
+    }
+
+    /**
+     * Remaining bytes for this owner in this tenant, or `null` for unlimited.
+     */
+    public function remainingBytesForOwner(Model $owner, ?Tenant $tenant = null): ?int
+    {
+        $quota = $this->effectiveQuota($owner, $tenant);
+
+        if ($quota === null) {
+            return null;
+        }
+
+        $used = $tenant !== null
+            ? $this->usedBytesForOwnerInTenant($owner, $tenant)
+            : $this->usedBytesForOwner($owner);
+
+        return max(0, $quota - $used);
+    }
+
+    /**
+     * Refresh whichever denormalized column tracks this owner's used bytes.
+     * Returns the freshly-computed total.
+     */
+    public function recomputeForOwner(Model $owner): int
+    {
+        if ($owner instanceof User) {
+            return $this->recomputeForUser($owner);
+        }
+
+        if ($owner instanceof Tenant) {
+            return $this->recomputeForTenant($owner);
+        }
+
+        // Custom owners can wire their own denormalization in their model;
+        // we just compute the live total without persisting.
+        return $this->usedBytesForOwner($owner);
+    }
+
+    // -----------------------------------------------------------------------
+    // User-specific shims (kept so existing call-sites keep working)
+    // -----------------------------------------------------------------------
+
+    public function usedBytesForUser(User $user): int
+    {
+        return $this->usedBytesForOwner($user);
+    }
+
     public function usedBytesForUserInTenant(User $user, Tenant $tenant): int
     {
-        return (int) $this->billableQuery($user, $tenant)->sum('media.size');
+        return $this->usedBytesForOwnerInTenant($user, $tenant);
     }
 
     /**
@@ -84,7 +165,6 @@ class StorageUsageService
         $query = User::query();
 
         if ($search !== null && $search !== '') {
-            // Escape LIKE wildcards — mirrors how we filter the admin user list.
             $escaped = addcslashes($search, '%_\\');
             $like = "%{$escaped}%";
             $query->where(function ($q) use ($like): void {
@@ -107,9 +187,7 @@ class StorageUsageService
     }
 
     /**
-     * Billable usage per customer (tenant). Sums the `file` collection only,
-     * so previews/chat/avatars don't leak into the per-customer breakdown.
-     * Optional search filters by tenant name or slug (case-insensitive).
+     * Billable usage per customer (tenant). Sums the `file` collection only.
      *
      * @return array<int, array{tenant_id: int, name: string, slug: string, bytes: int, file_count: int}>
      */
@@ -185,10 +263,6 @@ class StorageUsageService
     }
 
     /**
-     * Admin dashboard pie — what share of system storage is user-billable vs
-     * platform overhead (previews, chat attachments, avatars). Helps admins
-     * decide whether preview/transcode strategies need tuning.
-     *
      * @return array<string, int> bucket => bytes
      */
     public function systemBreakdownByCollection(): array
@@ -220,7 +294,7 @@ class StorageUsageService
 
     public function recomputeForUser(User $user): int
     {
-        $bytes = $this->usedBytesForUser($user);
+        $bytes = $this->usedBytesForOwner($user);
 
         if ((int) $user->storage_used_bytes !== $bytes) {
             $user->forceFill(['storage_used_bytes' => $bytes])->saveQuietly();
@@ -235,15 +309,7 @@ class StorageUsageService
      */
     public function remainingBytesInTenant(User $user, Tenant $tenant): ?int
     {
-        $quota = $this->effectivePersonalQuota($user, $tenant);
-
-        if ($quota === null) {
-            return null;
-        }
-
-        $used = $this->usedBytesForUserInTenant($user, $tenant);
-
-        return max(0, $quota - $used);
+        return $this->remainingBytesForOwner($user, $tenant);
     }
 
     /** 0-100(+) percent of quota consumed by this tenant's files. */
@@ -255,21 +321,18 @@ class StorageUsageService
             return 0.0;
         }
 
-        return round(($this->usedBytesForUserInTenant($user, $tenant) / $quota) * 100, 2);
+        return round(($this->usedBytesForOwnerInTenant($user, $tenant) / $quota) * 100, 2);
     }
 
     /**
      * Resolve a user's effective personal-storage quota following the 3-tier
      * fallback order: user override → customer default → global default →
-     * unlimited. Returns `null` for unlimited, `0` for hard-disabled, and a
-     * positive byte cap otherwise.
+     * unlimited.
      *
      * Sentinels:
-     *   - `-1` at any level = explicit unlimited (returns null so existing
-     *     "null = no cap" checks keep working).
+     *   - `-1` at any level = explicit unlimited (returns null).
      *   - `0` is a hard block (returns 0) — never inherited past.
-     *   - null at a given level means "defer to the next level"; only the
-     *     final fallback (app default) treats null as unlimited.
+     *   - null at a given level means "defer to the next level".
      */
     public function effectivePersonalQuota(User $user, Tenant $tenant): ?int
     {
@@ -308,8 +371,8 @@ class StorageUsageService
 
     /**
      * Bytes consumed by the company-shared bucket for this tenant: the sum of
-     * native company-scope uploads plus every personal file currently linked
-     * into this tenant's company tree. A linked file counts toward BOTH its
+     * Tenant-owned uploads plus every personal file currently linked into
+     * this tenant's company tree. A linked file counts toward BOTH its
      * owner's personal bucket and the company bucket — intentional: the
      * shared copy increases the tenant's footprint without affecting the
      * user's own storage accounting.
@@ -325,7 +388,8 @@ class StorageUsageService
                     ->where('media.model_type', FileItem::class);
             })
             ->where('media.collection_name', self::BILLABLE_COLLECTION)
-            ->where('file_items.scope', FileItem::SCOPE_COMPANY)
+            ->where('file_items.owner_type', Tenant::class)
+            ->where('file_items.owner_id', $tenant->id)
             ->where('file_items.tenant_id', $tenant->id)
             ->sum('media.size');
 
@@ -379,9 +443,9 @@ class StorageUsageService
     }
 
     /**
-     * Fire threshold alerts for *this tenant only*. Each tenant has its own
-     * slot in `storage_last_alerted_threshold` (keyed by tenant id), so a
-     * user crossing 80% in Company A doesn't suppress an 80% alert for
+     * Fire threshold alerts for this user in this tenant. Each tenant has
+     * its own slot in `storage_last_alerted_threshold` (keyed by tenant id),
+     * so a user crossing 80% in Company A doesn't suppress an 80% alert for
      * Company B later.
      */
     public function checkAndNotifyThresholds(User $user, Tenant $tenant): void
@@ -394,7 +458,7 @@ class StorageUsageService
             return;
         }
 
-        $used = $this->usedBytesForUserInTenant($user, $tenant);
+        $used = $this->usedBytesForOwnerInTenant($user, $tenant);
         $percent = ($used / $quota) * 100;
 
         $thresholdMap = is_array($resolved['storage_last_alerted_threshold'] ?? null)
@@ -438,15 +502,11 @@ class StorageUsageService
     }
 
     /**
-     * Build the billable subquery: only media rows from the FileItem `file`
-     * collection, optionally scoped to one tenant. Previews + chat + avatars
-     * are intentionally excluded.
-     *
-     * Callers pick their own projection — leaving the SELECT empty here
-     * avoids poisoning aggregate callers like `breakdownByTypeForUser`
-     * (Postgres rejects non-grouped columns; SQLite silently accepts them).
+     * Build the billable subquery: media rows from the FileItem `file`
+     * collection scoped to one polymorphic owner, optionally narrowed to a
+     * single tenant. Previews + chat + avatars are intentionally excluded.
      */
-    private function billableQuery(User $user, ?Tenant $tenant): Builder
+    private function billableQuery(Model $owner, ?Tenant $tenant): Builder
     {
         $conn = $this->central();
 
@@ -457,7 +517,8 @@ class StorageUsageService
                     ->where('media.model_type', FileItem::class);
             })
             ->where('media.collection_name', self::BILLABLE_COLLECTION)
-            ->where('file_items.user_id', $user->id)
+            ->where('file_items.owner_type', $owner::class)
+            ->where('file_items.owner_id', $owner->getKey())
             ->when($tenant !== null, fn ($q) => $q->where('file_items.tenant_id', $tenant->id));
     }
 
