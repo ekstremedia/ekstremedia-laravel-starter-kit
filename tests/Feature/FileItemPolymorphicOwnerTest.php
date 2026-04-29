@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Events\FileItemUpdated;
 use App\Models\FileItem;
 use App\Models\Tenant;
 use App\Models\User;
-use App\Services\StorageUsageService;
 use Database\Seeders\RoleAndPermissionSeeder;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -78,8 +78,8 @@ it('routes broadcast channels by owner type', function () {
             'user_id' => $this->user->id,
         ]);
 
-    $userEvent = new App\Events\FileItemUpdated($userItem->fresh(['owner']));
-    $companyEvent = new App\Events\FileItemUpdated($companyItem->fresh(['owner']));
+    $userEvent = new FileItemUpdated($userItem->fresh(['owner']));
+    $companyEvent = new FileItemUpdated($companyItem->fresh(['owner']));
 
     expect($userEvent->broadcastOn()[0]->name)
         ->toBe('private-App.Models.User.'.$this->user->id)

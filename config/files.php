@@ -1,5 +1,8 @@
 <?php
 
+use App\Models\Tenant;
+use App\Models\User;
+
 /**
  * File-system module configuration.
  *
@@ -19,8 +22,8 @@ return [
     // — the controller refuses to morph to anything not on this list to
     // prevent crafted owner_type payloads from probing arbitrary classes.
     'allowed_owner_types' => [
-        \App\Models\User::class,
-        \App\Models\Tenant::class,
+        User::class,
+        Tenant::class,
     ],
 
     // Per-file upload size limit applied to files.* validation. Expressed

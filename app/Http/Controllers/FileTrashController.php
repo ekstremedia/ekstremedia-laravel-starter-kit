@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Contracts\FileOwner;
 use App\Http\Resources\FileItemResource;
 use App\Models\AppSetting;
 use App\Models\FileItem;
@@ -218,7 +219,7 @@ class FileTrashController extends Controller
      */
     private function authorizeOwnerAccess(User $user, Model $owner, Tenant $tenant, bool $view): void
     {
-        if (! $owner instanceof \App\Contracts\FileOwner) {
+        if (! $owner instanceof FileOwner) {
             // Unknown owner type can't be authorized — refuse rather than
             // silently allow.
             abort(403, __('files.permission_denied'));

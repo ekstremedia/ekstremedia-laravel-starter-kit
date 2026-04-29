@@ -10,6 +10,7 @@ use Database\Factories\TenantFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Permission\PermissionRegistrar;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
 use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
@@ -143,7 +144,7 @@ class Tenant extends BaseTenant implements FileOwner, TenantWithDatabase
      */
     private function checkScopedPermission(User $user, string $permission): bool
     {
-        $registrar = app(\Spatie\Permission\PermissionRegistrar::class);
+        $registrar = app(PermissionRegistrar::class);
         $previous = $registrar->getPermissionsTeamId();
 
         try {

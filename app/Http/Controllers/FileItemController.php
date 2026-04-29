@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Contracts\FileOwner;
 use App\Events\FileItemUpdated;
 use App\Http\Resources\FileItemResource;
 use App\Jobs\GenerateDocumentPreview;
@@ -396,7 +397,7 @@ class FileItemController extends Controller
      */
     private function authorizeOwnerAccess(User $user, Model $owner, Tenant $tenant, bool $view): void
     {
-        if (! $owner instanceof \App\Contracts\FileOwner) {
+        if (! $owner instanceof FileOwner) {
             abort(403, __('files.permission_denied'));
         }
 

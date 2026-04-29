@@ -66,7 +66,7 @@ return new class extends Migration
             ->count();
 
         if ($orphaned > 0) {
-            throw new \RuntimeException(
+            throw new RuntimeException(
                 "Refusing to tighten owner_type/owner_id NOT NULL: {$orphaned} file_items row(s) "
                 .'still have NULL owner. Backfill manually before re-running this migration.',
             );

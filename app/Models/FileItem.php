@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -38,7 +39,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property-read Tenant $tenant
  * @property-read User $creator
  * @property-read User $user
- * @property-read \Illuminate\Database\Eloquent\Model|null $owner
+ * @property-read Model|null $owner
  * @property-read FileItem|null $parent
  */
 class FileItem extends Model implements HasMedia
@@ -131,7 +132,7 @@ class FileItem extends Model implements HasMedia
      * Tenant for company, future Building/Customer/etc.). Can be null when
      * the related row was hard-deleted out from under the morph.
      *
-     * @return MorphTo<\Illuminate\Database\Eloquent\Model, $this>
+     * @return MorphTo<Model, $this>
      */
     public function owner(): MorphTo
     {
@@ -237,8 +238,8 @@ class FileItem extends Model implements HasMedia
      * Scope by polymorphic owner — replaces hand-rolled
      * `where('user_id', $u->id)->where('scope', 'personal')` blocks.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder<FileItem>  $query
-     * @return \Illuminate\Database\Eloquent\Builder<FileItem>
+     * @param  Builder<FileItem>  $query
+     * @return Builder<FileItem>
      */
     public function scopeForOwner($query, Model $owner)
     {
