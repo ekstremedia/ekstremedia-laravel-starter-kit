@@ -388,7 +388,7 @@ class StorageUsageService
                     ->where('media.model_type', FileItem::class);
             })
             ->where('media.collection_name', self::BILLABLE_COLLECTION)
-            ->where('file_items.owner_type', Tenant::class)
+            ->where('file_items.owner_type', $tenant->getMorphClass())
             ->where('file_items.owner_id', $tenant->id)
             ->where('file_items.tenant_id', $tenant->id)
             ->sum('media.size');
@@ -517,7 +517,7 @@ class StorageUsageService
                     ->where('media.model_type', FileItem::class);
             })
             ->where('media.collection_name', self::BILLABLE_COLLECTION)
-            ->where('file_items.owner_type', $owner::class)
+            ->where('file_items.owner_type', $owner->getMorphClass())
             ->where('file_items.owner_id', $owner->getKey())
             ->when($tenant !== null, fn ($q) => $q->where('file_items.tenant_id', $tenant->id));
     }
