@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Contracts\FileOwner;
 use App\Events\FileItemUpdated;
 use App\Http\Resources\FileItemResource;
 use App\Jobs\GenerateDocumentPreview;
@@ -13,11 +14,14 @@ use App\Models\AppSetting;
 use App\Models\CompanyFileLink;
 use App\Models\FileItem;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\StorageUsageService;
 use App\Support\CompanyFilesCache;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -32,8 +36,11 @@ class FileItemController extends Controller
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
 
+        $owner = $this->resolveOwner($request, $user);
+        $this->authorizeOwnerAccess($user, $owner, $tenant, view: true);
+
         if ($folder !== null && $folder->exists) {
-            $this->authorizeOwn($folder, $user->id, $tenant->id);
+            Gate::forUser($user)->authorize('view', [$folder, $tenant]);
             if (! $folder->isFolder()) {
                 abort(404);
             }
@@ -43,13 +50,11 @@ class FileItemController extends Controller
 
         $query = FileItem::query()
             ->where('tenant_id', $tenant->id)
-            ->where('user_id', $user->id)
-            ->where('scope', FileItem::SCOPE_PERSONAL)
+            ->forOwner($owner)
             ->where('parent_id', $parentId)
             ->with(['media', 'companyLink']);
 
         if ($search = $request->string('q')->toString()) {
-            // Case-insensitive prefix search, escaping LIKE wildcards.
             $escaped = addcslashes($search, '%_\\');
             $driver = DB::connection()->getDriverName();
             $op = $driver === 'pgsql' ? 'ilike' : 'like';
@@ -60,11 +65,11 @@ class FileItemController extends Controller
             ->orderBy('name')
             ->get();
 
-        $usedBytes = $this->usage->usedBytesForUserInTenant($user, $tenant);
+        $usedBytes = $this->usage->usedBytesForOwnerInTenant($owner, $tenant);
 
         $trashedCount = FileItem::onlyTrashed()
             ->where('tenant_id', $tenant->id)
-            ->where('user_id', $user->id)
+            ->forOwner($owner)
             ->count();
 
         return Inertia::render('Files/Index', [
@@ -73,8 +78,10 @@ class FileItemController extends Controller
             'current_folder' => $folder?->only(['id', 'name', 'uuid']),
             'usage' => [
                 'used_bytes' => $usedBytes,
-                'quota_bytes' => $this->usage->effectivePersonalQuota($user, $tenant),
-                'percent' => $this->usage->percentUsedInTenant($user, $tenant),
+                'quota_bytes' => $this->usage->effectiveQuota($owner, $tenant),
+                'percent' => $owner instanceof User
+                    ? $this->usage->percentUsedInTenant($owner, $tenant)
+                    : 0.0,
             ],
             'trashed_count' => $trashedCount,
             'search' => $search ?: null,
@@ -86,7 +93,9 @@ class FileItemController extends Controller
         $tenant = $this->currentTenant($request);
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
-        abort_unless($user->can('create folders'), 403, __('files.permission_denied'));
+
+        $owner = $this->resolveOwner($request, $user);
+        Gate::forUser($user)->authorize('createFolderFor', [FileItem::class, $owner, $tenant]);
 
         $data = $request->validate([
             'name' => 'required|string|max:255',
@@ -95,7 +104,7 @@ class FileItemController extends Controller
 
         if (isset($data['parent_id'])) {
             $parent = FileItem::findOrFail($data['parent_id']);
-            $this->authorizeOwn($parent, $user->id, $tenant->id);
+            Gate::forUser($user)->authorize('update', [$parent, $tenant]);
             if (! $parent->isFolder()) {
                 abort(422, 'Parent must be a folder.');
             }
@@ -104,9 +113,12 @@ class FileItemController extends Controller
         $folder = FileItem::create([
             'tenant_id' => $tenant->id,
             'user_id' => $user->id,
+            'owner_type' => $owner::class,
+            'owner_id' => $owner->getKey(),
             'parent_id' => $data['parent_id'] ?? null,
             'type' => FileItem::TYPE_FOLDER,
-            'name' => $this->uniqueName($tenant->id, $user->id, $data['parent_id'] ?? null, $data['name']),
+            'scope' => $this->scopeFor($owner),
+            'name' => $this->uniqueName($tenant->id, $owner, $data['parent_id'] ?? null, $data['name']),
         ]);
 
         return back()->with('success', __('files.folder_created', ['name' => $folder->name]));
@@ -117,7 +129,9 @@ class FileItemController extends Controller
         $tenant = $this->currentTenant($request);
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
-        abort_unless($user->can('upload files'), 403, __('files.permission_denied'));
+
+        $owner = $this->resolveOwner($request, $user);
+        Gate::forUser($user)->authorize('uploadTo', [FileItem::class, $owner, $tenant]);
 
         $request->validate([
             'files' => 'required|array|min:1',
@@ -128,7 +142,7 @@ class FileItemController extends Controller
         $parentId = $request->integer('parent_id') ?: null;
         if ($parentId !== null) {
             $parent = FileItem::findOrFail($parentId);
-            $this->authorizeOwn($parent, $user->id, $tenant->id);
+            Gate::forUser($user)->authorize('update', [$parent, $tenant]);
             if (! $parent->isFolder()) {
                 abort(422, 'Parent must be a folder.');
             }
@@ -137,17 +151,18 @@ class FileItemController extends Controller
         $created = 0;
         $previewTargets = [];
         $videoTargets = [];
-        DB::connection((string) config('tenancy.database.central_connection'))->transaction(function () use ($request, $tenant, $user, $parentId, &$created, &$previewTargets, &$videoTargets): void {
+        DB::connection((string) config('tenancy.database.central_connection'))->transaction(function () use ($request, $tenant, $user, $owner, $parentId, &$created, &$previewTargets, &$videoTargets): void {
             foreach ($request->file('files', []) as $file) {
-                $name = $this->uniqueName($tenant->id, $user->id, $parentId, $file->getClientOriginalName());
-                // getSize() can return false on partial uploads — fall back to
-                // 0 so we don't store an int-cast-of-false (also 0) silently.
+                $name = $this->uniqueName($tenant->id, $owner, $parentId, $file->getClientOriginalName());
                 $size = $file->getSize();
                 $item = FileItem::create([
                     'tenant_id' => $tenant->id,
                     'user_id' => $user->id,
+                    'owner_type' => $owner::class,
+                    'owner_id' => $owner->getKey(),
                     'parent_id' => $parentId,
                     'type' => FileItem::TYPE_FILE,
+                    'scope' => $this->scopeFor($owner),
                     'name' => $name,
                     'mime_type' => $file->getClientMimeType(),
                     'size' => $size === false ? 0 : (int) $size,
@@ -156,21 +171,15 @@ class FileItemController extends Controller
                 $item->addMedia($file)->toMediaCollection('file');
                 $created++;
 
-                // Office/PDF files get a first-page render via Gotenberg+Imagick
-                // on the queue, then broadcast an update to the owner's channel.
                 if (in_array((string) $item->mime_type, config('files.preview_mime_types', []), true)) {
                     $previewTargets[] = $item->id;
                 }
-                // Videos get a poster frame + web-friendly MP4 via ffmpeg on
-                // the queue. UI shows a spinner until the broadcast arrives.
                 if ($item->isVideo()) {
                     $videoTargets[] = $item->id;
                 }
             }
         });
 
-        // Dispatch preview jobs + broadcast initial "new item" events after
-        // the transaction commits so the worker sees a row it can load.
         foreach ($previewTargets as $id) {
             GenerateDocumentPreview::dispatch($id);
         }
@@ -184,10 +193,12 @@ class FileItemController extends Controller
             }
         }
 
-        // Refresh the denormalized column (billable across every tenant) and
-        // fire threshold alerts for the tenant the user uploaded into.
-        $this->usage->recomputeForUser($user);
-        $this->usage->checkAndNotifyThresholds($user->fresh(), $tenant);
+        // Refresh whichever owner-scoped denormalization exists, then fire
+        // threshold alerts (only meaningful for User owners today).
+        $this->usage->recomputeForOwner($owner);
+        if ($owner instanceof User) {
+            $this->usage->checkAndNotifyThresholds($owner->fresh(), $tenant);
+        }
 
         return back()->with('success', __('files.upload_success', ['count' => $created]));
     }
@@ -197,8 +208,7 @@ class FileItemController extends Controller
         $tenant = $this->currentTenant($request);
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
-        $this->authorizeOwn($file, $user->id, $tenant->id);
-        abort_unless($user->can('rename files'), 403, __('files.permission_denied'));
+        Gate::forUser($user)->authorize('update', [$file, $tenant]);
 
         $data = $request->validate([
             'name' => 'sometimes|string|min:1|max:255',
@@ -207,17 +217,14 @@ class FileItemController extends Controller
 
         if (array_key_exists('parent_id', $data)) {
             if ($data['parent_id'] !== null) {
-                // Refuse self-parenting up front — the descendant check below
-                // wouldn't catch (id === id) because the walk stops at root.
                 if ((int) $data['parent_id'] === (int) $file->id) {
                     abort(422, 'Cannot set an item as its own parent.');
                 }
                 $parent = FileItem::findOrFail($data['parent_id']);
-                $this->authorizeOwn($parent, $user->id, $tenant->id);
+                Gate::forUser($user)->authorize('update', [$parent, $tenant]);
                 if (! $parent->isFolder()) {
                     abort(422, 'Destination must be a folder.');
                 }
-                // Disallow moving a folder into its own descendant.
                 if ($file->isFolder() && $this->isDescendantOf($parent, $file)) {
                     abort(422, 'Cannot move a folder into its own descendant.');
                 }
@@ -226,7 +233,7 @@ class FileItemController extends Controller
         }
 
         if (array_key_exists('name', $data) && $data['name'] !== '') {
-            $file->name = $this->uniqueName($tenant->id, $user->id, $file->parent_id, $data['name'], $file->id);
+            $file->name = $this->uniqueNameForItem($tenant->id, $file, $data['name']);
         }
 
         $file->save();
@@ -239,28 +246,23 @@ class FileItemController extends Controller
         $tenant = $this->currentTenant($request);
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
-        $this->authorizeOwn($file, $user->id, $tenant->id);
-        abort_unless($user->can('delete files'), 403, __('files.permission_denied'));
+        Gate::forUser($user)->authorize('delete', [$file, $tenant]);
 
         $file->delete();
-        $this->usage->recomputeForUser($user);
+        $this->usage->recomputeForOwner($file->owner ?? $user);
 
         return back()->with('success', __('files.deleted'));
     }
 
     /**
      * Share an owned personal file to the active customer's company tree.
-     * Creates a CompanyFileLink (one row per (tenant, file)); no media
-     * duplication — the same FileItem now surfaces in Company Files with an
-     * owner chip. Folders can't be linked; users organise by linking files
-     * into native company folders (created via CompanyFileController).
      */
     public function share(Request $request, FileItem $file): RedirectResponse
     {
         $tenant = $this->currentTenant($request);
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
-        $this->authorizeOwn($file, $user->id, $tenant->id);
+        Gate::forUser($user)->authorize('share', [$file, $tenant]);
 
         abort_unless(
             $tenant->company_files_enabled,
@@ -290,9 +292,6 @@ class FileItemController extends Controller
         }
 
         if ($file->isFolder()) {
-            // Heavy. Queue it so the request returns immediately — the UI
-            // gets an instant "sharing…" bump and settles when the job
-            // finishes (second bump from inside the job).
             CompanyFilesCache::bump($tenant->id, 'folder_share_started', $parentId);
             ShareFolderToCompany::dispatch(
                 personalFolderId: $file->id,
@@ -304,11 +303,6 @@ class FileItemController extends Controller
             return back()->with('success', __('files.shared_to_company_queued'));
         }
 
-        // Single-file share: fast enough to do inline. One link row per
-        // (tenant, file) — re-sharing moves it between company folders
-        // instead of creating a duplicate. Wrap in the central-connection
-        // transaction so a mid-flight failure doesn't leave a half-
-        // written link that the usage recompute would then see.
         DB::connection((string) config('tenancy.database.central_connection'))
             ->transaction(function () use ($file, $tenant, $user, $parentId): void {
                 CompanyFileLink::updateOrCreate(
@@ -323,17 +317,12 @@ class FileItemController extends Controller
         return back()->with('success', __('files.shared_to_company'));
     }
 
-    /**
-     * Remove a personal file from the company tree. Only the owner can
-     * call this — company admins unshare via CompanyFileController::unlink
-     * (which surfaces the notify-owner flow).
-     */
     public function unshare(Request $request, FileItem $file): RedirectResponse
     {
         $tenant = $this->currentTenant($request);
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
-        $this->authorizeOwn($file, $user->id, $tenant->id);
+        Gate::forUser($user)->authorize('share', [$file, $tenant]);
 
         if ($file->scope !== FileItem::SCOPE_PERSONAL) {
             abort(422, __('files.cannot_unshare_non_personal'));
@@ -342,10 +331,6 @@ class FileItemController extends Controller
         DB::connection((string) config('tenancy.database.central_connection'))
             ->transaction(function () use ($file, $tenant): void {
                 if ($file->isFolder()) {
-                    // Walk the personal folder tree and drop any links that
-                    // were created for its descendant files. Leave the
-                    // mirrored company folders in place — they may now
-                    // contain links from other members or native uploads.
                     $this->unshareFolderFromCompany($file, $tenant);
                 } else {
                     CompanyFileLink::query()
@@ -381,7 +366,7 @@ class FileItemController extends Controller
         $tenant = $this->currentTenant($request);
         $user = $request->user();
         $this->assertFeatureAvailable($request, $tenant);
-        $this->authorizeOwn($file, $user->id, $tenant->id);
+        Gate::forUser($user)->authorize('download', [$file, $tenant]);
 
         if ($file->isFolder()) {
             abort(404);
@@ -395,9 +380,6 @@ class FileItemController extends Controller
         $requested = $request->string('size')->toString();
         if ($requested !== '' && $requested !== 'original' && $media->hasGeneratedConversion($requested)) {
             $path = $media->getPath($requested);
-            // Derive the conversion's extension from the file on disk rather
-            // than assuming .webp — conversions can be any format Spatie is
-            // configured to produce.
             $ext = pathinfo($path, PATHINFO_EXTENSION) ?: 'webp';
             $filename = pathinfo($file->name, PATHINFO_FILENAME).'-'.$requested.'.'.$ext;
         } else {
@@ -408,6 +390,59 @@ class FileItemController extends Controller
         return response()->download($path, $filename);
     }
 
+    /**
+     * Refuse listing/management when the caller can't access this owner's
+     * files. Mirrors FileTrashController so a crafted owner_type/owner_id
+     * pair on the index endpoint can't expose another owner's tree.
+     */
+    private function authorizeOwnerAccess(User $user, Model $owner, Tenant $tenant, bool $view): void
+    {
+        if (! $owner instanceof FileOwner) {
+            abort(403, __('files.permission_denied'));
+        }
+
+        $allowed = $view
+            ? $owner->canViewFiles($user, $tenant)
+            : $owner->canManageFiles($user, $tenant);
+
+        abort_unless($allowed, 403, __('files.permission_denied'));
+    }
+
+    /**
+     * Resolve the polymorphic owner the request is acting on. Defaults to
+     * the authenticated user (personal files) — future routes can pass an
+     * `owner_type` + `owner_id` pair (e.g. /files/buildings/12) and this
+     * method will resolve and authorize it.
+     */
+    private function resolveOwner(Request $request, User $user): Model
+    {
+        $type = $request->input('owner_type');
+        $id = $request->input('owner_id');
+
+        if (! is_string($type) || ! is_numeric($id)) {
+            return $user;
+        }
+
+        // Only allow morphing to classes the app has registered as owners.
+        // The default Eloquent morphTo can be tricked otherwise.
+        $allowed = config('files.allowed_owner_types', [User::class, Tenant::class]);
+        if (! in_array($type, $allowed, true) || ! class_exists($type)) {
+            abort(422, 'Unknown owner type.');
+        }
+
+        $resolved = $type::query()->find((int) $id);
+        if ($resolved === null) {
+            abort(404);
+        }
+
+        return $resolved;
+    }
+
+    private function scopeFor(Model $owner): string
+    {
+        return $owner instanceof Tenant ? FileItem::SCOPE_COMPANY : FileItem::SCOPE_PERSONAL;
+    }
+
     private function currentTenant(Request $request): Tenant
     {
         $tenant = $request->attributes->get('customer');
@@ -416,8 +451,6 @@ class FileItemController extends Controller
             return $tenant;
         }
 
-        // Single-tenant installs (tenancy disabled) — fall back to the
-        // default-customer row. When that's missing the feature simply 404s.
         $slug = config('tenancy.default_customer_slug');
         $fallback = $slug ? Tenant::query()->where('slug', $slug)->first() : null;
 
@@ -428,12 +461,6 @@ class FileItemController extends Controller
         return $fallback;
     }
 
-    /**
-     * Validation rule that checks a file_items.id exists on the central
-     * connection. The built-in `exists:` rule binds to the default
-     * connection, which is swapped to the tenant schema by stancl/tenancy —
-     * file_items lives in the central DB, so we look it up through the model.
-     */
     private function existsFileItemRule(): \Closure
     {
         return function (string $attribute, $value, \Closure $fail): void {
@@ -448,9 +475,6 @@ class FileItemController extends Controller
 
     private function assertFeatureAvailable(Request $request, Tenant $tenant): void
     {
-        // Global kill-switch — admin can disable the whole subsystem from
-        // /admin/settings. Image previews (avatars, chat thumbnails) still
-        // work because those live under User/Message, not FileItem.
         if (! AppSetting::current()->files_feature_enabled) {
             abort(404);
         }
@@ -471,13 +495,6 @@ class FileItemController extends Controller
         }
     }
 
-    private function authorizeOwn(FileItem $item, int $userId, int $tenantId): void
-    {
-        if ($item->user_id !== $userId || $item->tenant_id !== $tenantId) {
-            abort(403, __('files.permission_denied'));
-        }
-    }
-
     private function isDescendantOf(FileItem $candidate, FileItem $possibleAncestor): bool
     {
         $cursor = $candidate;
@@ -495,16 +512,48 @@ class FileItemController extends Controller
     }
 
     /**
-     * Suffix " (n)" until the name is unique within the folder. Excludes
-     * $ignoreId so renaming to the same name is a no-op.
+     * Suffix " (n)" until the name is unique within the (owner, parent)
+     * folder. Operates on owner_type/owner_id so company and personal files
+     * have independent name spaces even when they share a tenant + parent.
      */
-    private function uniqueName(int $tenantId, int $userId, ?int $parentId, string $name, ?int $ignoreId = null): string
+    private function uniqueName(int $tenantId, Model $owner, ?int $parentId, string $name, ?int $ignoreId = null): string
+    {
+        return $this->uniqueNameByColumns(
+            $tenantId,
+            $owner::class,
+            (int) $owner->getKey(),
+            $parentId,
+            $name,
+            $ignoreId,
+        );
+    }
+
+    /**
+     * Same uniqueness check, driven from the FileItem's stored owner_type/
+     * owner_id columns rather than the loaded relation. Used by rename so
+     * we don't depend on owner being eagerly loadable — a deleted owner row
+     * still has stable stored ids and we want the rename to succeed.
+     */
+    private function uniqueNameForItem(int $tenantId, FileItem $item, string $name): string
+    {
+        return $this->uniqueNameByColumns(
+            $tenantId,
+            (string) $item->owner_type,
+            (int) $item->owner_id,
+            $item->parent_id,
+            $name,
+            $item->id,
+        );
+    }
+
+    private function uniqueNameByColumns(int $tenantId, string $ownerType, int $ownerId, ?int $parentId, string $name, ?int $ignoreId): string
     {
         $base = $name;
         $i = 1;
         while (FileItem::query()
             ->where('tenant_id', $tenantId)
-            ->where('user_id', $userId)
+            ->where('owner_type', $ownerType)
+            ->where('owner_id', $ownerId)
             ->where('parent_id', $parentId)
             ->where('name', $name)
             ->when($ignoreId !== null, fn ($q) => $q->where('id', '!=', $ignoreId))

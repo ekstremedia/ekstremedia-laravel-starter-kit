@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Events;
 
 use App\Models\FileItem;
+use App\Models\Tenant;
+use App\Models\User;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
@@ -13,10 +15,10 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Broadcast on the owner's private channel whenever a FileItem changes in a
- * way the UI needs to know about — preview conversions finishing, a rename,
- * or a delete. Carries a minimal payload so the Vue page can patch the item
- * in place without a full re-fetch.
+ * Broadcast whenever a FileItem changes in a way the UI needs to know about —
+ * preview conversions finishing, a rename, or a delete. The channel is the
+ * owner's private channel: User → user, Tenant → customer.{id}.files,
+ * future polymorphic owners can opt in by exposing fileBroadcastChannels().
  */
 class FileItemUpdated implements ShouldBroadcast
 {
@@ -29,7 +31,26 @@ class FileItemUpdated implements ShouldBroadcast
      */
     public function broadcastOn(): array
     {
-        return [new PrivateChannel('App.Models.User.'.$this->item->user_id)];
+        $owner = $this->item->owner;
+
+        if ($owner instanceof User) {
+            return [new PrivateChannel('App.Models.User.'.$owner->getKey())];
+        }
+
+        if ($owner instanceof Tenant) {
+            return [new PrivateChannel('customer.'.$owner->getKey().'.files')];
+        }
+
+        // Custom owners can declare their own channel(s) — return empty if
+        // the owner doesn't (broadcast still fires, just nowhere to listen).
+        if ($owner !== null && method_exists($owner, 'fileBroadcastChannels')) {
+            /** @var array<int, Channel> $channels */
+            $channels = $owner->fileBroadcastChannels($this->item);
+
+            return $channels;
+        }
+
+        return [];
     }
 
     public function broadcastAs(): string

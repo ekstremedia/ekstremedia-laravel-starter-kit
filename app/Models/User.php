@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Contracts\FileOwner;
+use App\Models\Concerns\HasFiles;
 use App\Notifications\ResetPasswordNotification;
 use App\Notifications\VerifyEmailNotification;
 use Database\Factories\UserFactory;
@@ -47,12 +49,12 @@ use Spatie\Permission\Traits\HasRoles;
 // going through the SuperAdmin-gated code path.
 #[Fillable(['public_id', 'first_name', 'last_name', 'email', 'password', 'headline', 'bio', 'location', 'website'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable implements HasLocalePreference, HasMedia, MustVerifyEmail
+class User extends Authenticatable implements FileOwner, HasLocalePreference, HasMedia, MustVerifyEmail
 {
     public const ROLE_SUPER_ADMIN = 'SuperAdmin';
 
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, HasRoles, Impersonate, InteractsWithMedia, LogsActivity, Notifiable, Searchable, TwoFactorAuthenticatable;
+    use HasApiTokens, HasFactory, HasFiles, HasRoles, Impersonate, InteractsWithMedia, LogsActivity, Notifiable, Searchable, TwoFactorAuthenticatable;
 
     public const USERS_LIST_CACHE_KEY = 'admin.users.index';
 
@@ -293,13 +295,35 @@ class User extends Authenticatable implements HasLocalePreference, HasMedia, Mus
     }
 
     /**
-     * File-system entries owned by this user across all customers.
+     * Files where this user is the uploader/creator (regardless of who owns
+     * the file). Distinct from files() which returns owned files via the
+     * polymorphic owner relation. Mostly useful for "show me everything I
+     * uploaded into the company tree".
      *
      * @return HasMany<FileItem, $this>
      */
-    public function files(): HasMany
+    public function uploadedFiles(): HasMany
     {
-        return $this->hasMany(FileItem::class);
+        return $this->hasMany(FileItem::class, 'user_id');
+    }
+
+    /**
+     * A user owns a file iff they are its owner. Editors/Admins can manage
+     * arbitrary user-owned files only via the cross-cutting `manage all
+     * files` permission (or super-admin).
+     */
+    public function canManageFiles(User $user, ?Tenant $tenant = null): bool
+    {
+        if ($user->isSuperAdmin() || $user->can('manage all files')) {
+            return true;
+        }
+
+        return $user->getKey() === $this->getKey();
+    }
+
+    public function canViewFiles(User $user, ?Tenant $tenant = null): bool
+    {
+        return $this->canManageFiles($user, $tenant);
     }
 
     /**

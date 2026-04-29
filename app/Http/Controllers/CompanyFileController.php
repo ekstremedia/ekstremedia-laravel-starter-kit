@@ -175,6 +175,8 @@ class CompanyFileController extends Controller
         $folder = FileItem::create([
             'tenant_id' => $tenant->id,
             'user_id' => $user->id,
+            'owner_type' => Tenant::class,
+            'owner_id' => $tenant->id,
             'parent_id' => $data['parent_id'] ?? null,
             'type' => FileItem::TYPE_FOLDER,
             'scope' => FileItem::SCOPE_COMPANY,
@@ -215,6 +217,8 @@ class CompanyFileController extends Controller
                 $item = FileItem::create([
                     'tenant_id' => $tenant->id,
                     'user_id' => $user->id,
+                    'owner_type' => Tenant::class,
+                    'owner_id' => $tenant->id,
                     'parent_id' => $parentId,
                     'type' => FileItem::TYPE_FILE,
                     'scope' => FileItem::SCOPE_COMPANY,
@@ -310,21 +314,22 @@ class CompanyFileController extends Controller
         abort_unless($isOwner || $canManage, 403, __('files.permission_denied'));
 
         [$notifyInApp, $notifyEmail] = $this->notifyFlags($request);
-        // `user_id` is NOT NULL on file_items, so the owner relation is
-        // always set — no defensive null-check needed.
-        $owner = $file->user;
+        // `user_id` is NOT NULL on file_items, so the uploader relation is
+        // always set — no defensive null-check needed. (For company files the
+        // polymorphic owner is the Tenant; `$file->user` is the uploader.)
+        $uploader = $file->user;
 
         $parentIdBeforeDelete = $file->parent_id;
         $file->delete();
         $this->usage->recomputeForTenant($tenant);
         CompanyFilesCache::bump($tenant->id, 'item_deleted', $parentIdBeforeDelete);
-        // Owner's personal denormalized usage doesn't change for native
+        // Uploader's personal denormalized usage doesn't change for native
         // company files (they weren't billable to the user), but keeping the
         // recompute path consistent costs one query and avoids drift.
-        $this->usage->recomputeForUser($owner);
+        $this->usage->recomputeForUser($uploader);
 
         if (! $isOwner && ($notifyInApp || $notifyEmail)) {
-            $owner->notify(new CompanyFileDeletedByAdminNotification(
+            $uploader->notify(new CompanyFileDeletedByAdminNotification(
                 fileName: $file->name,
                 tenantId: $tenant->id,
                 tenantName: $tenant->name,
@@ -362,11 +367,13 @@ class CompanyFileController extends Controller
 
         // file_items.user_id is NOT NULL (see migration), so the relation
         // is always resolved. phpstan enforces this from the phpdoc.
-        $owner = $fileItem->user;
-        $isOwner = $owner->id === $user->id;
+        // For company files the polymorphic owner is the Tenant; `$fileItem->user`
+        // is the uploader, which is what we compare and notify here.
+        $uploader = $fileItem->user;
+        $isUploader = $uploader->id === $user->id;
         $canManage = $this->canManageCompanyFiles($user, $tenant);
 
-        abort_unless($isOwner || $canManage, 403, __('files.permission_denied'));
+        abort_unless($isUploader || $canManage, 403, __('files.permission_denied'));
 
         [$notifyInApp, $notifyEmail] = $this->notifyFlags($request);
         $fileName = $fileItem->name;
@@ -375,11 +382,11 @@ class CompanyFileController extends Controller
         $this->usage->recomputeForTenant($tenant);
         CompanyFilesCache::bump($tenant->id, 'link_removed');
 
-        // Skip the owner notification when the file has been trashed —
-        // the owner is already aware they deleted it, and a separate
-        // admin-unlink notification would only add noise.
-        if (! $isOwner && ! $fileItem->trashed() && ($notifyInApp || $notifyEmail)) {
-            $owner->notify(new CompanyFileUnlinkedByAdminNotification(
+        // Skip the uploader notification when the file has been trashed —
+        // they're already aware they deleted it, and a separate admin-unlink
+        // notification would only add noise.
+        if (! $isUploader && ! $fileItem->trashed() && ($notifyInApp || $notifyEmail)) {
+            $uploader->notify(new CompanyFileUnlinkedByAdminNotification(
                 fileName: $fileName,
                 tenantId: $tenant->id,
                 tenantName: $tenant->name,
